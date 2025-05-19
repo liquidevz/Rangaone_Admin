@@ -1,168 +1,206 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import type { ColumnDef } from "@tanstack/react-table"
-import { type User, fetchUsers, createUser, updateUser, deleteUser, banUser, unbanUser } from "@/lib/api-users"
-import { DataTable } from "@/components/ui/data-table"
-import { Button } from "@/components/ui/button"
-import { UserFormDialog } from "@/components/user-form-dialog"
-import { ConfirmDialog } from "@/components/confirm-dialog"
-import { useToast } from "@/hooks/use-toast"
-import { Badge } from "@/components/ui/badge"
-import { RefreshCw, UserPlus, Edit, Trash2, Ban, UserCheck } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { formatDistanceToNow } from "date-fns"
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
+import { UserFormDialog } from "@/components/user-form-dialog";
+import { useToast } from "@/hooks/use-toast";
+import {
+  type User,
+  banUser,
+  createUser,
+  deleteUser,
+  fetchUsers,
+  unbanUser,
+  updateUser,
+} from "@/lib/api-users";
+import type { ColumnDef } from "@tanstack/react-table";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Ban,
+  Edit,
+  RefreshCw,
+  Trash2,
+  UserCheck,
+  UserPlus,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [userToEdit, setUserToEdit] = useState<User | null>(null)
-  const [userToDelete, setUserToDelete] = useState<User | null>(null)
-  const [userToBan, setUserToBan] = useState<User | null>(null)
-  const [userToUnban, setUserToUnban] = useState<User | null>(null)
-  const { toast } = useToast()
-  const router = useRouter()
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToBan, setUserToBan] = useState<User | null>(null);
+  const [userToUnban, setUserToUnban] = useState<User | null>(null);
+  const { toast } = useToast();
+  const router = useRouter();
+
+  console.log("UsersPage component rendered", users);
 
   // Load users data
   const loadUsers = async () => {
     try {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
 
-      console.log("Loading users...")
-      const data = await fetchUsers()
-      setUsers(data)
+      console.log("Loading users...");
+      const data = await fetchUsers();
+      setUsers(data);
     } catch (err) {
-      console.error("Error loading users:", err)
-      setError(err instanceof Error ? err.message : "Failed to load users")
+      console.error("Error loading users:", err);
+      setError(err instanceof Error ? err.message : "Failed to load users");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    loadUsers()
-  }, [])
+    loadUsers();
+  }, []);
 
   // Handle user creation
   const handleCreateUser = async (userData: any) => {
     try {
-      const newUser = await createUser(userData)
-      setUsers((prev) => [...prev, newUser])
+      const newUser = await createUser(userData);
+      setUsers((prev) => [...prev, newUser]);
       toast({
         title: "User created successfully",
-      })
+      });
     } catch (err) {
-      console.error("Error creating user:", err)
+      console.error("Error creating user:", err);
       toast({
         title: "Failed to create user",
-        description: err instanceof Error ? err.message : "An unknown error occurred",
+        description:
+          err instanceof Error ? err.message : "An unknown error occurred",
         variant: "destructive",
-      })
-      throw err
+      });
+      throw err;
     }
-  }
+  };
 
   // Handle user update
   const handleUpdateUser = async (userData: any) => {
-    if (!userToEdit) return
+    if (!userToEdit) return;
 
     try {
-      const updatedUser = await updateUser(userToEdit._id, userData)
-      setUsers((prev) => prev.map((user) => (user._id === userToEdit._id ? updatedUser : user)))
+      const updatedUser = await updateUser(userToEdit._id, userData);
+      setUsers((prev) =>
+        prev.map((user) => (user._id === userToEdit._id ? updatedUser : user))
+      );
       toast({
         title: "User updated successfully",
-      })
+      });
     } catch (err) {
-      console.error("Error updating user:", err)
+      console.error("Error updating user:", err);
       toast({
         title: "Failed to update user",
-        description: err instanceof Error ? err.message : "An unknown error occurred",
+        description:
+          err instanceof Error ? err.message : "An unknown error occurred",
         variant: "destructive",
-      })
-      throw err
+      });
+      throw err;
     }
-  }
+  };
 
   // Handle user deletion
   const handleDeleteUser = async () => {
-    if (!userToDelete) return
+    if (!userToDelete) return;
 
     try {
-      await deleteUser(userToDelete._id)
-      setUsers((prev) => prev.filter((user) => user._id !== userToDelete._id))
+      await deleteUser(userToDelete._id);
+      setUsers((prev) => prev.filter((user) => user._id !== userToDelete._id));
       toast({
         title: "User deleted successfully",
-      })
+      });
     } catch (err) {
-      console.error("Error deleting user:", err)
+      console.error("Error deleting user:", err);
       toast({
         title: "Failed to delete user",
-        description: err instanceof Error ? err.message : "An unknown error occurred",
+        description:
+          err instanceof Error ? err.message : "An unknown error occurred",
         variant: "destructive",
-      })
+      });
     } finally {
-      setUserToDelete(null)
+      setUserToDelete(null);
     }
-  }
+  };
 
   // Handle user ban
   const handleBanUser = async () => {
-    if (!userToBan) return
+    if (!userToBan) return;
 
     try {
-      await banUser(userToBan._id)
+      await banUser(userToBan._id);
       // Update the user status in the local state
       setUsers((prev) =>
         prev.map((user) =>
-          user._id === userToBan._id ? { ...user, emailVerified: false, status: "inactive", isBanned: true } : user,
-        ),
-      )
+          user._id === userToBan._id
+            ? {
+                ...user,
+                emailVerified: false,
+                status: "inactive",
+                isBanned: true,
+              }
+            : user
+        )
+      );
       toast({
         title: "User banned successfully",
-      })
+      });
     } catch (err) {
-      console.error("Error banning user:", err)
+      console.error("Error banning user:", err);
       toast({
         title: "Failed to ban user",
-        description: err instanceof Error ? err.message : "An unknown error occurred",
+        description:
+          err instanceof Error ? err.message : "An unknown error occurred",
         variant: "destructive",
-      })
+      });
     } finally {
-      setUserToBan(null)
+      setUserToBan(null);
     }
-  }
+  };
 
   // Handle user unban
   const handleUnbanUser = async () => {
-    if (!userToUnban) return
+    if (!userToUnban) return;
 
     try {
-      await unbanUser(userToUnban._id)
+      await unbanUser(userToUnban._id);
       // Update the user status in the local state
       setUsers((prev) =>
         prev.map((user) =>
-          user._id === userToUnban._id ? { ...user, emailVerified: true, status: "active", isBanned: false } : user,
-        ),
-      )
+          user._id === userToUnban._id
+            ? {
+                ...user,
+                emailVerified: true,
+                status: "active",
+                isBanned: false,
+              }
+            : user
+        )
+      );
       toast({
         title: "User unbanned successfully",
-      })
+      });
     } catch (err) {
-      console.error("Error unbanning user:", err)
+      console.error("Error unbanning user:", err);
       toast({
         title: "Failed to unban user",
-        description: err instanceof Error ? err.message : "An unknown error occurred",
+        description:
+          err instanceof Error ? err.message : "An unknown error occurred",
         variant: "destructive",
-      })
+      });
     } finally {
-      setUserToUnban(null)
+      setUserToUnban(null);
     }
-  }
+  };
 
   // Define table columns
   const columns: ColumnDef<User>[] = [
@@ -170,8 +208,8 @@ export default function UsersPage() {
       accessorKey: "username",
       header: "Username",
       cell: ({ row }) => {
-        const username = row.getValue("username") as string
-        return username || row.original.email.split("@")[0]
+        const username = row.getValue("username") as string;
+        return username || row.original.email.split("@")[0];
       },
     },
     {
@@ -182,41 +220,57 @@ export default function UsersPage() {
       accessorKey: "role",
       header: "Role",
       cell: ({ row }) => {
-        const role = row.getValue("role") as string
+        const role = row.getValue("role") as string;
         return role ? (
-          <Badge variant={role === "admin" ? "default" : role === "manager" ? "outline" : "secondary"}>{role}</Badge>
+          <Badge
+            variant={
+              role === "admin"
+                ? "default"
+                : role === "manager"
+                ? "outline"
+                : "secondary"
+            }
+          >
+            {role}
+          </Badge>
         ) : (
           <Badge variant="secondary">user</Badge>
-        )
+        );
       },
     },
     {
       accessorKey: "emailVerified",
       header: "Status",
       cell: ({ row }) => {
-        const emailVerified = row.getValue("emailVerified") as boolean
-        const isBanned = row.original.isBanned
+        const emailVerified = row.getValue("emailVerified") as boolean;
+        const isBanned = row.original.isBanned;
         return (
-          <Badge variant={isBanned ? "destructive" : emailVerified ? "success" : "secondary"}>
+          <Badge
+            variant={
+              isBanned ? "destructive" : emailVerified ? "success" : "secondary"
+            }
+          >
             {isBanned ? "Banned" : emailVerified ? "Active" : "Inactive"}
           </Badge>
-        )
+        );
       },
     },
     {
       accessorKey: "createdAt",
       header: "Created",
       cell: ({ row }) => {
-        const createdAt = row.getValue("createdAt") as string
-        return createdAt ? formatDistanceToNow(new Date(createdAt), { addSuffix: true }) : "Unknown"
+        const createdAt = row.getValue("createdAt") as string;
+        return createdAt
+          ? formatDistanceToNow(new Date(createdAt), { addSuffix: true })
+          : "Unknown";
       },
     },
     {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {
-        const user = row.original
-        const isBanned = !user.emailVerified || user.isBanned
+        const user = row.original;
+        const isBanned = user.banInfo;
 
         return (
           <div className="flex items-center justify-end gap-2">
@@ -224,8 +278,8 @@ export default function UsersPage() {
               variant="ghost"
               size="icon"
               onClick={() => {
-                setUserToEdit(user)
-                setIsEditDialogOpen(true)
+                setUserToEdit(user);
+                setIsEditDialogOpen(true);
               }}
               className="h-8 w-8"
               title="Edit User"
@@ -269,21 +323,30 @@ export default function UsersPage() {
               <span className="sr-only">Delete</span>
             </Button>
           </div>
-        )
+        );
       },
     },
-  ]
+  ];
 
   return (
     <div className="py-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-muted-foreground">Manage user accounts and permissions.</p>
+          <p className="text-muted-foreground">
+            Manage user accounts and permissions.
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadUsers} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadUsers}
+            disabled={loading}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
           <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
@@ -301,19 +364,28 @@ export default function UsersPage() {
       )}
 
       <div className="border rounded-lg">
-        <DataTable columns={columns} data={users} searchColumn="email" isLoading={loading} />
+        <DataTable
+          columns={columns}
+          data={users}
+          searchColumn="email"
+          isLoading={loading}
+        />
       </div>
 
       {/* Create User Dialog */}
-      <UserFormDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onSubmit={handleCreateUser} />
+      <UserFormDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSubmit={handleCreateUser}
+      />
 
       {/* Edit User Dialog */}
       {userToEdit && (
         <UserFormDialog
           open={isEditDialogOpen}
           onOpenChange={(open) => {
-            setIsEditDialogOpen(open)
-            if (!open) setUserToEdit(null)
+            setIsEditDialogOpen(open);
+            if (!open) setUserToEdit(null);
           }}
           onSubmit={handleUpdateUser}
           user={userToEdit}
@@ -327,7 +399,9 @@ export default function UsersPage() {
         onOpenChange={(open) => !open && setUserToDelete(null)}
         onConfirm={handleDeleteUser}
         title="Delete User"
-        description={`Are you sure you want to delete ${userToDelete?.username || userToDelete?.email}? This action cannot be undone.`}
+        description={`Are you sure you want to delete ${
+          userToDelete?.username || userToDelete?.email
+        }? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
       />
@@ -338,7 +412,9 @@ export default function UsersPage() {
         onOpenChange={(open) => !open && setUserToBan(null)}
         onConfirm={handleBanUser}
         title="Ban User"
-        description={`Are you sure you want to ban ${userToBan?.username || userToBan?.email}? They will no longer be able to access the system.`}
+        description={`Are you sure you want to ban ${
+          userToBan?.username || userToBan?.email
+        }? They will no longer be able to access the system.`}
         confirmText="Ban User"
         cancelText="Cancel"
       />
@@ -349,10 +425,12 @@ export default function UsersPage() {
         onOpenChange={(open) => !open && setUserToUnban(null)}
         onConfirm={handleUnbanUser}
         title="Unban User"
-        description={`Are you sure you want to unban ${userToUnban?.username || userToUnban?.email}? They will regain access to the system.`}
+        description={`Are you sure you want to unban ${
+          userToUnban?.username || userToUnban?.email
+        }? They will regain access to the system.`}
         confirmText="Unban User"
         cancelText="Cancel"
       />
     </div>
-  )
+  );
 }

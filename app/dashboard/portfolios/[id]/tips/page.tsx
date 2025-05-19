@@ -1,84 +1,105 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
-import { PlusCircle, Pencil, Trash2, RefreshCw, ArrowLeft, AlertCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { PortfolioTipDialog } from "@/components/portfolio-tip-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  fetchPortfolioTips,
-  fetchPortfolioById,
-  updateTip,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
+import { useToast } from "@/hooks/use-toast";
+import {
   deleteTip,
-  fetchTipById,
+  fetchPortfolioById,
+  fetchPortfolioTips,
   type Portfolio,
   type PortfolioTip,
-  type CreatePortfolioTipRequest,
-} from "@/lib/api"
-import { createPortfolioTip } from "@/lib/api-portfolio-tips" // Import from the new file
-import { PortfolioTipDialog } from "@/components/portfolio-tip-dialog"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DataTable } from "@/components/ui/data-table"
-import type { ColumnDef } from "@tanstack/react-table"
-import { Badge } from "@/components/ui/badge"
-import { formatUsdToInr } from "@/lib/currency"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+} from "@/lib/api";
+import { createTip, CreateTipRequest, Tip, updateTip } from "@/lib/api-tips";
+import { formatUsdToInr } from "@/lib/currency";
+import type { ColumnDef } from "@tanstack/react-table";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Pencil,
+  PlusCircle,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function PortfolioTipsPage() {
-  const params = useParams()
-  const portfolioId = params.id as string
-  const router = useRouter()
-  const { toast } = useToast()
+  const params = useParams();
+  const portfolioId = params.id as string;
+  const router = useRouter();
+  const { toast } = useToast();
 
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
-  const [tips, setTips] = useState<PortfolioTip[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isInvalid, setIsInvalid] = useState(false)
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [selectedTip, setSelectedTip] = useState<PortfolioTip | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [tips, setTips] = useState<PortfolioTip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInvalid, setIsInvalid] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedTip, setSelectedTip] = useState<PortfolioTip | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     // Check if portfolioId is valid
     if (!portfolioId || portfolioId === "undefined") {
-      setIsInvalid(true)
-      setIsLoading(false)
+      setIsInvalid(true);
+      setIsLoading(false);
       toast({
         title: "Invalid Portfolio",
         description: "The portfolio ID is invalid or missing",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     try {
-      console.log(`Loading data for portfolio: ${portfolioId}`)
+      console.log(`Loading data for portfolio: ${portfolioId}`);
 
       // Fetch portfolio data first
       try {
-        const portfolioData = await fetchPortfolioById(portfolioId)
-        setPortfolio(portfolioData)
-        console.log(`Successfully loaded portfolio: ${portfolioData.name}`)
+        const portfolioData = await fetchPortfolioById(portfolioId);
+        setPortfolio(portfolioData);
+        console.log(`Successfully loaded portfolio: ${portfolioData.name}`);
 
         // Then fetch tips for this portfolio
         try {
-          console.log(`Fetching tips for portfolio: ${portfolioId}`)
-          const tipsData = await fetchPortfolioTips(portfolioId)
-          console.log(`Loaded ${tipsData.length} tips for portfolio: ${portfolioId}`)
-          setTips(tipsData)
+          console.log(`Fetching tips for portfolio: ${portfolioId}`);
+          const tipsData = await fetchPortfolioTips(portfolioId);
+          console.log(
+            `Loaded ${tipsData.length} tips for portfolio: ${portfolioId}`
+          );
+          setTips(tipsData);
         } catch (tipsError) {
-          console.error("Error loading portfolio tips:", tipsError)
-          setError(tipsError instanceof Error ? tipsError.message : "Failed to load portfolio tips")
-          setTips([])
+          console.error("Error loading portfolio tips:", tipsError);
+          setError(
+            tipsError instanceof Error
+              ? tipsError.message
+              : "Failed to load portfolio tips"
+          );
+          setTips([]);
         }
       } catch (portfolioError) {
-        console.error("Error loading portfolio:", portfolioError)
-        setError(portfolioError instanceof Error ? portfolioError.message : "Failed to load portfolio")
+        console.error("Error loading portfolio:", portfolioError);
+        setError(
+          portfolioError instanceof Error
+            ? portfolioError.message
+            : "Failed to load portfolio"
+        );
 
         // Check if we should mark the portfolio as invalid
         if (
@@ -87,23 +108,24 @@ export default function PortfolioTipsPage() {
             portfolioError.message.includes("Portfolio not found") ||
             portfolioError.message.includes("Server returned 404"))
         ) {
-          setIsInvalid(true)
+          setIsInvalid(true);
           toast({
             title: "Portfolio Not Found",
             description: "The requested portfolio could not be found",
             variant: "destructive",
-          })
+          });
         }
       }
     } catch (error) {
-      console.error("Error loading data:", error)
-      setError(error instanceof Error ? error.message : "An error occurred")
+      console.error("Error loading data:", error);
+      setError(error instanceof Error ? error.message : "An error occurred");
 
       toast({
         title: "Error loading data",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
+      });
 
       // If we can't fetch the portfolio, it might not exist
       if (
@@ -112,230 +134,265 @@ export default function PortfolioTipsPage() {
           error.message.includes("Portfolio not found") ||
           error.message.includes("Server returned 404"))
       ) {
-        setIsInvalid(true)
+        setIsInvalid(true);
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    loadData()
-  }, [portfolioId])
+    loadData();
+  }, [portfolioId]);
 
-  const handleCreateTip = async (tipData: CreatePortfolioTipRequest) => {
+  const handleCreateTip = async (tipData: CreateTipRequest) => {
     if (!portfolioId || portfolioId === "undefined") {
       toast({
         title: "Invalid Portfolio",
         description: "Cannot create a tip for an invalid portfolio",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     try {
-      console.log(`Creating tip for portfolio ${portfolioId}:`, tipData)
+      console.log(`Creating tip for portfolio ${portfolioId}:`, tipData);
 
       // Show loading toast
       toast({
         title: "Creating Tip",
         description: "Please wait while we create your tip...",
-      })
+      });
 
-      const createdTip = await createPortfolioTip(portfolioId, tipData)
+      const createdTip = await createTip(portfolioId, tipData);
 
-      console.log("Tip created successfully:", createdTip)
+      console.log("Tip created successfully:", createdTip);
 
       toast({
         title: "Tip Created",
         description: "Portfolio tip has been created successfully",
-      })
+      });
 
       // Refresh the tips list
-      loadData()
+      loadData();
     } catch (error) {
-      console.error("Error creating tip:", error)
+      console.error("Error creating tip:", error);
 
       toast({
         title: "Failed to create tip",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
-  const handleEditTip = async (tipData: CreatePortfolioTipRequest) => {
-    if (!selectedTip) return
+  const handleEditTip = async (tipData: CreateTipRequest) => {
+    if (!selectedTip) return;
 
     try {
-      await updateTip(selectedTip._id, tipData)
+      await updateTip(selectedTip.id, tipData);
       toast({
         title: "Tip Updated",
         description: "Portfolio tip has been updated successfully",
-      })
-      loadData()
+      });
+      loadData();
     } catch (error) {
-      console.error("Error updating tip:", error)
+      console.error("Error updating tip:", error);
 
       toast({
         title: "Failed to update tip",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
+      });
 
-      throw error
+      throw error;
     }
-  }
+  };
 
   const handleDeleteTip = async () => {
-    if (!selectedTip) return
+    if (!selectedTip) return;
 
     try {
-      await deleteTip(selectedTip._id)
+      await deleteTip(selectedTip.id);
+
       toast({
         title: "Tip Deleted",
-        description: "Portfolio tip has been deleted successfully",
-      })
-      setDeleteDialogOpen(false)
-      loadData()
+        description: "Investment tip has been deleted successfully",
+      });
+
+      setDeleteDialogOpen(false);
+
+      if (selectedTip) {
+        loadData();
+      }
     } catch (error) {
-      console.error("Error deleting tip:", error)
+      console.error("Error deleting tip:", error);
       toast({
         title: "Failed to delete tip",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
-  const openEditDialog = async (id: string) => {
+  const openEditDialog = async (tip: Tip) => {
     try {
-      const tip = await fetchTipById(id)
-      setSelectedTip(tip)
-      setEditDialogOpen(true)
+      // const tip = await fetchTipById(id);
+      setSelectedTip(tip);
+      setEditDialogOpen(true);
     } catch (error) {
-      console.error("Error fetching tip:", error)
+      console.error("Error fetching tip:", error);
       toast({
         title: "Failed to load tip",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const openDeleteDialog = (tip: PortfolioTip) => {
-    setSelectedTip(tip)
-    setDeleteDialogOpen(true)
-  }
+    setSelectedTip(tip);
+    setDeleteDialogOpen(true);
+  };
 
   const getTypeColor = (type: string) => {
     switch (type?.toLowerCase()) {
       case "buy":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "sell":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       case "hold":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "inactive":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
-  }
+  };
 
   const columns: ColumnDef<PortfolioTip>[] = [
     {
       accessorKey: "title",
       header: "Title",
-      cell: ({ row }) => <div className="font-medium">{row.getValue("title")}</div>,
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("title")}</div>
+      ),
     },
     {
       accessorKey: "content",
       header: "Content",
       cell: ({ row }) => {
-        const content = row.getValue("content") as string
+        const content = row.getValue("content") as string;
         return (
           <div className="max-w-[120px] sm:max-w-[200px] md:max-w-[300px] truncate">
-            {content || <span className="text-muted-foreground italic">No content</span>}
+            {content || (
+              <span className="text-muted-foreground italic">No content</span>
+            )}
           </div>
-        )
+        );
       },
     },
     {
       accessorKey: "type",
       header: "Type",
       cell: ({ row }) => {
-        const type = row.getValue("type") as string
+        const type = row.getValue("type") as string;
         return type ? (
-          <Badge className={getTypeColor(type)}>{type.charAt(0).toUpperCase() + type.slice(1)}</Badge>
+          <Badge className={getTypeColor(type)}>
+            {type.charAt(0).toUpperCase() + type.slice(1)}
+          </Badge>
         ) : (
           <span className="text-muted-foreground">General</span>
-        )
+        );
       },
     },
     {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("status") as string
+        const status = row.getValue("status") as string;
         return status ? (
-          <Badge className={getStatusColor(status)}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>
+          <Badge className={getStatusColor(status)}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Badge>
         ) : (
           <span className="text-muted-foreground">-</span>
-        )
+        );
       },
     },
     {
       accessorKey: "targetPrice",
       header: "Target Price",
       cell: ({ row }) => {
-        const targetPrice = row.getValue("targetPrice") as number
-        return targetPrice ? <div>{formatUsdToInr(targetPrice)}</div> : <span className="text-muted-foreground">-</span>
+        const targetPrice = row.getValue("targetPrice") as number;
+        return targetPrice ? (
+          <div>{formatUsdToInr(targetPrice)}</div>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
       },
     },
     {
       accessorKey: "createdAt",
       header: "Created",
       cell: ({ row }) => {
-        const date = row.getValue("createdAt") as string
-        return <div>{new Date(date).toLocaleDateString()}</div>
+        const date = row.original.createdAt as string;
+
+        console.log("Created date:", row.original);
+        return <div>{new Date(date).toLocaleDateString()}</div>;
       },
     },
     {
       id: "actions",
       cell: ({ row }) => {
-        const tip = row.original
+        const tip = row.original;
 
         return (
           <div className="flex items-center justify-end space-x-2">
-            <Button variant="ghost" size="icon" onClick={() => openEditDialog(tip._id)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openEditDialog(tip)}
+            >
               <Pencil className="h-4 w-4" />
               <span className="sr-only">Edit</span>
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(tip)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openDeleteDialog(tip)}
+            >
               <Trash2 className="h-4 w-4" />
               <span className="sr-only">Delete</span>
             </Button>
           </div>
-        )
+        );
       },
     },
-  ]
+  ];
 
   // Show an error message if the portfolio ID is invalid
   if (isInvalid) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" className="mb-2" onClick={() => router.push("/dashboard/portfolios")}>
+        <Button
+          variant="ghost"
+          className="mb-2"
+          onClick={() => router.push("/dashboard/portfolios")}
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Portfolios
         </Button>
@@ -345,26 +402,37 @@ export default function PortfolioTipsPage() {
             <div className="mb-4 text-center">
               <h2 className="text-xl font-semibold">Invalid Portfolio</h2>
               <p className="text-muted-foreground mt-2">
-                The portfolio you're trying to access doesn't exist or you don't have permission to view it.
+                The portfolio you're trying to access doesn't exist or you don't
+                have permission to view it.
               </p>
             </div>
-            <Button onClick={() => router.push("/dashboard/portfolios")}>Return to Portfolios</Button>
+            <Button onClick={() => router.push("/dashboard/portfolios")}>
+              Return to Portfolios
+            </Button>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <Button variant="ghost" className="mb-2" onClick={() => router.back()}>
+          <Button
+            variant="ghost"
+            className="mb-2"
+            onClick={() => router.back()}
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold">{portfolio ? `Tips for ${portfolio.name}` : "Portfolio Tips"}</h1>
-          <p className="text-muted-foreground">Manage investment tips for this portfolio</p>
+          <h1 className="text-3xl font-bold">
+            {portfolio ? `Tips for ${portfolio.name}` : "Portfolio Tips"}
+          </h1>
+          <p className="text-muted-foreground">
+            Manage investment tips for this portfolio
+          </p>
         </div>
         <div className="flex space-x-2">
           <Button onClick={() => loadData()} variant="outline">
@@ -381,7 +449,9 @@ export default function PortfolioTipsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Portfolio Tips</CardTitle>
-          <CardDescription>View and manage investment tips for this portfolio</CardDescription>
+          <CardDescription>
+            View and manage investment tips for this portfolio
+          </CardDescription>
         </CardHeader>
         <CardContent className="px-0 sm:px-6">
           {error && !isInvalid && (
@@ -397,8 +467,14 @@ export default function PortfolioTipsPage() {
             </div>
           ) : tips.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No tips found for this portfolio.</p>
-              <Button variant="outline" className="mt-4" onClick={() => setCreateDialogOpen(true)}>
+              <p className="text-muted-foreground">
+                No tips found for this portfolio.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => setCreateDialogOpen(true)}
+              >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Your First Tip
               </Button>
@@ -431,6 +507,16 @@ export default function PortfolioTipsPage() {
       )}
 
       {/* Delete Confirmation Dialog */}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteTip}
+        title="Delete Investment Tip"
+        description={`Are you sure you want to delete this tip? This action cannot be undone.`}
+        confirmText="Delete"
+      />
     </div>
-  )
+  );
 }

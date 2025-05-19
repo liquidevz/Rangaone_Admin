@@ -1,4 +1,5 @@
 import { API_BASE_URL, fetchWithAuth, getAdminAccessToken } from "@/lib/auth";
+import { User } from "./api-users";
 
 // Configuration Types
 export interface Config {
@@ -1260,15 +1261,13 @@ export const deleteTip = async (tipId: string): Promise<void> => {
 // Subscription Types
 export interface Subscription {
   id: string;
-  userId: string;
-  portfolioId: string;
-  status: string;
-  startDate: string;
-  endDate: string;
-  amount: number;
-  paymentId?: string;
+  isActive: boolean;
+  lastPaidAt?: string;
+  missedCycles?: number;
   createdAt: string;
   updatedAt: string;
+  user?: User;
+  portfolio?: Portfolio;
 }
 
 export interface PaymentHistory {
@@ -1319,7 +1318,9 @@ export const fetchSubscriptions = async (): Promise<Subscription[]> => {
       throw new Error(error.message || "Failed to fetch subscriptions");
     }
 
-    return await response.json();
+    const finalData = await response.json();
+
+    return finalData?.subscriptions || [];
   } catch (error) {
     console.error("Error fetching subscriptions:", error);
     // Return mock data as fallback for any error

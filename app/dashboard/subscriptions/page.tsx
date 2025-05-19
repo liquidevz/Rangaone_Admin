@@ -1,328 +1,356 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
-import { useToast } from "@/hooks/use-toast"
-import { PlusCircle, RefreshCw, CheckCircle, XCircle, CreditCard } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { PaymentVerificationDialog } from "@/components/payment-verification-dialog";
+import { SubscriptionFormDialog } from "@/components/subscription-form-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  fetchSubscriptions,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import {
   fetchPaymentHistory,
+  fetchSubscriptions,
   updateSubscriptionStatus,
-  type Subscription,
   type PaymentHistory,
-} from "@/lib/api"
-import { SubscriptionFormDialog } from "@/components/subscription-form-dialog"
-import { PaymentVerificationDialog } from "@/components/payment-verification-dialog"
-import { ConfirmDialog } from "@/components/confirm-dialog"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DataTable } from "@/components/ui/data-table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { ColumnDef } from "@tanstack/react-table"
-import { Badge } from "@/components/ui/badge"
-import { formatUsdToInr } from "@/lib/currency"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+  type Subscription,
+} from "@/lib/api";
+import { formatUsdToInr } from "@/lib/currency";
+import type { ColumnDef } from "@tanstack/react-table";
+import {
+  AlertCircle,
+  CreditCard,
+  PlusCircle,
+  RefreshCw,
+  XCircle,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 export default function SubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("subscriptions")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false)
-  const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null)
-  const [orderData, setOrderData] = useState<{ orderId: string; amount: number; currency: string } | null>(null)
-  const [newStatus, setNewStatus] = useState<string>("")
-  const [usingMockData, setUsingMockData] = useState({ subscriptions: false, payments: false })
-  const { toast } = useToast()
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("subscriptions");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] =
+    useState<Subscription | null>(null);
+  const [orderData, setOrderData] = useState<{
+    orderId: string;
+    amount: number;
+    currency: string;
+  } | null>(null);
+  const [newStatus, setNewStatus] = useState<string>("");
+  const [usingMockData, setUsingMockData] = useState({
+    subscriptions: false,
+    payments: false,
+  });
+  const { toast } = useToast();
+
+  console.log("SubscriptionsPage component rendered", subscriptions);
 
   // Update the loadData function to handle errors better
   const loadData = useCallback(async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // Fetch subscriptions first
-      let subscriptionsData: Subscription[] = []
-      let usingMockSubscriptions = false
+      let subscriptionsData: Subscription[] = [];
+      let usingMockSubscriptions = false;
       try {
-        subscriptionsData = await fetchSubscriptions()
-        // Check if we're using mock data by looking at the IDs
-        usingMockSubscriptions = subscriptionsData.length > 0 && subscriptionsData[0].id.startsWith("sub_mock")
+        subscriptionsData = await fetchSubscriptions();
       } catch (error) {
-        console.error("Error loading subscriptions:", error)
+        console.error("Error loading subscriptions:", error);
         toast({
           title: "Failed to load subscriptions",
           description: "Using mock data instead",
           variant: "destructive",
-        })
+        });
         // Use empty array as fallback
-        subscriptionsData = []
-        usingMockSubscriptions = true
+        subscriptionsData = [];
+        usingMockSubscriptions = true;
       }
 
       // Then fetch payment history
-      let paymentHistoryData: PaymentHistory[] = []
-      let usingMockPayments = false
+      let paymentHistoryData: PaymentHistory[] = [];
+      let usingMockPayments = false;
       try {
-        paymentHistoryData = await fetchPaymentHistory()
+        paymentHistoryData = await fetchPaymentHistory();
         // Check if we're using mock data by looking at the IDs
-        usingMockPayments = paymentHistoryData.length > 0 && paymentHistoryData[0].id.startsWith("pay_mock")
+        usingMockPayments =
+          paymentHistoryData.length > 0 &&
+          paymentHistoryData[0].id.startsWith("pay_mock");
       } catch (error) {
-        console.error("Error loading payment history:", error)
+        console.error("Error loading payment history:", error);
         // This shouldn't happen now with our fallback, but just in case
-        paymentHistoryData = []
-        usingMockPayments = true
+        paymentHistoryData = [];
+        usingMockPayments = true;
       }
 
-      setSubscriptions(subscriptionsData)
-      setPaymentHistory(paymentHistoryData)
+      console.log("Fetched subscriptions:", subscriptionsData);
+      setSubscriptions(subscriptionsData);
+      setPaymentHistory(paymentHistoryData);
       setUsingMockData({
         subscriptions: usingMockSubscriptions,
         payments: usingMockPayments,
-      })
+      });
     } catch (error) {
-      console.error("Error loading data:", error)
+      console.error("Error loading data:", error);
       toast({
         title: "Failed to load data",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
-      setUsingMockData({ subscriptions: true, payments: true })
+      });
+      setUsingMockData({ subscriptions: true, payments: true });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [toast])
+  }, [toast]);
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadData();
+  }, [loadData]);
 
-  const handleCreateOrderSuccess = (data: { orderId: string; amount: number; currency: string }) => {
-    setOrderData(data)
-    setVerifyDialogOpen(true)
-  }
+  const handleCreateOrderSuccess = (data: {
+    orderId: string;
+    amount: number;
+    currency: string;
+  }) => {
+    setOrderData(data);
+    setVerifyDialogOpen(true);
+  };
 
   const handleVerifyPaymentSuccess = () => {
-    loadData()
-  }
+    loadData();
+  };
 
   const openStatusDialog = (subscription: Subscription, status: string) => {
-    setSelectedSubscription(subscription)
-    setNewStatus(status)
-    setStatusDialogOpen(true)
-  }
+    setSelectedSubscription(subscription);
+    setNewStatus(status);
+    setStatusDialogOpen(true);
+  };
 
   const handleUpdateStatus = async () => {
-    if (!selectedSubscription || !newStatus) return
+    if (!selectedSubscription || !newStatus) return;
 
     try {
-      await updateSubscriptionStatus(selectedSubscription.id, newStatus)
+      await updateSubscriptionStatus(selectedSubscription.id, newStatus);
       toast({
         title: "Status Updated",
         description: `Subscription status has been updated to ${newStatus}`,
-      })
-      setStatusDialogOpen(false)
-      loadData()
+      });
+      setStatusDialogOpen(false);
+      loadData();
     } catch (error) {
-      console.error("Error updating subscription status:", error)
+      console.error("Error updating subscription status:", error);
       toast({
         title: "Failed to update status",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       case "cancelled":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       case "expired":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
       default:
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
     }
-  }
+  };
 
   const getPaymentStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "completed":
       case "success":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       case "failed":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
-  }
+  };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A"
-    return new Date(dateString).toLocaleDateString()
-  }
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString();
+  };
 
   const subscriptionColumns: ColumnDef<Subscription>[] = [
     {
       accessorKey: "id",
       header: "ID",
-      cell: ({ row }) => <div className="font-mono text-xs truncate max-w-[100px]">{row.getValue("id")}</div>,
+      cell: ({ row }) => (
+        <div className="font-mono text-xs truncate max-w-[100px]">
+          {row.original._id}
+        </div>
+      ),
     },
     {
       accessorKey: "userId",
       header: "User ID",
-      cell: ({ row }) => <div className="font-mono text-xs truncate max-w-[100px]">{row.getValue("userId")}</div>,
+      cell: ({ row }) => (
+        <div className="font-mono text-xs truncate max-w-[100px]">
+          {row.original.user?._id}
+        </div>
+      ),
     },
     {
       accessorKey: "portfolioId",
       header: "Portfolio ID",
-      cell: ({ row }) => <div className="font-mono text-xs truncate max-w-[100px]">{row.getValue("portfolioId")}</div>,
+      cell: ({ row }) => (
+        <div className="font-mono text-xs truncate max-w-[100px]">
+          {row.original.portfolio?._id}
+        </div>
+      ),
     },
     {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("status") as string
-        return status ? (
-          <Badge className={getStatusColor(status)}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )
+        return (
+          <Badge
+            className={getStatusColor(
+              row.original.isActive ? "active" : "inactive"
+            )}
+          >
+            {row.original.isActive ? "Active" : "Inactive"}
+          </Badge>
+        );
       },
     },
     {
-      accessorKey: "amount",
-      header: "Amount",
+      accessorKey: "lastPaidAt",
+      header: "Payment Date",
       cell: ({ row }) => {
-        const amount = row.getValue("amount") as number
-        return <div>{formatUsdToInr(amount)}</div>
+        return <div>{row.original.lastPaidAt || "N/A"}</div>;
       },
-    },
-    {
-      accessorKey: "startDate",
-      header: "Start Date",
-      cell: ({ row }) => <div>{formatDate(row.getValue("startDate") as string)}</div>,
-    },
-    {
-      accessorKey: "endDate",
-      header: "End Date",
-      cell: ({ row }) => <div>{formatDate(row.getValue("endDate") as string)}</div>,
     },
     {
       id: "actions",
       cell: ({ row }) => {
-        const subscription = row.original
-        const status = subscription.status?.toLowerCase()
-
-        // Disable actions for mock data
-        if (usingMockData.subscriptions) {
-          return (
-            <div className="flex items-center justify-end space-x-2">
-              <Button variant="ghost" size="icon" disabled title="Actions disabled for mock data">
-                <CheckCircle className="h-4 w-4" />
-                <span className="sr-only">Action</span>
-              </Button>
-            </div>
-          )
-        }
+        const subscription = row.original;
 
         return (
           <div className="flex items-center justify-end space-x-2">
-            {status === "pending" && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => openStatusDialog(subscription, "active")}
-                title="Activate Subscription"
-              >
-                <CheckCircle className="h-4 w-4" />
-                <span className="sr-only">Activate</span>
-              </Button>
-            )}
-            {status === "active" && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => openStatusDialog(subscription, "cancelled")}
-                title="Cancel Subscription"
-              >
-                <XCircle className="h-4 w-4" />
-                <span className="sr-only">Cancel</span>
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openStatusDialog(subscription, "cancelled")}
+              title="Cancel Subscription"
+            >
+              <XCircle className="h-4 w-4" />
+              <span className="sr-only">Cancel</span>
+            </Button>
           </div>
-        )
+        );
       },
     },
-  ]
+  ];
 
   const paymentHistoryColumns: ColumnDef<PaymentHistory>[] = [
     {
       accessorKey: "id",
       header: "ID",
-      cell: ({ row }) => <div className="font-mono text-xs truncate max-w-[100px]">{row.getValue("id")}</div>,
+      cell: ({ row }) => (
+        <div className="font-mono text-xs truncate max-w-[100px]">
+          {row.getValue("id")}
+        </div>
+      ),
     },
     {
       accessorKey: "userId",
       header: "User ID",
-      cell: ({ row }) => <div className="font-mono text-xs truncate max-w-[100px]">{row.getValue("userId")}</div>,
+      cell: ({ row }) => (
+        <div className="font-mono text-xs truncate max-w-[100px]">
+          {row.getValue("userId")}
+        </div>
+      ),
     },
     {
       accessorKey: "portfolioId",
       header: "Portfolio ID",
-      cell: ({ row }) => <div className="font-mono text-xs truncate max-w-[100px]">{row.getValue("portfolioId")}</div>,
+      cell: ({ row }) => (
+        <div className="font-mono text-xs truncate max-w-[100px]">
+          {row.getValue("portfolioId")}
+        </div>
+      ),
     },
     {
       accessorKey: "amount",
       header: "Amount",
       cell: ({ row }) => {
-        const amount = row.getValue("amount") as number
-        return <div>{formatUsdToInr(amount)}</div>
+        const amount = row.getValue("amount") as number;
+        return <div>{formatUsdToInr(amount)}</div>;
       },
     },
     {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("status") as string
+        const status = row.getValue("status") as string;
         return status ? (
-          <Badge className={getPaymentStatusColor(status)}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>
+          <Badge className={getPaymentStatusColor(status)}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Badge>
         ) : (
           <span className="text-muted-foreground">-</span>
-        )
+        );
       },
     },
     {
       accessorKey: "paymentMethod",
       header: "Payment Method",
       cell: ({ row }) => {
-        const method = row.getValue("paymentMethod") as string
-        return <div>{method || "N/A"}</div>
+        const method = row.getValue("paymentMethod") as string;
+        return <div>{method || "N/A"}</div>;
       },
     },
     {
       accessorKey: "createdAt",
       header: "Date",
-      cell: ({ row }) => <div>{formatDate(row.getValue("createdAt") as string)}</div>,
+      cell: ({ row }) => (
+        <div>{formatDate(row.getValue("createdAt") as string)}</div>
+      ),
     },
     {
       accessorKey: "orderId",
       header: "Order ID",
-      cell: ({ row }) => <div className="font-mono text-xs truncate max-w-[100px]">{row.getValue("orderId")}</div>,
+      cell: ({ row }) => (
+        <div className="font-mono text-xs truncate max-w-[100px]">
+          {row.getValue("orderId")}
+        </div>
+      ),
     },
-  ]
+  ];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Subscription Management</h1>
-          <p className="text-muted-foreground">Manage user subscriptions and payments</p>
+          <p className="text-muted-foreground">
+            Manage user subscriptions and payments
+          </p>
         </div>
         <div className="flex space-x-2">
           <Button onClick={() => loadData()} variant="outline">
@@ -350,7 +378,8 @@ export default function SubscriptionsPage() {
                 View and manage user subscriptions
                 {usingMockData.subscriptions && (
                   <span className="block mt-1 text-xs text-amber-500">
-                    Note: Showing mock data as the subscriptions API is not available
+                    Note: Showing mock data as the subscriptions API is not
+                    available
                   </span>
                 )}
               </CardDescription>
@@ -361,7 +390,8 @@ export default function SubscriptionsPage() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Using Mock Data</AlertTitle>
                   <AlertDescription>
-                    The subscription data shown is mock data. The API returned an HTML response instead of JSON.
+                    The subscription data shown is mock data. The API returned
+                    an HTML response instead of JSON.
                   </AlertDescription>
                 </Alert>
               )}
@@ -373,9 +403,17 @@ export default function SubscriptionsPage() {
               ) : subscriptions.length === 0 ? (
                 <div className="text-center py-8">
                   <CreditCard className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-4 text-lg font-semibold">No Subscriptions Found</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">There are no subscriptions in the system yet.</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setCreateDialogOpen(true)}>
+                  <h3 className="mt-4 text-lg font-semibold">
+                    No Subscriptions Found
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    There are no subscriptions in the system yet.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setCreateDialogOpen(true)}
+                  >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Create New Order
                   </Button>
@@ -395,7 +433,8 @@ export default function SubscriptionsPage() {
                 View payment history for all subscriptions
                 {usingMockData.payments && (
                   <span className="block mt-1 text-xs text-amber-500">
-                    Note: Showing mock data as the payment history API is not available
+                    Note: Showing mock data as the payment history API is not
+                    available
                   </span>
                 )}
               </CardDescription>
@@ -406,7 +445,8 @@ export default function SubscriptionsPage() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Using Mock Data</AlertTitle>
                   <AlertDescription>
-                    The payment history shown is mock data. The API returned an HTML response instead of JSON.
+                    The payment history shown is mock data. The API returned an
+                    HTML response instead of JSON.
                   </AlertDescription>
                 </Alert>
               )}
@@ -418,11 +458,18 @@ export default function SubscriptionsPage() {
               ) : paymentHistory.length === 0 ? (
                 <div className="text-center py-8">
                   <CreditCard className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-4 text-lg font-semibold">No Payment History</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">There are no payment records in the system yet.</p>
+                  <h3 className="mt-4 text-lg font-semibold">
+                    No Payment History
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    There are no payment records in the system yet.
+                  </p>
                 </div>
               ) : (
-                <DataTable columns={paymentHistoryColumns} data={paymentHistory} />
+                <DataTable
+                  columns={paymentHistoryColumns}
+                  data={paymentHistory}
+                />
               )}
             </CardContent>
           </Card>
@@ -450,9 +497,15 @@ export default function SubscriptionsPage() {
         onOpenChange={setStatusDialogOpen}
         onConfirm={handleUpdateStatus}
         title={`${newStatus === "active" ? "Activate" : "Cancel"} Subscription`}
-        description={`Are you sure you want to ${newStatus === "active" ? "activate" : "cancel"} this subscription? This will ${newStatus === "active" ? "enable" : "disable"} access to the portfolio.`}
-        confirmText={newStatus === "active" ? "Activate" : "Cancel Subscription"}
+        description={`Are you sure you want to ${
+          newStatus === "active" ? "activate" : "cancel"
+        } this subscription? This will ${
+          newStatus === "active" ? "enable" : "disable"
+        } access to the portfolio.`}
+        confirmText={
+          newStatus === "active" ? "Activate" : "Cancel Subscription"
+        }
       />
     </div>
-  )
+  );
 }

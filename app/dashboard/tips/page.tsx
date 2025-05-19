@@ -36,7 +36,6 @@ import {
   fetchTipById,
   getMockTips,
   updateTip,
-  usingMockData,
   type CreateTipRequest,
   type Tip,
 } from "@/lib/api-tips";
@@ -66,7 +65,6 @@ export default function TipsManagementPage() {
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [isMockData, setIsMockData] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
 
@@ -91,7 +89,6 @@ export default function TipsManagementPage() {
       const tipsData = await fetchPortfolioTips(portfolioId);
       setTips(tipsData);
       setFilteredTips(tipsData);
-      setIsMockData(usingMockData);
     } catch (error) {
       console.error("Error loading tips:", error);
 
@@ -112,7 +109,6 @@ export default function TipsManagementPage() {
       );
       setTips(mockTips);
       setFilteredTips(mockTips);
-      setIsMockData(true);
     } finally {
       setIsLoading(false);
     }
@@ -532,18 +528,6 @@ export default function TipsManagementPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Mock data alert */}
-        {isMockData && (
-          <Alert variant="warning" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Using Mock Data</AlertTitle>
-            <AlertDescription>
-              Unable to connect to the API. Using mock data instead. Some
-              features may be limited.
-            </AlertDescription>
           </Alert>
         )}
 
