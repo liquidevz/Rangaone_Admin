@@ -199,17 +199,12 @@ export default function TipsManagementPage() {
 
       toast({
         title: "Tip Created",
-        description: isMockData
-          ? "Investment tip has been created (using mock data)"
-          : "Investment tip has been created successfully",
+        description: "Investment tip has been created successfully",
       });
 
       // If we're using mock data, manually add the new tip to our list
-      if (isMockData) {
-        setTips((prev) => [newTip, ...prev]);
-      } else {
-        loadData();
-      }
+
+      loadData();
     } catch (error) {
       console.error("Error creating tip:", error);
       toast({
@@ -230,21 +225,12 @@ export default function TipsManagementPage() {
 
       toast({
         title: "Tip Updated",
-        description: isMockData
-          ? "Investment tip has been updated (using mock data)"
-          : "Investment tip has been updated successfully",
+        description: "Investment tip has been updated successfully",
       });
 
       // If we're using mock data, manually update the tip in our list
-      if (isMockData) {
-        setTips((prev) =>
-          prev.map((tip) =>
-            tip._id === selectedTip._id ? { ...tip, ...updatedTip } : tip
-          )
-        );
-      } else {
-        loadData();
-      }
+
+      loadData();
     } catch (error) {
       console.error("Error updating tip:", error);
       toast({
@@ -265,19 +251,14 @@ export default function TipsManagementPage() {
 
       toast({
         title: "Tip Deleted",
-        description: isMockData
-          ? "Investment tip has been deleted (using mock data)"
-          : "Investment tip has been deleted successfully",
+        description: "Investment tip has been deleted successfully",
       });
 
       setDeleteDialogOpen(false);
 
       // If we're using mock data, manually remove the tip from our list
-      if (isMockData) {
-        setTips((prev) => prev.filter((tip) => tip._id !== selectedTip._id));
-      } else {
-        loadData();
-      }
+
+      loadData();
     } catch (error) {
       console.error("Error deleting tip:", error);
       toast({
