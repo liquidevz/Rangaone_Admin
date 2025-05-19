@@ -1271,9 +1271,10 @@ export interface Subscription {
 }
 
 export interface PaymentHistory {
-  id: string;
-  userId: string;
-  portfolioId: string;
+  _id: string;
+  user: string;
+  portfolio: string;
+  subscription: string;
   amount: number;
   currency: string;
   status: string;

@@ -139,18 +139,8 @@ export default function UsersPage() {
     try {
       await banUser(userToBan._id);
       // Update the user status in the local state
-      setUsers((prev) =>
-        prev.map((user) =>
-          user._id === userToBan._id
-            ? {
-                ...user,
-                emailVerified: false,
-                status: "inactive",
-                isBanned: true,
-              }
-            : user
-        )
-      );
+
+      await loadUsers();
       toast({
         title: "User banned successfully",
       });
@@ -173,19 +163,8 @@ export default function UsersPage() {
 
     try {
       await unbanUser(userToUnban._id);
-      // Update the user status in the local state
-      setUsers((prev) =>
-        prev.map((user) =>
-          user._id === userToUnban._id
-            ? {
-                ...user,
-                emailVerified: true,
-                status: "active",
-                isBanned: false,
-              }
-            : user
-        )
-      );
+
+      await loadUsers();
       toast({
         title: "User unbanned successfully",
       });

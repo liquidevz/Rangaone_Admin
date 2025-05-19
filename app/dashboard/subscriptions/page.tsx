@@ -23,7 +23,6 @@ import {
   type PaymentHistory,
   type Subscription,
 } from "@/lib/api";
-import { formatUsdToInr } from "@/lib/currency";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertCircle,
@@ -84,10 +83,6 @@ export default function SubscriptionsPage() {
       let usingMockPayments = false;
       try {
         paymentHistoryData = await fetchPaymentHistory();
-        // Check if we're using mock data by looking at the IDs
-        usingMockPayments =
-          paymentHistoryData.length > 0 &&
-          paymentHistoryData[0].id.startsWith("pay_mock");
       } catch (error) {
         console.error("Error loading payment history:", error);
         // This shouldn't happen now with our fallback, but just in case
@@ -95,7 +90,7 @@ export default function SubscriptionsPage() {
         usingMockPayments = true;
       }
 
-      console.log("Fetched subscriptions:", subscriptionsData);
+      console.log("Fetched subscriptions:", paymentHistoryData);
       setSubscriptions(subscriptionsData);
       setPaymentHistory(paymentHistoryData);
       setUsingMockData({
@@ -273,7 +268,7 @@ export default function SubscriptionsPage() {
       header: "ID",
       cell: ({ row }) => (
         <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.getValue("id")}
+          {row.original._id}
         </div>
       ),
     },
@@ -282,7 +277,7 @@ export default function SubscriptionsPage() {
       header: "User ID",
       cell: ({ row }) => (
         <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.getValue("userId")}
+          {row.original.user}
         </div>
       ),
     },
@@ -291,7 +286,7 @@ export default function SubscriptionsPage() {
       header: "Portfolio ID",
       cell: ({ row }) => (
         <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.getValue("portfolioId")}
+          {row.original.portfolio}
         </div>
       ),
     },
@@ -300,7 +295,7 @@ export default function SubscriptionsPage() {
       header: "Amount",
       cell: ({ row }) => {
         const amount = row.getValue("amount") as number;
-        return <div>{formatUsdToInr(amount)}</div>;
+        return <div>{amount}</div>;
       },
     },
     {
@@ -315,14 +310,6 @@ export default function SubscriptionsPage() {
         ) : (
           <span className="text-muted-foreground">-</span>
         );
-      },
-    },
-    {
-      accessorKey: "paymentMethod",
-      header: "Payment Method",
-      cell: ({ row }) => {
-        const method = row.getValue("paymentMethod") as string;
-        return <div>{method || "N/A"}</div>;
       },
     },
     {
