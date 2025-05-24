@@ -1,8 +1,7 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -10,24 +9,35 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Trash2 } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import type { PortfolioHolding, CreatePortfolioRequest, Portfolio } from "@/lib/api"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import type {
+  CreatePortfolioRequest,
+  Portfolio,
+  PortfolioHolding,
+} from "@/lib/api";
+import { Plus, Trash2 } from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 interface PortfolioFormDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSubmit: (portfolioData: CreatePortfolioRequest) => Promise<void>
-  initialData?: Portfolio
-  title: string
-  description: string
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (portfolioData: CreatePortfolioRequest) => Promise<void>;
+  initialData?: Portfolio;
+  title: string;
+  description: string;
 }
 
 export function PortfolioFormDialog({
@@ -40,19 +50,24 @@ export function PortfolioFormDialog({
 }: PortfolioFormDialogProps) {
   // Add a helper function to convert USD to INR for display purposes
   const convertToInr = (usdValue: number): number => {
-    return usdValue * 83.5 // Using a fixed conversion rate of 1 USD = 83.5 INR
-  }
+    return usdValue * 83.5; // Using a fixed conversion rate of 1 USD = 83.5 INR
+  };
 
-  const [name, setName] = useState(initialData?.name || "")
-  const [portfolioDescription, setPortfolioDescription] = useState(initialData?.description || "")
-  const [cashRemaining, setCashRemaining] = useState("")
-  const [subscriptionFee, setSubscriptionFee] = useState("")
-  const [minInvestment, setMinInvestment] = useState("")
-  const [durationMonths, setDurationMonths] = useState(initialData?.durationMonths?.toString() || "")
-  const [holdings, setHoldings] = useState<PortfolioHolding[]>([])
-  const [activeTab, setActiveTab] = useState("basic")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const { toast } = useToast()
+  const [name, setName] = useState(initialData?.name || "");
+  const [portfolioDescription, setPortfolioDescription] = useState(
+    initialData?.description || ""
+  );
+  const [cashRemaining, setCashRemaining] = useState("");
+  const [subscriptionFee, setSubscriptionFee] = useState("");
+  const [minInvestment, setMinInvestment] = useState("");
+  const [durationMonths, setDurationMonths] = useState(
+    initialData?.durationMonths?.toString() || ""
+  );
+  const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
+  const [pdfLinks, setPdfLinks] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("basic");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   // New holding form state
   const [newHolding, setNewHolding] = useState<PortfolioHolding>({
@@ -61,96 +76,125 @@ export function PortfolioFormDialog({
     sector: "",
     status: "Fresh-Buy",
     price: 0,
-  })
+  });
 
   // Use useEffect to initialize form data when initialData changes or dialog opens
   useEffect(() => {
     if (open && initialData) {
-      console.log("Initializing form with data:", initialData)
+      console.log("Initializing form with data:", initialData);
 
       // Reset form when dialog opens with initialData
-      setName(initialData.name || "")
-      setPortfolioDescription(initialData.description || "")
+      setName(initialData.name || "");
+      setPortfolioDescription(initialData.description || "");
 
       // Handle numeric values with proper conversion
       if (initialData.cashRemaining !== undefined) {
-        const inrValue = convertToInr(initialData.cashRemaining)
-        console.log(`Converting cashRemaining from USD ${initialData.cashRemaining} to INR ${inrValue}`)
-        setCashRemaining(inrValue.toString())
+        const inrValue = convertToInr(initialData.cashRemaining);
+        console.log(
+          `Converting cashRemaining from USD ${initialData.cashRemaining} to INR ${inrValue}`
+        );
+        setCashRemaining(inrValue.toString());
       } else {
-        setCashRemaining("")
+        setCashRemaining("");
       }
 
       if (initialData.subscriptionFee !== undefined) {
-        const inrValue = convertToInr(initialData.subscriptionFee)
-        console.log(`Converting subscriptionFee from USD ${initialData.subscriptionFee} to INR ${inrValue}`)
-        setSubscriptionFee(inrValue.toString())
+        const inrValue = convertToInr(initialData.subscriptionFee);
+        console.log(
+          `Converting subscriptionFee from USD ${initialData.subscriptionFee} to INR ${inrValue}`
+        );
+        setSubscriptionFee(inrValue.toString());
       } else {
-        setSubscriptionFee("")
+        setSubscriptionFee("");
       }
 
       if (initialData.minInvestment !== undefined) {
-        const inrValue = convertToInr(initialData.minInvestment)
-        console.log(`Converting minInvestment from USD ${initialData.minInvestment} to INR ${inrValue}`)
-        setMinInvestment(inrValue.toString())
+        const inrValue = convertToInr(initialData.minInvestment);
+        console.log(
+          `Converting minInvestment from USD ${initialData.minInvestment} to INR ${inrValue}`
+        );
+        setMinInvestment(inrValue.toString());
       } else {
-        setMinInvestment("")
+        setMinInvestment("");
       }
 
-      setDurationMonths(initialData.durationMonths?.toString() || "")
+      setDurationMonths(initialData.durationMonths?.toString() || "");
 
       // Handle holdings with proper conversion
       if (initialData.holdings && Array.isArray(initialData.holdings)) {
         const convertedHoldings = initialData.holdings.map((h) => ({
           ...h,
           price: convertToInr(h.price), // Convert USD to INR for display
-        }))
-        console.log("Setting holdings with converted prices:", convertedHoldings)
-        setHoldings(convertedHoldings)
+        }));
+        console.log(
+          "Setting holdings with converted prices:",
+          convertedHoldings
+        );
+        setHoldings(convertedHoldings);
       } else {
-        setHoldings([])
+        setHoldings([]);
       }
 
-      setActiveTab("basic")
+      // Handle PDF links
+      if (
+        initialData.downloadLinks &&
+        Array.isArray(initialData.downloadLinks)
+      ) {
+        setPdfLinks(
+          initialData?.downloadLinks?.map((link) =>
+            typeof link === "string" ? link : link?.link || ""
+          ) || []
+        );
+      } else {
+        setPdfLinks([]);
+      }
+
+      setActiveTab("basic");
       setNewHolding({
         symbol: "",
         weight: 0,
         sector: "",
         status: "Fresh-Buy",
         price: 0,
-      })
+      });
     } else if (open) {
       // Reset form when dialog opens without initialData
-      setName("")
-      setPortfolioDescription("")
-      setCashRemaining("")
-      setSubscriptionFee("")
-      setMinInvestment("")
-      setDurationMonths("")
-      setHoldings([])
-      setActiveTab("basic")
+      setName("");
+      setPortfolioDescription("");
+      setCashRemaining("");
+      setSubscriptionFee("");
+      setMinInvestment("");
+      setDurationMonths("");
+      setHoldings([]);
+      setPdfLinks([]);
+      setActiveTab("basic");
       setNewHolding({
         symbol: "",
         weight: 0,
         sector: "",
         status: "Fresh-Buy",
         price: 0,
-      })
+      });
     }
-  }, [open, initialData])
+  }, [open, initialData]);
 
   // Update the handleSubmit function to properly format the data before submission
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     // For edit operations, verify we have a valid ID if initialData is provided
-    if (initialData && title.includes("Edit") && !initialData.id && !initialData._id) {
+    if (
+      initialData &&
+      title.includes("Edit") &&
+      !initialData.id &&
+      !initialData._id
+    ) {
       toast({
         title: "Validation Error",
         description: "Cannot edit: Missing portfolio ID",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (!name.trim()) {
@@ -158,63 +202,87 @@ export function PortfolioFormDialog({
         title: "Validation Error",
         description: "Portfolio name is required",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     // Validate total weight is 100% if holdings exist
     if (holdings.length > 0) {
-      const totalWeight = holdings.reduce((sum, holding) => sum + holding.weight, 0)
+      const totalWeight = holdings.reduce(
+        (sum, holding) => sum + holding.weight,
+        0
+      );
       if (totalWeight !== 100) {
         toast({
           title: "Validation Error",
           description: `Total weight of holdings must be 100%. Current total: ${totalWeight}%`,
           variant: "destructive",
-        })
-        setActiveTab("holdings")
-        return
+        });
+        setActiveTab("holdings");
+        return;
       }
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
 
     try {
       const convertToUsd = (inrValue: number): number => {
-        return inrValue / 83.5 // Convert back to USD for API
-      }
+        return inrValue / 83.5; // Convert back to USD for API
+      };
 
       // Ensure all values are properly parsed to numbers
       const portfolioData: CreatePortfolioRequest = {
         name,
         description: portfolioDescription,
-        cashRemaining: cashRemaining ? convertToUsd(Number.parseFloat(cashRemaining)) : undefined,
-        subscriptionFee: subscriptionFee ? convertToUsd(Number.parseFloat(subscriptionFee)) : undefined,
-        minInvestment: minInvestment ? convertToUsd(Number.parseFloat(minInvestment)) : undefined,
-        durationMonths: durationMonths ? Number.parseInt(durationMonths, 10) : undefined,
+        cashRemaining: cashRemaining
+          ? convertToUsd(Number.parseFloat(cashRemaining))
+          : undefined,
+        subscriptionFee: subscriptionFee
+          ? convertToUsd(Number.parseFloat(subscriptionFee))
+          : undefined,
+        minInvestment: minInvestment
+          ? convertToUsd(Number.parseFloat(minInvestment))
+          : undefined,
+        durationMonths: durationMonths
+          ? Number.parseInt(durationMonths, 10)
+          : undefined,
         holdings:
           holdings.length > 0
             ? holdings.map((h) => ({
                 ...h,
-                weight: typeof h.weight === "string" ? Number.parseFloat(h.weight) : h.weight,
-                price: convertToUsd(typeof h.price === "string" ? Number.parseFloat(h.price) : h.price),
+                weight:
+                  typeof h.weight === "string"
+                    ? Number.parseFloat(h.weight)
+                    : h.weight,
+                price: convertToUsd(
+                  typeof h.price === "string"
+                    ? Number.parseFloat(h.price)
+                    : h.price
+                ),
               }))
             : undefined,
-      }
+        downloadLinks:
+          pdfLinks.length > 0 ? pdfLinks.map((link) => ({ link })) : undefined,
+      };
 
-      console.log("Submitting portfolio data:", JSON.stringify(portfolioData, null, 2))
-      await onSubmit(portfolioData)
-      onOpenChange(false)
+      console.log(
+        "Submitting portfolio data:",
+        JSON.stringify(portfolioData, null, 2)
+      );
+      await onSubmit(portfolioData);
+      onOpenChange(false);
     } catch (error) {
-      console.error("Error submitting portfolio:", error)
+      console.error("Error submitting portfolio:", error);
       toast({
         title: "Failed to save portfolio",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const addHolding = () => {
     // Validate new holding
@@ -223,8 +291,8 @@ export function PortfolioFormDialog({
         title: "Validation Error",
         description: "Symbol is required",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (newHolding.weight <= 0) {
@@ -232,8 +300,8 @@ export function PortfolioFormDialog({
         title: "Validation Error",
         description: "Weight must be greater than 0",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (!newHolding.sector.trim()) {
@@ -241,8 +309,8 @@ export function PortfolioFormDialog({
         title: "Validation Error",
         description: "Sector is required",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (newHolding.price <= 0) {
@@ -250,12 +318,12 @@ export function PortfolioFormDialog({
         title: "Validation Error",
         description: "Price must be greater than 0",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     // Add new holding to the list
-    setHoldings([...holdings, { ...newHolding }])
+    setHoldings([...holdings, { ...newHolding }]);
 
     // Reset new holding form
     setNewHolding({
@@ -264,14 +332,30 @@ export function PortfolioFormDialog({
       sector: "",
       status: "Fresh-Buy",
       price: 0,
-    })
-  }
+    });
+  };
 
   const removeHolding = (index: number) => {
-    const updatedHoldings = [...holdings]
-    updatedHoldings.splice(index, 1)
-    setHoldings(updatedHoldings)
-  }
+    const updatedHoldings = [...holdings];
+    updatedHoldings.splice(index, 1);
+    setHoldings(updatedHoldings);
+  };
+
+  const addPdfLink = () => {
+    setPdfLinks([...pdfLinks, ""]);
+  };
+
+  const updatePdfLink = (index: number, value: string) => {
+    const updatedLinks = [...pdfLinks];
+    updatedLinks[index] = value;
+    setPdfLinks(updatedLinks);
+  };
+
+  const removePdfLink = (index: number) => {
+    const updatedLinks = [...pdfLinks];
+    updatedLinks.splice(index, 1);
+    setPdfLinks(updatedLinks);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -283,10 +367,11 @@ export function PortfolioFormDialog({
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="financial">Financial Details</TabsTrigger>
               <TabsTrigger value="holdings">Holdings</TabsTrigger>
+              <TabsTrigger value="pdfLinks">PDF Links</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4 py-4">
@@ -381,7 +466,12 @@ export function PortfolioFormDialog({
                       <Input
                         id="symbol"
                         value={newHolding.symbol}
-                        onChange={(e) => setNewHolding({ ...newHolding, symbol: e.target.value.toUpperCase() })}
+                        onChange={(e) =>
+                          setNewHolding({
+                            ...newHolding,
+                            symbol: e.target.value.toUpperCase(),
+                          })
+                        }
                         placeholder="e.g., AAPL"
                         disabled={isSubmitting}
                       />
@@ -395,7 +485,10 @@ export function PortfolioFormDialog({
                         max="100"
                         value={newHolding.weight || ""}
                         onChange={(e) =>
-                          setNewHolding({ ...newHolding, weight: Number.parseFloat(e.target.value) || 0 })
+                          setNewHolding({
+                            ...newHolding,
+                            weight: Number.parseFloat(e.target.value) || 0,
+                          })
                         }
                         placeholder="e.g., 25"
                         disabled={isSubmitting}
@@ -406,7 +499,12 @@ export function PortfolioFormDialog({
                       <Input
                         id="sector"
                         value={newHolding.sector}
-                        onChange={(e) => setNewHolding({ ...newHolding, sector: e.target.value })}
+                        onChange={(e) =>
+                          setNewHolding({
+                            ...newHolding,
+                            sector: e.target.value,
+                          })
+                        }
                         placeholder="e.g., Technology"
                         disabled={isSubmitting}
                       />
@@ -415,7 +513,9 @@ export function PortfolioFormDialog({
                       <Label htmlFor="status">Status</Label>
                       <Select
                         value={newHolding.status}
-                        onValueChange={(value) => setNewHolding({ ...newHolding, status: value })}
+                        onValueChange={(value) =>
+                          setNewHolding({ ...newHolding, status: value })
+                        }
                         disabled={isSubmitting}
                       >
                         <SelectTrigger id="status">
@@ -437,14 +537,21 @@ export function PortfolioFormDialog({
                         min="0"
                         value={newHolding.price || ""}
                         onChange={(e) =>
-                          setNewHolding({ ...newHolding, price: Number.parseFloat(e.target.value) || 0 })
+                          setNewHolding({
+                            ...newHolding,
+                            price: Number.parseFloat(e.target.value) || 0,
+                          })
                         }
                         placeholder="e.g., 150.75"
                         disabled={isSubmitting}
                       />
                     </div>
                     <div className="flex items-end">
-                      <Button type="button" onClick={addHolding} disabled={isSubmitting}>
+                      <Button
+                        type="button"
+                        onClick={addHolding}
+                        disabled={isSubmitting}
+                      >
                         <Plus className="mr-2 h-4 w-4" />
                         Add Holding
                       </Button>
@@ -455,7 +562,9 @@ export function PortfolioFormDialog({
                 <div>
                   <h4 className="mb-2 font-medium">Current Holdings</h4>
                   {holdings.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No holdings added yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No holdings added yet.
+                    </p>
                   ) : (
                     <div className="space-y-2">
                       {holdings.map((holding, index) => (
@@ -464,13 +573,22 @@ export function PortfolioFormDialog({
                             <div className="flex items-center justify-between">
                               <div className="grid gap-1">
                                 <div className="flex items-center">
-                                  <span className="font-medium">{holding.symbol}</span>
-                                  <span className="ml-2 text-sm text-muted-foreground">({holding.sector})</span>
+                                  <span className="font-medium">
+                                    {holding.symbol}
+                                  </span>
+                                  <span className="ml-2 text-sm text-muted-foreground">
+                                    ({holding.sector})
+                                  </span>
                                 </div>
                                 <div className="text-sm">
-                                  <span className="mr-2">Weight: {holding.weight}%</span>
                                   <span className="mr-2">
-                                    Price: ₹{holding.price.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                                    Weight: {holding.weight}%
+                                  </span>
+                                  <span className="mr-2">
+                                    Price: ₹
+                                    {holding.price.toLocaleString("en-IN", {
+                                      maximumFractionDigits: 0,
+                                    })}
                                   </span>
                                   <span>Status: {holding.status}</span>
                                 </div>
@@ -492,7 +610,14 @@ export function PortfolioFormDialog({
 
                       <div className="mt-4 flex justify-between rounded-md bg-muted p-2 text-sm">
                         <span>Total Weight:</span>
-                        <span className={holdings.reduce((sum, h) => sum + h.weight, 0) !== 100 ? "text-red-500" : ""}>
+                        <span
+                          className={
+                            holdings.reduce((sum, h) => sum + h.weight, 0) !==
+                            100
+                              ? "text-red-500"
+                              : ""
+                          }
+                        >
                           {holdings.reduce((sum, h) => sum + h.weight, 0)}%
                         </span>
                       </div>
@@ -501,10 +626,63 @@ export function PortfolioFormDialog({
                 </div>
               </div>
             </TabsContent>
+
+            <TabsContent value="pdfLinks" className="py-4">
+              <div className="space-y-4">
+                <div className="rounded-md border p-4">
+                  <h4 className="mb-3 font-medium">PDF Links</h4>
+                  <div className="space-y-3">
+                    {pdfLinks.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No PDF links added yet.
+                      </p>
+                    ) : (
+                      pdfLinks.map((link, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input
+                            value={link}
+                            onChange={(e) =>
+                              updatePdfLink(index, e.target.value)
+                            }
+                            placeholder="Enter PDF URL"
+                            disabled={isSubmitting}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removePdfLink(index)}
+                            disabled={isSubmitting}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Remove</span>
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                    <Button
+                      type="button"
+                      onClick={addPdfLink}
+                      variant="outline"
+                      className="mt-2"
+                      disabled={isSubmitting}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add PDF Link
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
           </Tabs>
 
           <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -514,5 +692,5 @@ export function PortfolioFormDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

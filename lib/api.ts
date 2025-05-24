@@ -391,6 +391,11 @@ export interface Portfolio {
   holdings?: PortfolioHolding[];
   createdAt?: string;
   updatedAt?: string;
+  downloadLinks?: DownloadLink[];
+}
+
+export interface DownloadLink {
+  link: string;
 }
 
 export interface CreatePortfolioRequest {
@@ -402,6 +407,7 @@ export interface CreatePortfolioRequest {
   minInvestment?: number;
   durationMonths?: number;
   holdings?: PortfolioHolding[];
+  downloadLinks?: DownloadLink[];
 }
 
 // Portfolio Tip Types
