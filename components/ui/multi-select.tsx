@@ -1,11 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { X } from "lucide-react"
+import { X, ChevronDown, Check } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export type Option = {
   label: string
@@ -32,125 +37,199 @@ export function MultiSelect({
   ...props
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false)
+  const [searchTerm, setSearchTerm] = React.useState("")
 
-  const handleUnselect = (item: Option) => {
+  const handleUnselect = React.useCallback((item: Option, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log("Unselecting item via close icon:", item)
     onChange(value.filter((i) => i.value !== item.value))
-  }
+  }, [onChange, value])
 
-  const handleSelect = (selectedItem: Option) => {
+  const handleSelect = React.useCallback((selectedItem: Option) => {
+    console.log("Selecting/deselecting item:", selectedItem)
     const isSelected = value.some((item) => item.value === selectedItem.value)
+    
     if (isSelected) {
-      onChange(value.filter((item) => item.value !== selectedItem.value))
+      const newValue = value.filter((item) => item.value !== selectedItem.value)
+      console.log("Removing item, new value:", newValue)
+      onChange(newValue)
     } else {
-      onChange([...value, selectedItem])
+      const newValue = [...value, selectedItem]
+      console.log("Adding item, new value:", newValue)
+      onChange(newValue)
     }
-  }
+    
+    // Keep dropdown open for multiple selections
+    // Don't close: setOpen(false)
+  }, [onChange, value])
 
-  // Log available options for debugging
+  const isOptionSelected = React.useCallback((option: Option) => {
+    return value.some((item) => item.value === option.value)
+  }, [value])
+
+  // Filter options based on search term
+  const filteredOptions = React.useMemo(() => {
+    if (!searchTerm.trim()) return options
+    return options.filter(option => 
+      option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (option.description && option.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  }, [options, searchTerm])
+
+  // Reset search when dropdown closes
   React.useEffect(() => {
-    console.log("MultiSelect options:", options)
-    console.log("MultiSelect value:", value)
-  }, [options, value])
+    if (!open) {
+      setSearchTerm("")
+    }
+  }, [open])
 
   return (
-    <Popover open={open && !disabled} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <div
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className={cn(
-            "flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 cursor-pointer hover:bg-accent hover:text-accent-foreground",
-            disabled && "cursor-not-allowed opacity-50",
+            "w-full justify-between min-h-10 px-3 py-2 text-sm font-normal",
             className
           )}
-          onClick={() => !disabled && setOpen(true)}
+          onClick={() => {
+            console.log("MultiSelect button clicked, open:", open)
+          }}
           {...props}
         >
-          <div className="flex flex-wrap gap-1 flex-1">
+          <div className="flex flex-wrap gap-1 flex-1 text-left">
             {value.length > 0 ? (
-              value.map((item) => (
-                <Badge key={item.value} variant="secondary" className="mr-1 mb-1">
+              value.map((item, index) => (
+                <Badge key={item.value || `item-${index}`} variant="secondary" className="mr-1 mb-1">
                   {item.label}
-                  <button
-                    className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleUnselect(item)
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                    }}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      handleUnselect(item)
-                    }}
-                    disabled={disabled}
-                  >
-                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                  </button>
+                  {!disabled && (
+                    <span
+                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer inline-flex items-center justify-center w-4 h-4 hover:bg-destructive/20"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        console.log("Close icon clicked for:", item.label)
+                        handleUnselect(item, e)
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        console.log("Close icon onClick for:", item.label)
+                        handleUnselect(item, e)
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          console.log("Close icon keyboard triggered for:", item.label)
+                          handleUnselect(item, e as any)
+                        }
+                      }}
+                    >
+                      <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                    </span>
+                  )}
                 </Badge>
               ))
             ) : (
               <span className="text-muted-foreground">{placeholder}</span>
             )}
           </div>
-          <div className="ml-2 flex h-4 w-4 items-center justify-center opacity-50">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 15 15"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-            >
-              <path
-                d="M4.93179 5.43179C4.75605 5.60753 4.75605 5.89245 4.93179 6.06819C5.10753 6.24392 5.39245 6.24392 5.56819 6.06819L7.49999 4.13638L9.43179 6.06819C9.60753 6.24392 9.89245 6.24392 10.0682 6.06819C10.2439 5.89245 10.2439 5.60753 10.0682 5.43179L7.81819 3.18179C7.73379 3.0974 7.61933 3.04999 7.49999 3.04999C7.38064 3.04999 7.26618 3.0974 7.18179 3.18179L4.93179 5.43179ZM10.0682 9.56819C10.2439 9.39245 10.2439 9.10753 10.0682 8.93179C9.89245 8.75606 9.60753 8.75606 9.43179 8.93179L7.49999 10.8636L5.56819 8.93179C5.39245 8.75606 5.10753 8.75606 4.93179 8.93179C4.75605 9.10753 4.75605 9.39245 4.93179 9.56819L7.18179 11.8182C7.26618 11.9026 7.38064 11.95 7.49999 11.95C7.61933 11.95 7.73379 11.9026 7.81819 11.8182L10.0682 9.56819Z"
-                fill="currentColor"
-                fillRule="evenodd"
-                clipRule="evenodd"
-              />
-            </svg>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-64 overflow-y-auto p-0">
+        {/* Search Input */}
+        <div className="flex items-center border-b px-3 py-2">
+          <div className="flex items-center w-full">
+            <input
+              type="text"
+              placeholder="Search portfolios..."
+              value={searchTerm}
+              onChange={(e) => {
+                console.log("Search term changed:", e.target.value)
+                setSearchTerm(e.target.value)
+              }}
+              className="flex-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+              }}
+            />
+            {searchTerm && (
+              <span
+                className="ml-2 cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setSearchTerm("")
+                }}
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </span>
+            )}
           </div>
         </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search portfolios..." />
-          <CommandEmpty>No portfolios found.</CommandEmpty>
-          <CommandGroup className="max-h-64 overflow-auto">
-            {options.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                No portfolios available. Please create portfolios first.
-              </div>
-            ) : (
-              options.map((option) => {
-                const isSelected = value.some((item) => item.value === option.value)
-                return (
-                  <CommandItem
-                    key={option.value}
-                    onSelect={() => handleSelect(option)}
-                    className={cn("flex items-center gap-2 py-2", isSelected ? "bg-accent" : "")}
-                  >
-                    <div className="flex flex-col">
-                      <div className={cn("flex-1", isSelected ? "font-medium" : "")}>
-                        {option.label}
-                      </div>
-                      {option.description && (
-                        <div className="text-xs text-muted-foreground truncate max-w-[250px]">
-                          {option.description}
-                        </div>
-                      )}
+        
+        {/* Options List */}
+        <div className="p-1">
+          {filteredOptions.length === 0 ? (
+            <DropdownMenuItem disabled>
+              {options.length === 0 ? "No portfolios available" : "No portfolios found"}
+            </DropdownMenuItem>
+          ) : (
+            filteredOptions.map((option) => {
+              const isSelected = isOptionSelected(option)
+              return (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    console.log("DropdownMenuItem clicked:", option.label)
+                    handleSelect(option)
+                  }}
+                  className="flex items-center gap-2 py-2"
+                >
+                  <div className="flex h-4 w-4 items-center justify-center">
+                    {isSelected && <Check className="h-4 w-4 text-primary" />}
+                  </div>
+                  <div className="flex flex-col flex-1">
+                    <div className={cn("flex-1", isSelected ? "font-medium" : "")}>
+                      {option.label}
                     </div>
-                  </CommandItem>
-                )
-              })
+                    {option.description && (
+                      <div className="text-xs text-muted-foreground truncate max-w-[250px]">
+                        {option.description}
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuItem>
+              )
+            })
+          )}
+        </div>
+        
+        {/* Show selected count and search info at bottom */}
+        {(value.length > 0 || searchTerm) && (
+          <div className="border-t px-3 py-2 text-xs text-muted-foreground">
+            {value.length > 0 && (
+              <div>{value.length} portfolio{value.length === 1 ? '' : 's'} selected</div>
             )}
-          </CommandGroup>
-        </Command>
-      </PopoverContent>
-    </Popover>
+            {searchTerm && (
+              <div>Showing {filteredOptions.length} of {options.length} portfolios</div>
+            )}
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
-} 
+}
