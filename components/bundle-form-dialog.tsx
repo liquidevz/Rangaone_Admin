@@ -31,6 +31,7 @@ import { Portfolio, fetchPortfolios } from "@/lib/api"
 import { Loader2, Info } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { isAuthenticated } from "@/lib/auth"
 
 // Define form validation schema
 const bundleFormSchema = z.object({
@@ -70,40 +71,71 @@ export function BundleFormDialog({
   const [portfolioOptions, setPortfolioOptions] = useState<{ label: string; value: string; description?: string }[]>([])
   const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(false)
   const [selectedPortfolioDetails, setSelectedPortfolioDetails] = useState<Record<string, Portfolio>>({})
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [portfoliosLoaded, setPortfoliosLoaded] = useState(false)
 
-  // Initialize form with default values or initialData
+  // Initialize form with default values only - we'll update it after portfolios load
   const form = useForm<BundleFormValues>({
     resolver: zodResolver(bundleFormSchema),
     defaultValues: {
-      name: initialData?.name || "",
-      description: initialData?.description || "",
-      portfolios: initialData?.portfolios ? 
-        (Array.isArray(initialData.portfolios) ? 
-          initialData.portfolios.map(p => typeof p === 'string' ? p : p.id || "") : 
-          []) : 
-        [],
-      discountPercentage: initialData?.discountPercentage || 0,
+      name: "",
+      description: "",
+      portfolios: [],
+      discountPercentage: 0,
     },
   })
+
+  // Helper function to extract portfolio IDs from bundle portfolios
+  const extractPortfolioIds = (portfolios: Bundle['portfolios']): string[] => {
+    if (!Array.isArray(portfolios)) return []
+    
+    return portfolios.map(p => {
+      if (typeof p === 'string') return p
+      if (typeof p === 'object' && p !== null) {
+        return (p as any).id || (p as any)._id || ""
+      }
+      return ""
+    }).filter(id => id.trim() !== "")
+  }
+
+  // Helper function to create MultiSelect option from portfolio ID
+  const createOptionFromPortfolioId = (portfolioId: string, portfolioLookup: Record<string, Portfolio>) => {
+    const portfolio = portfolioLookup[portfolioId]
+    if (portfolio) {
+      return {
+        label: portfolio.name || `Portfolio ${portfolioId.substring(0, 8)}...`,
+        value: portfolioId,
+        description: portfolio.riskLevel ? 
+          `Risk Level: ${portfolio.riskLevel}${portfolio.subscriptionFee ? ` | Fee: ₹${portfolio.subscriptionFee}` : ''}` : 
+          portfolio.description || ''
+      }
+    }
+    return {
+      label: `Portfolio ${portfolioId.substring(0, 8)}...`,
+      value: portfolioId,
+      description: "Portfolio details not available"
+    }
+  }
 
   // Load available portfolios for selection
   const loadPortfolios = useCallback(async () => {
     setIsLoadingPortfolios(true)
+    setAuthError(null)
+    setPortfoliosLoaded(false)
+    
     try {
       console.log("Starting to load portfolios...");
       
-      // Check authentication status
-      const token = localStorage.getItem("adminAccessToken");
-      if (!token) {
-        console.error("No authentication token found");
-        toast({
-          title: "Authentication Error",
-          description: "Please log in to access portfolios.",
-          variant: "destructive",
-        });
+      // Check authentication status first
+      const authStatus = isAuthenticated();
+      if (!authStatus) {
+        console.error("User is not authenticated");
+        setAuthError("Please log in to access portfolios.");
+        setPortfolioOptions([]);
         return;
       }
-      console.log("Authentication token found:", token.substring(0, 10) + "...");
+      
+      console.log("User is authenticated, proceeding to fetch portfolios");
 
       const portfolios = await fetchPortfolios()
       console.log("Fetched portfolios:", portfolios);
@@ -116,22 +148,28 @@ export function BundleFormDialog({
           variant: "default",
         })
         setPortfolioOptions([])
+        setPortfoliosLoaded(true)
         return
       }
       
       // Create options with labels for the MultiSelect component
-      const options = portfolios.map((portfolio) => {
-        const id = portfolio.id || portfolio._id || "";
-        const option = {
-          label: portfolio.name || `Portfolio ${id.substring(0, 8)}...`,
-          value: id,
-          description: portfolio.riskLevel ? 
-            `Risk Level: ${portfolio.riskLevel}${portfolio.subscriptionFee ? ` | Fee: ₹${portfolio.subscriptionFee}` : ''}` : 
-            portfolio.description || ''
-        };
-        console.log("Created option:", option);
-        return option;
-      }).filter(option => option.value); // Filter out any options without a value
+      const options = portfolios
+        .filter(portfolio => {
+          const id = portfolio.id || portfolio._id;
+          return id && id.trim() !== ''; // Only include portfolios with valid, non-empty IDs
+        })
+        .map((portfolio) => {
+          const id = portfolio.id || portfolio._id || "";
+          const option = {
+            label: portfolio.name || `Portfolio ${id.substring(0, 8)}...`,
+            value: id,
+            description: portfolio.riskLevel ? 
+              `Risk Level: ${portfolio.riskLevel}${portfolio.subscriptionFee ? ` | Fee: ₹${portfolio.subscriptionFee}` : ''}` : 
+              portfolio.description || ''
+          };
+          console.log("Created option:", option);
+          return option;
+        });
       
       console.log("Created portfolio options:", options);
       setPortfolioOptions(options)
@@ -146,14 +184,26 @@ export function BundleFormDialog({
       })
       console.log("Created portfolio lookup:", portfolioLookup);
       setSelectedPortfolioDetails(portfolioLookup)
+      setPortfoliosLoaded(true)
       
     } catch (error) {
       console.error("Failed to load portfolios:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to load portfolios"
+      
+      // Check if it's an authentication error
+      if (errorMessage.includes("401") || errorMessage.includes("expired") || errorMessage.includes("login")) {
+        setAuthError("Your session has expired. Please log in again.");
+      } else {
+        setAuthError(`Error loading portfolios: ${errorMessage}`);
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to load available portfolios. Please try again later.",
+        description: `Failed to load available portfolios: ${errorMessage}`,
         variant: "destructive",
       })
+      setPortfolioOptions([])
+      setPortfoliosLoaded(true)
     } finally {
       setIsLoadingPortfolios(false)
     }
@@ -162,32 +212,37 @@ export function BundleFormDialog({
   // Load portfolios when the dialog opens
   useEffect(() => {
     if (open) {
+      console.log("Dialog opened, loading portfolios...");
       loadPortfolios()
     }
   }, [open, loadPortfolios])
 
-  // Reset form when initialData changes
+  // Reset form when portfolios are loaded and initialData is available
   useEffect(() => {
-    if (initialData) {
-      const portfolioIds = Array.isArray(initialData.portfolios) ? 
-        initialData.portfolios.map(p => typeof p === 'string' ? p : p.id || "") : 
-        []
+    if (portfoliosLoaded && open) {
+      console.log("Portfolios loaded, updating form with initial data:", initialData);
       
-      form.reset({
-        name: initialData.name,
-        description: initialData.description,
-        portfolios: portfolioIds,
-        discountPercentage: initialData.discountPercentage,
-      })
-    } else {
-      form.reset({
-        name: "",
-        description: "",
-        portfolios: [],
-        discountPercentage: 0,
-      })
+      if (initialData) {
+        const portfolioIds = extractPortfolioIds(initialData.portfolios)
+        console.log("Extracted portfolio IDs for editing:", portfolioIds);
+        
+        form.reset({
+          name: initialData.name,
+          description: initialData.description,
+          portfolios: portfolioIds,
+          discountPercentage: initialData.discountPercentage,
+        })
+      } else {
+        console.log("No initial data, resetting form to defaults");
+        form.reset({
+          name: "",
+          description: "",
+          portfolios: [],
+          discountPercentage: 0,
+        })
+      }
     }
-  }, [initialData, form])
+  }, [portfoliosLoaded, initialData, form, open])
 
   const handleSubmit = async (values: BundleFormValues) => {
     setIsSubmitting(true)
@@ -211,9 +266,28 @@ export function BundleFormDialog({
     }
   }
 
+  const handleRetryPortfolios = () => {
+    console.log("Retrying portfolio load...");
+    loadPortfolios();
+  }
+
+  // Get the current selected portfolio options for MultiSelect
+  const getSelectedPortfolioOptions = (portfolioIds: string[]) => {
+    return portfolioIds.map(portfolioId => {
+      // First try to find in the loaded options
+      const existingOption = portfolioOptions.find(opt => opt.value === portfolioId)
+      if (existingOption) {
+        return existingOption
+      }
+      
+      // If not found in options, create from portfolio details
+      return createOptionFromPortfolioId(portfolioId, selectedPortfolioDetails)
+    })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Create Bundle" : "Edit Bundle"}</DialogTitle>
           <DialogDescription>
@@ -283,33 +357,53 @@ export function BundleFormDialog({
                     <FormControl>
                       <div className="relative">
                         {isLoadingPortfolios && (
-                          <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                          <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-md">
                             <Loader2 className="h-6 w-6 animate-spin text-primary" />
                           </div>
                         )}
+                        {authError && (
+                          <div className="mb-3 p-3 border border-destructive/20 bg-destructive/10 rounded-md">
+                            <p className="text-sm text-destructive mb-2">{authError}</p>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={handleRetryPortfolios}
+                              disabled={isLoadingPortfolios}
+                            >
+                              {isLoadingPortfolios ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Loading...
+                                </>
+                              ) : (
+                                "Retry"
+                              )}
+                            </Button>
+                          </div>
+                        )}
                         <MultiSelect
-                          placeholder={isLoadingPortfolios ? "Loading portfolios..." : "Select portfolios"}
-                          disabled={isLoadingPortfolios}
+                          placeholder={
+                            isLoadingPortfolios 
+                              ? "Loading portfolios..." 
+                              : portfolioOptions.length === 0 
+                                ? "No portfolios available" 
+                                : "Select portfolios"
+                          }
+                          disabled={isLoadingPortfolios || portfolioOptions.length === 0}
                           options={portfolioOptions}
-                          value={field.value.map(value => {
-                            const portfolioId = typeof value === 'string' ? value : '';
-                            const option = portfolioOptions.find(opt => opt.value === portfolioId);
-                            const portfolioDetails = portfolioId ? selectedPortfolioDetails[portfolioId] : undefined;
-                            return option || { 
-                              label: portfolioDetails?.name || `Portfolio ${portfolioId.substring(0, 8)}...`, 
-                              value: portfolioId,
-                              description: portfolioDetails ? `Risk Level: ${portfolioDetails.riskLevel} | Fee: ₹${portfolioDetails.subscriptionFee || 0}` : undefined
-                            };
-                          })}
+                          value={portfoliosLoaded ? getSelectedPortfolioOptions(field.value) : []}
                           onChange={(selected) => {
+                            console.log("MultiSelect onChange triggered with:", selected);
                             const selectedIds = selected.map(item => item.value);
+                            console.log("Setting field value to:", selectedIds);
                             field.onChange(selectedIds);
                           }}
-                          className="w-full"
+                          className="w-full h-22"
                         />
                       </div>
                     </FormControl>
-                    {portfolioOptions.length === 0 && !isLoadingPortfolios && (
+                    {portfolioOptions.length === 0 && !isLoadingPortfolios && !authError && (
                       <div className="text-sm text-destructive">
                         No portfolios available. Please create portfolios first.
                       </div>
@@ -317,13 +411,14 @@ export function BundleFormDialog({
                     <FormDescription>
                       {field.value.length > 0 ? (
                         <span className="block mt-2 space-y-2">
-                          <span className="block text-sm">Selected portfolios:</span>
+                          <span className="block text-sm">Selected portfolios ({field.value.length}):</span>
                           <span className="block space-y-2">
-                            {field.value.map((portfolioId) => {
+                            {field.value.map((portfolioId, index) => {
                               const portfolio = selectedPortfolioDetails[portfolioId];
+                              const uniqueKey = portfolioId || `portfolio-${index}`;
                               return (
-                                <span key={portfolioId} className="block rounded-md border p-3 text-sm">
-                                  <span className="block font-medium">{portfolio?.name || `Portfolio ${portfolioId.substring(0, 8)}...`}</span>
+                                <span key={uniqueKey} className="block rounded-md border p-3 text-sm">
+                                  <span className="block font-medium">{portfolio?.name || `Portfolio ${portfolioId ? portfolioId.substring(0, 8) : 'Unknown'}...`}</span>
                                   {portfolio && (
                                     <span className="block mt-1 space-y-1 text-muted-foreground">
                                       <span className="block">Risk Level: {portfolio.riskLevel}</span>
@@ -377,7 +472,7 @@ export function BundleFormDialog({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || portfolioOptions.length === 0}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {mode === "create" ? "Create Bundle" : "Save Changes"}
                 </Button>
@@ -388,4 +483,4 @@ export function BundleFormDialog({
       </DialogContent>
     </Dialog>
   )
-} 
+}
