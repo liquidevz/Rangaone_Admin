@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart, FileText, Home, Menu, Settings, Users, X, Lightbulb, Briefcase, CreditCard } from "lucide-react"
+import { BarChart, FileText, Home, Menu, Settings, Users, X, Lightbulb, Briefcase, CreditCard, Package } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -25,6 +25,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Portfolios",
     href: "/dashboard/portfolios",
     icon: Briefcase,
+  },
+  {
+    title: "Bundles",
+    href: "/dashboard/bundles",
+    icon: Package,
   },
   {
     title: "Tips",
