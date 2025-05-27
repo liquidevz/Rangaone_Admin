@@ -392,6 +392,7 @@ export interface Portfolio {
   createdAt?: string;
   updatedAt?: string;
   downloadLinks?: DownloadLink[];
+  _id?: string; // For compatibility with MongoDB responses
 }
 
 export interface DownloadLink {
@@ -433,13 +434,7 @@ export interface CreatePortfolioTipRequest {
 // Portfolio API Functions
 export const fetchPortfolios = async (): Promise<Portfolio[]> => {
   try {
-    // Log the API request for debugging
-    console.log(`Fetching portfolios from: ${API_BASE_URL}/api/portfolios`);
-
     const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios`);
-
-    // Log the response status for debugging
-    console.log(`Portfolio API response status: ${response.status}`);
 
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
@@ -447,43 +442,25 @@ export const fetchPortfolios = async (): Promise<Portfolio[]> => {
         throw new Error("Server returned HTML instead of JSON for portfolios");
       }
 
-      // Try to get the error message from the response
-      try {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message ||
-            `Failed to fetch portfolios: Server returned ${response.status}`
-        );
-      } catch (jsonError) {
-        // If we can't parse the error as JSON, throw a generic error with the status code
-        throw new Error(
-          `Failed to fetch portfolios: Server returned ${response.status}`
-        );
-      }
+      const error = await response.json();
+      throw new Error(error.message || `Failed to fetch portfolios: Server returned ${response.status}`);
     }
 
-    // Parse the response as JSON
-    const portfolios = await response.json();
+    const data = await response.json();
+    
+    // Handle different response formats
+    let portfolios: Portfolio[] = Array.isArray(data) ? data : 
+                                data.data ? data.data :
+                                data.portfolios ? data.portfolios :
+                                data.results ? data.results : [];
 
-    // Ensure all portfolios have valid IDs
-    const validatedPortfolios = portfolios.map((portfolio: Portfolio) => {
-      if (!portfolio.id && portfolio._id) {
-        console.log(
-          "Portfolio has _id but no id, copying _id to id:",
-          portfolio.name
-        );
-        return {
-          ...portfolio,
-          id: portfolio._id,
-        };
-      }
-      return portfolio;
-    });
-
-    // Log the number of portfolios fetched for debugging
-    console.log(`Fetched ${validatedPortfolios.length} portfolios from API`);
-
-    return validatedPortfolios;
+    // Ensure all portfolios have valid IDs and filter out any without IDs
+    return portfolios
+      .filter(portfolio => portfolio.id || portfolio._id)
+      .map(portfolio => ({
+        ...portfolio,
+        id: portfolio.id || portfolio._id || ''
+      }));
   } catch (error) {
     console.error("Error fetching portfolios:", error);
     throw error;
