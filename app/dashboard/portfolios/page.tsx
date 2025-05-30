@@ -8,6 +8,7 @@ import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useToast } from "@/hooks/use-toast"
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog"
+import { PortfolioDetailsDialog } from "@/components/portfolio-details-dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   fetchPortfolios,
@@ -223,46 +224,169 @@ export default function PortfoliosPage() {
     router.push("/login")
   }
 
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
+  const [selectedPortfolioForDetails, setSelectedPortfolioForDetails] = useState<Portfolio | null>(null)
+
   // Define columns for the data table
   const columns: ColumnDef<Portfolio>[] = [
     {
       accessorKey: "name",
       header: "Name",
-      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
-    },
+      cell: ({ row }) => (
+        <button 
+          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+          onClick={() => {
+            setSelectedPortfolioForDetails(row.original)
+            setIsDetailsDialogOpen(true)
+          }}
+        >
+          {row.original.name}
+        </button>
+      ),
+    },    
+    // {
+    //   accessorKey: "description",
+    //   header: "Description",
+    //   cell: ({ row }) => {
+    //     const descriptions = row.original.description;
+        
+    //     // Handle new description array format
+    //     if (Array.isArray(descriptions) && descriptions.length > 0) {
+    //       // Find the first non-empty description, preferring 'home card'
+    //       const homeCard = descriptions.find(d => d.key === "home card" && d.value.trim());
+    //       const firstDesc = homeCard || descriptions.find(d => d.value.trim());
+          
+    //       return (
+    //         <div className="max-w-[500px] truncate" title={firstDesc?.value || "No description"}>
+    //           {firstDesc?.value || "No description"}
+    //         </div>
+    //       );
+    //     }
+        
+    //     // Fallback for legacy string format
+    //     if (typeof descriptions === "string") {
+    //       return <div className="max-w-[300px] truncate">{descriptions}</div>;
+    //     }
+        
+    //     return <div className="max-w-[300px] truncate text-muted-foreground">No description</div>;
+    //   },
+    // },
     {
-      accessorKey: "description",
-      header: "Description",
-      cell: ({ row }) => <div className="max-w-[300px] truncate">{row.original.description}</div>,
+      accessorKey: "PortfolioCategory",
+      header: "Category",
+      cell: ({ row }) => (
+        <div className="font-medium">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            {row.original.PortfolioCategory || "Basic"}
+          </span>
+        </div>
+      ),
     },
-    {
-      accessorKey: "durationMonths",
-      header: "Duration",
-      cell: ({ row }) => {
-        const duration = row.original.durationMonths
-        return <div className="font-medium">{duration ? `${duration} months` : "N/A"}</div>
-      },
-    },
+    // {
+    //   accessorKey: "durationMonths",
+    //   header: "Duration",
+    //   cell: ({ row }) => {
+    //     const duration = row.original.durationMonths;
+    //     return <div className="font-medium">{duration ? `${duration} months` : "N/A"}</div>;
+    //   },
+    // },
     {
       accessorKey: "minInvestment",
       header: "Min. Investment",
       cell: ({ row }) => {
-        const minInvestment = row.original.minInvestment
+        const minInvestment = row.original.minInvestment;
         return minInvestment ? (
-          <div className="font-medium">₹{(minInvestment * 83.5).toLocaleString("en-IN")}</div>
+          <div className="font-medium text-green-600">
+            ₹{minInvestment.toLocaleString("en-IN")}
+          </div>
         ) : (
           <div>-</div>
-        )
+        );
       },
     },
+    // {
+    //   accessorKey: "subscriptionFee",
+    //   header: "Subscription",
+    //   cell: ({ row }) => {
+    //     const fees = row.original.subscriptionFee;
+        
+    //     if (Array.isArray(fees) && fees.length > 0) {
+    //       // Show the monthly fee if available, otherwise the first fee
+    //       const monthlyFee = fees.find(f => f.type === "monthly");
+    //       const displayFee = monthlyFee || fees[0];
+          
+    //       return (
+    //         <div className="font-medium">
+    //           <div className="text-sm">₹{displayFee.price.toLocaleString("en-IN")}</div>
+    //           <div className="text-xs text-muted-foreground capitalize">{displayFee.type}</div>
+    //         </div>
+    //       );
+    //     }
+        
+    //     // Fallback for legacy format
+    //     if (typeof row.original.subscriptionFee_legacy === "number") {
+    //       return (
+    //         <div className="font-medium">
+    //           ₹{row.original.subscriptionFee_legacy.toLocaleString("en-IN")}
+    //         </div>
+    //       );
+    //     }
+        
+    //     return <div>-</div>;
+    //   },
+    // },
     {
       accessorKey: "holdings",
       header: "Holdings",
       cell: ({ row }) => {
-        const holdings = row.original.holdings
-        return <div className="font-medium">{holdings ? holdings.length : 0} stocks</div>
+        const holdings = row.original.holdings;
+        const count = holdings ? holdings.length : 0;
+        const totalWeight = holdings ? holdings.reduce((sum, h) => sum + h.weight, 0) : 0;
+        
+        return (
+          <div className="font-medium">
+            <div>{count} stocks</div>
+            {count > 0 && (
+              <div className={`text-xs ${totalWeight > 100 ? 'text-red-600' : totalWeight === 100 ? 'text-green-600' : 'text-orange-600'} pt-1`}>
+                {totalWeight.toFixed(1)}% allocated
+              </div>
+            )}
+          </div>
+        );
       },
     },
+    {
+      accessorKey: "performance",
+      header: "Performance",
+      cell: ({ row }) => {
+        const portfolio = row.original;
+        const cagr = portfolio.CAGRSinceInception;
+        const oneYear = portfolio.oneYearGains;
+        
+        return (
+          <div className="text-sm">
+            {cagr && (
+              <div className="font-medium text-blue-600">
+                CAGR: {cagr.endsWith('%') ? cagr : `${cagr}%`}
+              </div>
+            )}
+            {oneYear && (
+              <div className="text-muted-foreground pt-1">
+                1Y: {oneYear.endsWith('%') ? oneYear : `${oneYear}%`}
+              </div>
+            )}
+            {!cagr && !oneYear && <div className="text-muted-foreground">-</div>}
+          </div>
+        );
+      },
+    },
+    // {
+    //   accessorKey: "timeHorizon",
+    //   header: "Time Horizon",
+    //   cell: ({ row }) => (
+    //     <div className="font-medium">{row.original.timeHorizon || "-"}</div>
+    //   ),
+    // },
     {
       id: "actions",
       header: "Actions",
@@ -277,18 +401,18 @@ export default function PortfoliosPage() {
             title="Edit"
             onClick={() => {
               // Use either id or _id, whichever is available
-              const portfolioId = row.original.id || row.original._id
+              const portfolioId = row.original.id || row.original._id;
 
               if (!portfolioId) {
                 toast({
                   title: "Error",
                   description: "Cannot edit portfolio: Missing portfolio ID",
                   variant: "destructive",
-                })
-                return
+                });
+                return;
               }
-              setSelectedPortfolio(row.original)
-              setIsEditDialogOpen(true)
+              setSelectedPortfolio(row.original);
+              setIsEditDialogOpen(true);
             }}
           >
             <Edit className="h-4 w-4" />
@@ -299,18 +423,18 @@ export default function PortfoliosPage() {
             title="Delete"
             onClick={() => {
               // Use either id or _id, whichever is available
-              const portfolioId = row.original.id || row.original._id
+              const portfolioId = row.original.id || row.original._id;
 
               if (!portfolioId) {
                 toast({
                   title: "Error",
                   description: "Cannot delete portfolio: Missing portfolio ID",
                   variant: "destructive",
-                })
-                return
+                });
+                return;
               }
-              setSelectedPortfolio(row.original)
-              setIsDeleteDialogOpen(true)
+              setSelectedPortfolio(row.original);
+              setIsDeleteDialogOpen(true);
             }}
           >
             <Trash2 className="h-4 w-4" />
@@ -318,7 +442,7 @@ export default function PortfoliosPage() {
         </div>
       ),
     },
-  ]
+  ];
 
   return (
     <div className="space-y-6">
@@ -413,6 +537,13 @@ export default function PortfoliosPage() {
         title="Delete Portfolio"
         description="Are you sure you want to delete this portfolio? This action cannot be undone."
         onConfirm={handleDeletePortfolio}
+      />
+
+      {/* Portfolio Details Dialog */}
+      <PortfolioDetailsDialog
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        portfolio={selectedPortfolioForDetails}
       />
     </div>
   )

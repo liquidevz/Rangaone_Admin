@@ -370,45 +370,98 @@ export const testSmtpConfig = async (
   }
 };
 
-// Portfolio Types
+// Updated Portfolio Types to match the new schema
+export interface DescriptionItem {
+  key: string;
+  value: string;
+}
+
+export interface SubscriptionFee {
+  type: "monthly" | "quarterly" | "yearly";
+  price: number;
+}
+
 export interface PortfolioHolding {
   symbol: string;
   weight: number;
   sector: string;
-  status: string;
-  price: number;
-}
-
-export interface Portfolio {
-  id: string;
-  name: string;
-  description: string;
-  riskLevel: string;
-  cashRemaining?: number;
-  subscriptionFee?: number;
-  minInvestment?: number;
-  durationMonths?: number;
-  holdings?: PortfolioHolding[];
-  createdAt?: string;
-  updatedAt?: string;
-  downloadLinks?: DownloadLink[];
-  _id?: string; // For compatibility with MongoDB responses
+  stockCapType?: "small cap" | "mid cap" | "large cap" | "micro cap" | "mega cap";
+  status: "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "Addon";
+  buyPrice: number;
+  quantity: number;
+  minimumInvestmentValueStock: number;
+  price?: number; // For backward compatibility
 }
 
 export interface DownloadLink {
+  _id?: string;
+  linkType: string;
+  linkUrl: string;
+  linkDiscription?: string;
+  name?: string;
+  createdAt?: string;
+}
+
+export interface YouTubeLink {
+  _id?: string;
   link: string;
+  createdAt?: string;
+}
+
+export interface Portfolio {
+  id?: string;
+  _id?: string;
+  name: string;
+  description: DescriptionItem[];
+  cashBalance: number;
+  currentValue: number;
+  timeHorizon?: string;
+  rebalancing?: string;
+  index?: string;
+  details?: string;
+  monthlyGains?: string;
+  CAGRSinceInception?: string;
+  oneYearGains?: string;
+  subscriptionFee: SubscriptionFee[];
+  minInvestment: number;
+  durationMonths: number;
+  PortfolioCategory: string;
+  compareWith?: string;
+  expiryDate?: string;
+  holdings: PortfolioHolding[];
+  downloadLinks?: DownloadLink[];
+  youTubeLinks?: YouTubeLink[];
+  holdingsValue?: number; // Virtual field
+  createdAt?: string;
+  updatedAt?: string;
+  
+  // Legacy fields for backward compatibility
+  riskLevel?: string;
+  cashRemaining?: number;
+  subscriptionFee_legacy?: number;
 }
 
 export interface CreatePortfolioRequest {
   name: string;
-  description: string;
-  riskLevel: string;
-  cashRemaining?: number;
-  subscriptionFee?: number;
-  minInvestment?: number;
-  durationMonths?: number;
+  description: DescriptionItem[];
+  subscriptionFee: SubscriptionFee[];
+  minInvestment: number;
+  durationMonths: number;
+  expiryDate?: string;
   holdings?: PortfolioHolding[];
+  PortfolioCategory?: string;
   downloadLinks?: DownloadLink[];
+  youTubeLinks?: YouTubeLink[];
+  timeHorizon?: string;
+  rebalancing?: string;
+  index?: string;
+  details?: string;
+  monthlyGains?: string;
+  CAGRSinceInception?: string;
+  oneYearGains?: string;
+  compareWith?: string;
+  cashBalance?: number;
+  currentValue?: number;
 }
 
 // Portfolio Tip Types
@@ -463,6 +516,15 @@ export const fetchPortfolios = async (): Promise<Portfolio[]> => {
       }));
   } catch (error) {
     console.error("Error fetching portfolios:", error);
+    
+    // Return mock data if in development or if API fails
+    if (
+      process.env.NODE_ENV !== "production" ||
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === "true"
+    ) {
+      return getMockPortfolios();
+    }
+    
     throw error;
   }
 };
@@ -503,76 +565,76 @@ function generateMockObjectId(): string {
   return timestamp + machineId + processId + counter;
 }
 
-// Add this helper function to generate mock portfolio data
+// Updated mock portfolio data to match new schema
 function getMockPortfolios(): Portfolio[] {
   return [
     {
       id: generateMockObjectId(),
       name: "Conservative Portfolio",
-      description:
-        "A low-risk portfolio focused on capital preservation with some income generation.",
-      riskLevel: "low",
-      cashRemaining: 15000,
-      subscriptionFee: 999,
-      minInvestment: 10000,
+      description: [
+        { key: "home card", value: "A low-risk portfolio focused on capital preservation with some income generation." },
+        { key: "checkout card", value: "Perfect for conservative investors seeking stable returns." },
+        { key: "portfolio card", value: "Blue-chip stocks with proven track record." }
+      ],
+      cashBalance: 15000,
+      currentValue: 100000,
+      subscriptionFee: [
+        { type: "monthly", price: 999 },
+        { type: "yearly", price: 9999 }
+      ],
+      minInvestment: 100000,
       durationMonths: 12,
+      PortfolioCategory: "Basic",
+      timeHorizon: "Long-term",
+      rebalancing: "Quarterly",
+      index: "NIFTY 50",
+      monthlyGains: "1.5%",
+      CAGRSinceInception: "12%",
+      oneYearGains: "15%",
+      compareWith: "NIFTY 50 Index",
       holdings: [
         {
           symbol: "HDFC",
           weight: 20,
           sector: "Banking",
-          status: "active",
-          price: 1500,
+          status: "Hold",
+          buyPrice: 1500,
+          quantity: 13,
+          minimumInvestmentValueStock: 19500,
+          stockCapType: "large cap"
         },
         {
           symbol: "TCS",
           weight: 15,
           sector: "Technology",
-          status: "active",
-          price: 3200,
+          status: "Fresh-Buy",
+          buyPrice: 3200,
+          quantity: 4,
+          minimumInvestmentValueStock: 12800,
+          stockCapType: "large cap"
         },
         {
           symbol: "ITC",
           weight: 15,
           sector: "Consumer Goods",
-          status: "active",
-          price: 420,
-        },
+          status: "Hold",
+          buyPrice: 420,
+          quantity: 35,
+          minimumInvestmentValueStock: 14700,
+          stockCapType: "large cap"
+        }
+      ],
+      downloadLinks: [
         {
-          symbol: "RELIANCE",
-          weight: 10,
-          sector: "Energy",
-          status: "active",
-          price: 2400,
-        },
+          linkType: "prospectus",
+          linkUrl: "https://example.com/conservative-prospectus.pdf",
+          linkDiscription: "Detailed prospectus for conservative portfolio"
+        }
+      ],
+      youTubeLinks: [
         {
-          symbol: "INFY",
-          weight: 10,
-          sector: "Technology",
-          status: "active",
-          price: 1600,
-        },
-        {
-          symbol: "BHARTIARTL",
-          weight: 10,
-          sector: "Telecom",
-          status: "active",
-          price: 850,
-        },
-        {
-          symbol: "HDFCBANK",
-          weight: 10,
-          sector: "Banking",
-          status: "active",
-          price: 1650,
-        },
-        {
-          symbol: "SUNPHARMA",
-          weight: 10,
-          sector: "Healthcare",
-          status: "active",
-          price: 1100,
-        },
+          link: "https://youtube.com/watch?v=example1"
+        }
       ],
       createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
@@ -580,77 +642,60 @@ function getMockPortfolios(): Portfolio[] {
     {
       id: generateMockObjectId(),
       name: "Balanced Growth",
-      description:
-        "A balanced portfolio aiming for moderate growth with reasonable risk.",
-      riskLevel: "medium",
-      cashRemaining: 10000,
-      subscriptionFee: 1499,
-      minInvestment: 25000,
+      description: [
+        { key: "home card", value: "A balanced portfolio aiming for moderate growth with reasonable risk." },
+        { key: "checkout card", value: "Ideal for investors seeking balanced exposure." },
+        { key: "portfolio card", value: "Mix of growth and value stocks." }
+      ],
+      cashBalance: 10000,
+      currentValue: 250000,
+      subscriptionFee: [
+        { type: "monthly", price: 1499 },
+        { type: "yearly", price: 14999 }
+      ],
+      minInvestment: 250000,
       durationMonths: 24,
+      PortfolioCategory: "Premium",
+      timeHorizon: "Medium-term",
+      rebalancing: "Semi-annually",
+      index: "NIFTY 100",
+      monthlyGains: "2.1%",
+      CAGRSinceInception: "16%",
+      oneYearGains: "18%",
+      compareWith: "NIFTY 100 Index",
       holdings: [
         {
           symbol: "TATAMOTORS",
           weight: 15,
           sector: "Automotive",
-          status: "active",
-          price: 650,
+          status: "Fresh-Buy",
+          buyPrice: 650,
+          quantity: 57,
+          minimumInvestmentValueStock: 37050,
+          stockCapType: "large cap"
         },
         {
           symbol: "ICICIBANK",
           weight: 15,
           sector: "Banking",
-          status: "active",
-          price: 950,
-        },
+          status: "Hold",
+          buyPrice: 950,
+          quantity: 39,
+          minimumInvestmentValueStock: 37050,
+          stockCapType: "large cap"
+        }
+      ],
+      downloadLinks: [
         {
-          symbol: "WIPRO",
-          weight: 10,
-          sector: "Technology",
-          status: "active",
-          price: 450,
-        },
+          linkType: "research",
+          linkUrl: "https://example.com/balanced-research.pdf",
+          linkDiscription: "Research report for balanced growth portfolio"
+        }
+      ],
+      youTubeLinks: [
         {
-          symbol: "ASIANPAINT",
-          weight: 10,
-          sector: "Consumer Goods",
-          status: "active",
-          price: 3100,
-        },
-        {
-          symbol: "AXISBANK",
-          weight: 10,
-          sector: "Banking",
-          status: "active",
-          price: 950,
-        },
-        {
-          symbol: "HCLTECH",
-          weight: 10,
-          sector: "Technology",
-          status: "active",
-          price: 1200,
-        },
-        {
-          symbol: "MARUTI",
-          weight: 10,
-          sector: "Automotive",
-          status: "active",
-          price: 9800,
-        },
-        {
-          symbol: "TITAN",
-          weight: 10,
-          sector: "Consumer Goods",
-          status: "active",
-          price: 2800,
-        },
-        {
-          symbol: "BAJFINANCE",
-          weight: 10,
-          sector: "Financial Services",
-          status: "active",
-          price: 6500,
-        },
+          link: "https://youtube.com/watch?v=example2"
+        }
       ],
       createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
@@ -658,77 +703,60 @@ function getMockPortfolios(): Portfolio[] {
     {
       id: generateMockObjectId(),
       name: "Aggressive Growth",
-      description:
-        "A high-risk, high-reward portfolio focused on maximum capital appreciation.",
-      riskLevel: "high",
-      cashRemaining: 5000,
-      subscriptionFee: 1999,
-      minInvestment: 50000,
+      description: [
+        { key: "home card", value: "A high-risk, high-reward portfolio focused on maximum capital appreciation." },
+        { key: "checkout card", value: "For aggressive investors seeking maximum returns." },
+        { key: "portfolio card", value: "High-growth potential stocks." }
+      ],
+      cashBalance: 5000,
+      currentValue: 500000,
+      subscriptionFee: [
+        { type: "monthly", price: 1999 },
+        { type: "yearly", price: 19999 }
+      ],
+      minInvestment: 500000,
       durationMonths: 36,
+      PortfolioCategory: "Advanced",
+      timeHorizon: "Long-term",
+      rebalancing: "Monthly",
+      index: "NIFTY NEXT 50",
+      monthlyGains: "3.2%",
+      CAGRSinceInception: "22%",
+      oneYearGains: "25%",
+      compareWith: "NIFTY NEXT 50 Index",
       holdings: [
         {
           symbol: "ADANIENT",
           weight: 15,
           sector: "Infrastructure",
-          status: "active",
-          price: 2200,
+          status: "Fresh-Buy",
+          buyPrice: 2200,
+          quantity: 34,
+          minimumInvestmentValueStock: 74800,
+          stockCapType: "large cap"
         },
         {
           symbol: "ZOMATO",
           weight: 15,
           sector: "Technology",
-          status: "active",
-          price: 120,
-        },
+          status: "Hold",
+          buyPrice: 120,
+          quantity: 625,
+          minimumInvestmentValueStock: 75000,
+          stockCapType: "mid cap"
+        }
+      ],
+      downloadLinks: [
         {
-          symbol: "NYKAA",
-          weight: 10,
-          sector: "Retail",
-          status: "active",
-          price: 180,
-        },
+          linkType: "fact-sheet",
+          linkUrl: "https://example.com/aggressive-factsheet.pdf",
+          linkDiscription: "Fact sheet for aggressive growth portfolio"
+        }
+      ],
+      youTubeLinks: [
         {
-          symbol: "POLICYBZR",
-          weight: 10,
-          sector: "Financial Services",
-          status: "active",
-          price: 650,
-        },
-        {
-          symbol: "PAYTM",
-          weight: 10,
-          sector: "Financial Technology",
-          status: "active",
-          price: 450,
-        },
-        {
-          symbol: "IRCTC",
-          weight: 10,
-          sector: "Travel",
-          status: "active",
-          price: 680,
-        },
-        {
-          symbol: "INDIGO",
-          weight: 10,
-          sector: "Aviation",
-          status: "active",
-          price: 2400,
-        },
-        {
-          symbol: "TATASTEEL",
-          weight: 10,
-          sector: "Steel",
-          status: "active",
-          price: 120,
-        },
-        {
-          symbol: "JINDALSTEL",
-          weight: 10,
-          sector: "Steel",
-          status: "active",
-          price: 650,
-        },
+          link: "https://youtube.com/watch?v=example3"
+        }
       ],
       createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
@@ -736,36 +764,18 @@ function getMockPortfolios(): Portfolio[] {
   ];
 }
 
-// Update the fetchPortfolioById function to use admin token
 export const fetchPortfolioById = async (id: string): Promise<Portfolio> => {
   try {
     if (!id || id === "undefined") {
       throw new Error("Invalid portfolio ID");
     }
 
-    // Log the API request for debugging
     console.log(
       `Fetching portfolio with ID ${id} from: ${API_BASE_URL}/api/portfolios/${id}`
     );
 
-    // Get the admin access token
-    const adminToken = getAdminAccessToken();
-    if (!adminToken) {
-      throw new Error("Admin authentication required to access portfolio");
-    }
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`);
 
-    // Make the request with the admin token in the Authorization header
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${adminToken}`,
-    };
-
-    const response = await fetch(`${API_BASE_URL}/api/portfolios/${id}`, {
-      method: "GET",
-      headers,
-    });
-
-    // Log the response status for debugging
     console.log(`Portfolio detail API response status: ${response.status}`);
 
     if (!response.ok) {
@@ -776,7 +786,6 @@ export const fetchPortfolioById = async (id: string): Promise<Portfolio> => {
         );
       }
 
-      // Try to get the error message from the response
       try {
         const errorData = await response.json();
         throw new Error(
@@ -785,7 +794,6 @@ export const fetchPortfolioById = async (id: string): Promise<Portfolio> => {
             `Failed to fetch portfolio: Server returned ${response.status}`
         );
       } catch (jsonError) {
-        // If we can't parse the error as JSON, throw a generic error with the status code
         throw new Error(
           `Failed to fetch portfolio: Server returned ${response.status}`
         );
@@ -803,6 +811,72 @@ export const fetchPortfolioById = async (id: string): Promise<Portfolio> => {
     return portfolio;
   } catch (error) {
     console.error(`Error fetching portfolio with id ${id}:`, error);
+    
+    // Return mock data if in development or if API fails
+    if (
+      process.env.NODE_ENV !== "production" ||
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === "true"
+    ) {
+      const mockPortfolios = getMockPortfolios();
+      const mockPortfolio = mockPortfolios.find(p => p.id === id);
+      if (mockPortfolio) {
+        return mockPortfolio;
+      }
+    }
+    
+    throw error;
+  }
+};
+
+export const createPortfolio = async (
+  portfolioData: CreatePortfolioRequest
+): Promise<Portfolio> => {
+  try {
+    console.log("Creating portfolio with data:", JSON.stringify(portfolioData, null, 2));
+
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios`, {
+      method: "POST",
+      body: JSON.stringify(portfolioData),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error("Server returned HTML instead of JSON for portfolio creation");
+      }
+
+      try {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message || errorData.error || "Failed to create portfolio"
+        );
+      } catch (jsonError) {
+        throw new Error(
+          `Failed to create portfolio: Server returned ${response.status}`
+        );
+      }
+    }
+
+    const createdPortfolio = await response.json();
+    console.log("Successfully created portfolio:", createdPortfolio);
+
+    // Ensure the portfolio has an id property (API might return _id)
+    if (createdPortfolio._id && !createdPortfolio.id) {
+      createdPortfolio.id = createdPortfolio._id;
+    }
+
+    return createdPortfolio;
+  } catch (error) {
+    console.error("Error creating portfolio:", error);
+    
+    // Return mock data if in development or if API fails
+    if (
+      process.env.NODE_ENV !== "production" ||
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === "true"
+    ) {
+      return getMockCreatedPortfolio(portfolioData);
+    }
+    
     throw error;
   }
 };
@@ -815,18 +889,28 @@ const getMockCreatedPortfolio = (
     id: generateMockObjectId(),
     name: portfolioData.name,
     description: portfolioData.description,
-    riskLevel: portfolioData.riskLevel,
-    cashRemaining: portfolioData.cashRemaining,
     subscriptionFee: portfolioData.subscriptionFee,
     minInvestment: portfolioData.minInvestment,
     durationMonths: portfolioData.durationMonths,
-    holdings: portfolioData.holdings,
+    PortfolioCategory: portfolioData.PortfolioCategory || "Basic",
+    holdings: portfolioData.holdings || [],
+    downloadLinks: portfolioData.downloadLinks || [],
+    youTubeLinks: portfolioData.youTubeLinks || [],
+    timeHorizon: portfolioData.timeHorizon || "",
+    rebalancing: portfolioData.rebalancing || "",
+    index: portfolioData.index || "",
+    details: portfolioData.details || "",
+    monthlyGains: portfolioData.monthlyGains || "",
+    CAGRSinceInception: portfolioData.CAGRSinceInception || "",
+    oneYearGains: portfolioData.oneYearGains || "",
+    compareWith: portfolioData.compareWith || "",
+    cashBalance: portfolioData.cashBalance || 0,
+    currentValue: portfolioData.currentValue || portfolioData.minInvestment,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 };
 
-// Update the updatePortfolio function to use admin token
 export const updatePortfolio = async (
   id: string,
   portfolioData: CreatePortfolioRequest
@@ -838,22 +922,10 @@ export const updatePortfolio = async (
     }
 
     console.log(`Updating portfolio with ID: ${id}`);
+    console.log("Update data:", JSON.stringify(portfolioData, null, 2));
 
-    // Get the admin access token
-    const adminToken = getAdminAccessToken();
-    if (!adminToken) {
-      throw new Error("Admin authentication required to update portfolio");
-    }
-
-    // Make the request with the admin token in the Authorization header
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${adminToken}`,
-    };
-
-    const response = await fetch(`${API_BASE_URL}/api/portfolios/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {
       method: "PUT",
-      headers,
       body: JSON.stringify(portfolioData),
     });
 
@@ -865,7 +937,6 @@ export const updatePortfolio = async (
         );
       }
 
-      // Try to get the error message from the response
       try {
         const errorData = await response.json();
         throw new Error(
@@ -878,7 +949,6 @@ export const updatePortfolio = async (
       }
     }
 
-    // Parse the response
     const updatedPortfolio = await response.json();
 
     // Ensure the portfolio has an id property (API might return _id)
@@ -897,28 +967,14 @@ export const updatePortfolio = async (
   }
 };
 
-// Update the deletePortfolio function to use admin token
 export const deletePortfolio = async (id: string): Promise<void> => {
   try {
     if (!id || id === "undefined") {
       throw new Error("Invalid portfolio ID");
     }
 
-    // Get the admin access token
-    const adminToken = getAdminAccessToken();
-    if (!adminToken) {
-      throw new Error("Admin authentication required to delete portfolio");
-    }
-
-    // Make the request with the admin token in the Authorization header
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${adminToken}`,
-    };
-
-    const response = await fetch(`${API_BASE_URL}/api/portfolios/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {
       method: "DELETE",
-      headers,
     });
 
     if (!response.ok) {
@@ -929,7 +985,6 @@ export const deletePortfolio = async (id: string): Promise<void> => {
         );
       }
 
-      // Try to get the error message from the response
       try {
         const errorData = await response.json();
         throw new Error(
@@ -1024,32 +1079,6 @@ function getMockPortfolioTips(portfolioId: string): PortfolioTip[] {
     },
   ];
 }
-
-export const createPortfolio = async (
-  portfolioData: CreatePortfolioRequest
-): Promise<Portfolio> => {
-  try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios`, {
-      method: "POST",
-      body: JSON.stringify(portfolioData),
-    });
-
-    if (!response.ok) {
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned an HTML response instead of JSON");
-      }
-
-      const error = await response.json();
-      throw new Error(error.message || "Failed to create portfolio");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error creating portfolio:", error);
-    throw error;
-  }
-};
 
 export const fetchTipById = async (tipId: string): Promise<PortfolioTip> => {
   try {
@@ -1315,43 +1344,7 @@ export const fetchSubscriptions = async (): Promise<Subscription[]> => {
 
 // Add this helper function to generate mock subscription data
 function getMockSubscriptions(): Subscription[] {
-  return [
-    {
-      id: "sub_mock1",
-      userId: "user123",
-      portfolioId: "port123",
-      status: "active",
-      startDate: new Date(Date.now() - 30 * 86400000).toISOString(), // 30 days ago
-      endDate: new Date(Date.now() + 335 * 86400000).toISOString(), // 335 days in future
-      amount: 1999,
-      paymentId: "pay_123456",
-      createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-    },
-    {
-      id: "sub_mock2",
-      userId: "user456",
-      portfolioId: "port456",
-      status: "pending",
-      startDate: new Date(Date.now() - 5 * 86400000).toISOString(), // 5 days ago
-      endDate: new Date(Date.now() + 360 * 86400000).toISOString(), // 360 days in future
-      amount: 2999,
-      createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-    },
-    {
-      id: "sub_mock3",
-      userId: "user789",
-      portfolioId: "port789",
-      status: "cancelled",
-      startDate: new Date(Date.now() - 180 * 86400000).toISOString(), // 180 days ago
-      endDate: new Date(Date.now() - 30 * 86400000).toISOString(), // 30 days ago (expired)
-      amount: 999,
-      paymentId: "pay_345678",
-      createdAt: new Date(Date.now() - 180 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-    },
-  ];
+  return [];
 }
 
 export const fetchSubscriptionById = async (
@@ -1473,44 +1466,7 @@ export const fetchPaymentHistory = async (): Promise<PaymentHistory[]> => {
 
 // Add this helper function to generate mock payment history data
 function getMockPaymentHistory(): PaymentHistory[] {
-  return [
-    {
-      id: "pay_mock1",
-      userId: "user123",
-      portfolioId: "port123",
-      amount: 1999,
-      currency: "INR",
-      status: "completed",
-      paymentId: "pay_123456",
-      orderId: "order_123456",
-      paymentMethod: "card",
-      createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    },
-    {
-      id: "pay_mock2",
-      userId: "user456",
-      portfolioId: "port456",
-      amount: 2999,
-      currency: "INR",
-      status: "pending",
-      paymentId: "pay_234567",
-      orderId: "order_234567",
-      paymentMethod: "upi",
-      createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-    },
-    {
-      id: "pay_mock3",
-      userId: "user789",
-      portfolioId: "port789",
-      amount: 999,
-      currency: "INR",
-      status: "failed",
-      paymentId: "pay_345678",
-      orderId: "order_345678",
-      paymentMethod: "netbanking",
-      createdAt: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-    },
-  ];
+  return [];
 }
 
 export const updateSubscriptionStatus = async (

@@ -1,38 +1,91 @@
 import { API_BASE_URL, getAdminAccessToken } from "@/lib/auth"
 
 // Portfolio Types
+export interface DescriptionItem {
+  key: string
+  value: string
+}
+
+export interface SubscriptionFee {
+  type: 'monthly' | 'quarterly' | 'yearly'
+  price: number
+}
+
 export interface PortfolioHolding {
   symbol: string
   weight: number
   sector: string
-  status: string
-  price: number
+  stockCapType?: 'small cap' | 'mid cap' | 'large cap' | 'micro cap' | 'mega cap'
+  status: 'Hold' | 'Fresh-Buy' | 'partial-sell' | 'Sell'
+  buyPrice: number
+  quantity: number
+  minimumInvestmentValueStock: number
+}
+
+export interface DownloadLink {
+  _id?: string
+  linkType: string
+  linkUrl: string
+  name?: string
+  linkDiscription?: string
+  createdAt?: string
+}
+
+export interface YouTubeLink {
+  _id?: string
+  link: string
+  createdAt?: string
 }
 
 export interface Portfolio {
   id?: string
   _id?: string
   name: string
-  description: string
-  riskLevel?: string
-  cashRemaining?: number
-  subscriptionFee?: number
-  minInvestment?: number
-  durationMonths?: number
-  holdings?: PortfolioHolding[]
+  description: DescriptionItem[]
+  cashBalance: number
+  currentValue: number
+  timeHorizon?: string
+  rebalancing?: string
+  index?: string
+  details?: string
+  monthlyGains?: string
+  CAGRSinceInception?: string
+  oneYearGains?: string
+  subscriptionFee: SubscriptionFee[]
+  minInvestment: number
+  durationMonths: number
+  PortfolioCategory: string
+  compareWith?: string
+  expiryDate?: string
+  holdings: PortfolioHolding[]
+  downloadLinks?: DownloadLink[]
+  youTubeLinks?: YouTubeLink[]
+  holdingsValue?: number // Virtual field
   createdAt?: string
   updatedAt?: string
 }
 
 export interface CreatePortfolioRequest {
   name: string
-  description: string
-  riskLevel?: string
-  cashRemaining?: number
-  subscriptionFee?: number
-  minInvestment?: number
-  durationMonths?: number
+  description?: DescriptionItem[]
+  cashBalance?: number
+  currentValue?: number
+  timeHorizon?: string
+  rebalancing?: string
+  index?: string
+  details?: string
+  monthlyGains?: string
+  CAGRSinceInception?: string
+  oneYearGains?: string
+  subscriptionFee: SubscriptionFee[]
+  minInvestment: number
+  durationMonths: number
+  PortfolioCategory?: string
+  compareWith?: string
+  expiryDate?: string
   holdings?: PortfolioHolding[]
+  downloadLinks?: DownloadLink[]
+  youTubeLinks?: YouTubeLink[]
 }
 
 // Portfolio API Functions
@@ -71,7 +124,7 @@ export const fetchPortfolios = async (): Promise<Portfolio[]> => {
       // Try to get the error message from the response
       try {
         const errorData = await response.json()
-        throw new Error(errorData.message || `Failed to fetch portfolios: Server returned ${response.status}`)
+        throw new Error(errorData.message || errorData.error || `Failed to fetch portfolios: Server returned ${response.status}`)
       } catch (jsonError) {
         // If we can't parse the error as JSON, throw a generic error with the status code
         throw new Error(`Failed to fetch portfolios: Server returned ${response.status}`)
@@ -126,7 +179,6 @@ export const fetchPortfolios = async (): Promise<Portfolio[]> => {
   }
 }
 
-// Update the fetchPortfolioById function to use admin token
 export const fetchPortfolioById = async (id: string): Promise<Portfolio> => {
   try {
     if (!id || id === "undefined") {
@@ -220,6 +272,9 @@ export const createPortfolio = async (portfolioData: CreatePortfolioRequest): Pr
     console.log(`Using admin token: ${adminToken.substring(0, 10)}...`)
     console.log("Portfolio data being sent:", JSON.stringify(portfolioData, null, 2))
 
+    // Validate and format the data before sending
+    const formattedData = formatPortfolioData(portfolioData)
+
     // Make the request with the admin token in the Authorization header
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -229,7 +284,7 @@ export const createPortfolio = async (portfolioData: CreatePortfolioRequest): Pr
     const response = await fetch(`${API_BASE_URL}/api/portfolios`, {
       method: "POST",
       headers,
-      body: JSON.stringify(portfolioData),
+      body: JSON.stringify(formattedData),
     })
 
     console.log(`Create portfolio response status: ${response.status}`)
@@ -284,7 +339,6 @@ export const createPortfolio = async (portfolioData: CreatePortfolioRequest): Pr
   }
 }
 
-// Update the updatePortfolio function to properly format and send the data
 export const updatePortfolio = async (id: string, portfolioData: CreatePortfolioRequest): Promise<Portfolio> => {
   try {
     if (!id || id === "undefined") {
@@ -302,36 +356,13 @@ export const updatePortfolio = async (id: string, portfolioData: CreatePortfolio
     console.log(`Using admin token: ${adminToken.substring(0, 10)}...`)
     console.log("Portfolio data being sent:", JSON.stringify(portfolioData, null, 2))
 
+    // Validate and format the data before sending
+    const formattedData = formatPortfolioData(portfolioData)
+
     // Make the request with the admin token in the Authorization header
     const headers: HeadersInit = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${adminToken}`,
-    }
-
-    // Ensure all numeric values are properly converted from strings if needed
-    const formattedData = {
-      ...portfolioData,
-      cashRemaining:
-        typeof portfolioData.cashRemaining === "string"
-          ? Number.parseFloat(portfolioData.cashRemaining)
-          : portfolioData.cashRemaining,
-      subscriptionFee:
-        typeof portfolioData.subscriptionFee === "string"
-          ? Number.parseFloat(portfolioData.subscriptionFee)
-          : portfolioData.subscriptionFee,
-      minInvestment:
-        typeof portfolioData.minInvestment === "string"
-          ? Number.parseFloat(portfolioData.minInvestment)
-          : portfolioData.minInvestment,
-      durationMonths:
-        typeof portfolioData.durationMonths === "string"
-          ? Number.parseInt(portfolioData.durationMonths, 10)
-          : portfolioData.durationMonths,
-      holdings: portfolioData.holdings?.map((holding) => ({
-        ...holding,
-        weight: typeof holding.weight === "string" ? Number.parseFloat(holding.weight) : holding.weight,
-        price: typeof holding.price === "string" ? Number.parseFloat(holding.price) : holding.price,
-      })),
     }
 
     console.log("Formatted data being sent:", JSON.stringify(formattedData, null, 2))
@@ -395,7 +426,6 @@ export const updatePortfolio = async (id: string, portfolioData: CreatePortfolio
   }
 }
 
-// Update the deletePortfolio function to use admin token
 export const deletePortfolio = async (id: string): Promise<void> => {
   try {
     if (!id || id === "undefined") {
@@ -445,6 +475,159 @@ export const deletePortfolio = async (id: string): Promise<void> => {
     console.log("Successfully deleted portfolio with ID:", id)
   } catch (error) {
     console.error(`Error deleting portfolio with id ${id}:`, error)
+    throw error
+  }
+}
+
+// Helper function to format and validate portfolio data
+const formatPortfolioData = (data: CreatePortfolioRequest) => {
+  // Ensure numeric fields are properly converted
+  const formattedData = {
+    ...data,
+    minInvestment: typeof data.minInvestment === "string" ? Number.parseFloat(data.minInvestment) : data.minInvestment,
+    durationMonths: typeof data.durationMonths === "string" ? Number.parseInt(data.durationMonths, 10) : data.durationMonths,
+    cashBalance: typeof data.cashBalance === "string" ? Number.parseFloat(data.cashBalance) : data.cashBalance,
+    currentValue: typeof data.currentValue === "string" ? Number.parseFloat(data.currentValue) : data.currentValue,
+  }
+
+  // Format subscription fees
+  if (formattedData.subscriptionFee && Array.isArray(formattedData.subscriptionFee)) {
+    formattedData.subscriptionFee = formattedData.subscriptionFee.map(fee => ({
+      ...fee,
+      price: typeof fee.price === "string" ? Number.parseFloat(fee.price) : fee.price,
+    }))
+  }
+
+  // Format holdings
+  if (formattedData.holdings && Array.isArray(formattedData.holdings)) {
+    formattedData.holdings = formattedData.holdings.map(holding => ({
+      ...holding,
+      weight: typeof holding.weight === "string" ? Number.parseFloat(holding.weight) : holding.weight,
+      buyPrice: typeof holding.buyPrice === "string" ? Number.parseFloat(holding.buyPrice) : holding.buyPrice,
+      quantity: typeof holding.quantity === "string" ? Number.parseInt(holding.quantity, 10) : holding.quantity,
+      minimumInvestmentValueStock: typeof holding.minimumInvestmentValueStock === "string" 
+        ? Number.parseFloat(holding.minimumInvestmentValueStock) 
+        : holding.minimumInvestmentValueStock,
+    }))
+  }
+
+  // Clean up undefined values to avoid sending them to the API
+  Object.keys(formattedData).forEach(key => {
+    if (formattedData[key as keyof CreatePortfolioRequest] === undefined) {
+      delete formattedData[key as keyof CreatePortfolioRequest]
+    }
+  })
+
+  return formattedData
+}
+
+// Additional API functions for managing links (if needed)
+export const addYouTubeLink = async (portfolioId: string, link: string): Promise<Portfolio> => {
+  try {
+    const adminToken = getAdminAccessToken()
+    if (!adminToken) {
+      throw new Error("Admin authentication required")
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/portfolios/${portfolioId}/youtube-links`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ link }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || errorData.error || "Failed to add YouTube link")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error adding YouTube link:", error)
+    throw error
+  }
+}
+
+export const removeYouTubeLink = async (portfolioId: string, linkId: string): Promise<Portfolio> => {
+  try {
+    const adminToken = getAdminAccessToken()
+    if (!adminToken) {
+      throw new Error("Admin authentication required")
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/portfolios/${portfolioId}/youtube-links/${linkId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || errorData.error || "Failed to remove YouTube link")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error removing YouTube link:", error)
+    throw error
+  }
+}
+
+export const addDownloadLink = async (portfolioId: string, linkData: Omit<DownloadLink, '_id' | 'createdAt'>): Promise<Portfolio> => {
+  try {
+    const adminToken = getAdminAccessToken()
+    if (!adminToken) {
+      throw new Error("Admin authentication required")
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/portfolios/${portfolioId}/download-links`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify(linkData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || errorData.error || "Failed to add download link")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error adding download link:", error)
+    throw error
+  }
+}
+
+export const removeDownloadLink = async (portfolioId: string, linkId: string): Promise<Portfolio> => {
+  try {
+    const adminToken = getAdminAccessToken()
+    if (!adminToken) {
+      throw new Error("Admin authentication required")
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/portfolios/${portfolioId}/download-links/${linkId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || errorData.error || "Failed to remove download link")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error removing download link:", error)
     throw error
   }
 }
