@@ -2,6 +2,7 @@
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TipFormDialog } from "@/components/tip-form-dialog";
+import { TipDetailsModal } from "@/components/tip-details-modal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,11 +31,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { fetchPortfolios, Portfolio } from "@/lib/api";
 import {
-  createTip,
+  createGeneralTip,
   deleteTip,
-  fetchPortfolioTips,
+  fetchAllTips,
   fetchTipById,
-  getMockTips,
   updateTip,
   type CreateTipRequest,
   type Tip,
@@ -47,6 +47,10 @@ import {
   PlusCircle,
   RefreshCw,
   Trash2,
+  Download,
+  ExternalLink,
+  Building2,
+  TrendingUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -55,104 +59,56 @@ export default function TipsManagementPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [tips, setTips] = useState<Tip[]>([]);
+  const [allTips, setAllTips] = useState<Tip[]>([]);
   const [filteredTips, setFilteredTips] = useState<Tip[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("all");
+  const [portfolioFilter, setPortfolioFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [actionFilter, setActionFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
 
-  console.log("Using mock data:", selectedTip);
+  const loadPortfolios = async () => {
+    try {
+      console.log("Fetching portfolios for filter options...");
+      const portfoliosData = await fetchPortfolios();
+      console.log(`Loaded ${portfoliosData.length} portfolios:`, portfoliosData);
+      setPortfolios(portfoliosData);
+    } catch (error) {
+      console.error("Error loading portfolios:", error);
+      // Don't show error for portfolios, just continue without them
+    }
+  };
 
-  // // Mock portfolio list for the demo
-  // const portfolios = [
-  //   { id: "portfolio1", name: "Conservative Portfolio" },
-  //   { id: "portfolio2", name: "Balanced Growth" },
-  //   { id: "portfolio3", name: "Aggressive Growth" },
-  // ];
-
-  const loadData = async () => {
+  const loadAllTips = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // For demo purposes, we'll load tips from the first portfolio
-      // In a real app, you might want to load all tips or have a portfolio selector
-      const portfolioId =
-        selectedPortfolioId === "all" ? "" : selectedPortfolioId;
-      const tipsData = await fetchPortfolioTips(portfolioId);
-      setTips(tipsData);
-      setFilteredTips(tipsData);
+      console.log("Fetching all tips (general + portfolio-specific)...");
+      
+      // For now, we'll use fetchAllTips which should return all tips
+      // including portfolio-specific ones from the backend
+      const allTipsData = await fetchAllTips();
+      console.log(`Loaded ${allTipsData.length} total tips:`, allTipsData);
+      
+      setAllTips(allTipsData);
+      setFilteredTips(allTipsData);
     } catch (error) {
-      console.error("Error loading tips:", error);
+      console.error("Error loading all tips:", error);
 
-      // Set error message
       setError(
         error instanceof Error ? error.message : "Failed to load tips data"
       );
 
       toast({
         title: "Error loading tips",
-        description: "Using mock data instead",
-        variant: "destructive",
-      });
-
-      // Set mock data for demo purposes
-      const mockTips = getMockTips(
-        selectedPortfolioId !== "all" ? selectedPortfolioId : undefined
-      );
-      setTips(mockTips);
-      setFilteredTips(mockTips);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadPortfolios = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      console.log("Fetching portfolios...");
-      const data = await fetchPortfolios();
-      console.log(`Loaded ${data.length} portfolios:`, data);
-      setPortfolios(data);
-    } catch (error) {
-      console.error("Error loading portfolios:", error);
-
-      // Check if it's an authentication error
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load portfolios";
-      if (
-        errorMessage.includes("401") ||
-        errorMessage.includes("expired") ||
-        errorMessage.includes("login")
-      ) {
-        // Set error message
-        setError(
-          error instanceof Error ? error.message : "Failed to load tips data"
-        );
-
-        toast({
-          title: "Error loading tips",
-          description: "Using mock data instead",
-          variant: "destructive",
-        });
-
-        setError("Your session has expired. Please log in again.");
-      } else {
-        setError(errorMessage);
-      }
-
-      toast({
-        title: "Error",
-        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -162,19 +118,32 @@ export default function TipsManagementPage() {
 
   useEffect(() => {
     loadPortfolios();
+    loadAllTips();
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [selectedPortfolioId]);
-
-  useEffect(() => {
     // Apply filters
-    let filtered = [...tips];
+    let filtered = [...allTips];
+
+    // Filter by portfolio
+    if (portfolioFilter !== "all") {
+      if (portfolioFilter === "general") {
+        // Show only general tips (no portfolio)
+        filtered = filtered.filter((tip) => !tip.portfolio);
+      } else {
+        // Show tips for specific portfolio
+        filtered = filtered.filter((tip) => tip.portfolio === portfolioFilter);
+      }
+    }
 
     // Filter by status
     if (statusFilter !== "all") {
       filtered = filtered.filter((tip) => tip.status === statusFilter);
+    }
+
+    // Filter by action
+    if (actionFilter !== "all") {
+      filtered = filtered.filter((tip) => tip.action === actionFilter);
     }
 
     // Filter by search query
@@ -183,28 +152,34 @@ export default function TipsManagementPage() {
       filtered = filtered.filter(
         (tip) =>
           tip.title.toLowerCase().includes(query) ||
-          tip.content.toLowerCase().includes(query)
+          tip.stockId.toLowerCase().includes(query) ||
+          tip.description.toLowerCase().includes(query) ||
+          tip.content.some(item => 
+            item.key.toLowerCase().includes(query) || 
+            item.value.toLowerCase().includes(query)
+          )
       );
     }
 
     setFilteredTips(filtered);
-  }, [tips, statusFilter, searchQuery]);
+  }, [allTips, portfolioFilter, statusFilter, actionFilter, searchQuery]);
 
   const handleCreateTip = async (tipData: CreateTipRequest) => {
     try {
       if (!tipData) {
         throw new Error("Invalid tip data");
       }
-      const newTip = await createTip(tipData.portfolio, tipData);
+      
+      console.log("Creating general tip:", tipData);
+      const newTip = await createGeneralTip(tipData);
 
       toast({
-        title: "Tip Created",
-        description: "Investment tip has been created successfully",
+        title: "General Tip Created",
+        description: "General investment tip has been created successfully",
       });
 
-      // If we're using mock data, manually add the new tip to our list
-
-      loadData();
+      // Refresh the tips list
+      loadAllTips();
     } catch (error) {
       console.error("Error creating tip:", error);
       toast({
@@ -221,6 +196,7 @@ export default function TipsManagementPage() {
     if (!selectedTip) return;
 
     try {
+      console.log(`Updating tip ${selectedTip.id}:`, tipData);
       const updatedTip = await updateTip(selectedTip.id, tipData);
 
       toast({
@@ -228,9 +204,8 @@ export default function TipsManagementPage() {
         description: "Investment tip has been updated successfully",
       });
 
-      // If we're using mock data, manually update the tip in our list
-
-      loadData();
+      // Refresh the tips list
+      loadAllTips();
     } catch (error) {
       console.error("Error updating tip:", error);
       toast({
@@ -256,9 +231,8 @@ export default function TipsManagementPage() {
 
       setDeleteDialogOpen(false);
 
-      // If we're using mock data, manually remove the tip from our list
-
-      loadData();
+      // Refresh the tips list
+      loadAllTips();
     } catch (error) {
       console.error("Error deleting tip:", error);
       toast({
@@ -274,7 +248,7 @@ export default function TipsManagementPage() {
     try {
       console.log("Opening edit dialog for tip ID:", id);
       // First try to find the tip in our current list
-      const existingTip = tips.find((tip) => tip._id === id);
+      const existingTip = allTips.find((tip) => tip._id === id || tip.id === id);
 
       if (existingTip) {
         setSelectedTip(existingTip);
@@ -302,12 +276,36 @@ export default function TipsManagementPage() {
     setDeleteDialogOpen(true);
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type?.toLowerCase()) {
+  const handleTitleClick = (tip: Tip) => {
+    setSelectedTip(tip);
+    
+    if (tip.portfolio) {
+      // For portfolio tips, redirect to portfolio page
+      router.push(`/dashboard/portfolios/${tip.portfolio}/tips`);
+    } else {
+      // For general tips, open the details modal
+      setViewModalOpen(true);
+    }
+  };
+
+  const getPortfolioName = (portfolioId?: string) => {
+    if (!portfolioId) return "General Tip";
+    const portfolio = portfolios.find((p) => p.id === portfolioId);
+    return portfolio ? portfolio.name : "Unknown Portfolio";
+  };
+
+  const getActionColor = (action?: string) => {
+    if (!action) return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+    
+    switch (action.toLowerCase()) {
       case "buy":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "sell":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+      case "partial sell":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+      case "partial profit":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       case "hold":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       default:
@@ -319,8 +317,6 @@ export default function TipsManagementPage() {
     switch (status?.toLowerCase()) {
       case "active":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "inactive":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       case "closed":
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
       default:
@@ -328,56 +324,100 @@ export default function TipsManagementPage() {
     }
   };
 
-  const getPortfolioName = (portfolioId: string) => {
-    const portfolio = portfolios.find((p) => p.id === portfolioId);
-    return portfolio ? portfolio.name : "Unknown Portfolio";
+  const formatContentPreview = (content: any) => {
+    if (!content) return "No content";
+    
+    // Handle array of key-value pairs
+    if (Array.isArray(content) && content.length > 0) {
+      const firstItem = content[0];
+      if (firstItem?.key && firstItem?.value) {
+        return `${firstItem.key}: ${firstItem.value.substring(0, 50)}${firstItem.value.length > 50 ? '...' : ''}`;
+      }
+    }
+    
+    // Handle string content (legacy format)
+    if (typeof content === 'string') {
+      return content.substring(0, 50) + (content.length > 50 ? '...' : '');
+    }
+    
+    return "No content";
   };
+
+  // Check if tip can be edited (only general tips can be edited from this page)
+  const canEditTip = (tip: Tip) => !tip.portfolio;
 
   // Responsive columns configuration
   const columns: ColumnDef<Tip>[] = [
     {
       accessorKey: "title",
-      header: "Stock",
+      header: "Title",
       cell: ({ row }) => {
-        const symbol = row.getValue("title") as string;
-        return <div className="font-medium">{symbol}</div>;
+        const tip = row.original;
+        const isGeneral = !tip.portfolio;
+        
+        return (
+          <div className="max-w-[200px]">
+            <button
+              onClick={() => handleTitleClick(tip)}
+              className={`font-medium text-left truncate w-full hover:underline transition-colors ${
+                isGeneral 
+                  ? 'text-purple-600 hover:text-purple-800' 
+                  : 'text-blue-600 hover:text-blue-800'
+              }`}
+              title={isGeneral ? "Click to view details" : "Click to go to portfolio page"}
+            >
+              {row.getValue("title")}
+            </button>
+            <div className="flex items-center gap-1 mt-1">
+              {isGeneral ? (
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3 text-purple-600" />
+                  <span className="text-xs text-purple-600">General</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Building2 className="h-3 w-3 text-blue-600" />
+                  <span className="text-xs text-blue-600">Portfolio</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "stockId",
+      header: "Stock Symbol",
+      cell: ({ row }) => {
+        const stockSymbol = row.getValue("stockId") as string;
+        return (
+          <div className="font-medium text-blue-600">{stockSymbol}</div>
+        );
+      },
+    },
+    {
+      accessorKey: "action",
+      header: "Action",
+      cell: ({ row }) => {
+        const action = row.getValue("action") as string;
+        return action ? (
+          <Badge className={getActionColor(action)}>
+            {action.charAt(0).toUpperCase() + action.slice(1)}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
       },
     },
     {
       accessorKey: "content",
       header: "Content",
       cell: ({ row }) => {
-        const content = row.getValue("content") as string;
+        const content = row.getValue("content");
         return (
-          <div className="max-w-[120px] sm:max-w-[200px] md:max-w-[300px] truncate">
-            {content || (
-              <span className="text-muted-foreground italic">No content</span>
-            )}
+          <div className="max-w-[150px] sm:max-w-[250px] truncate" title={formatContentPreview(content)}>
+            {formatContentPreview(content)}
           </div>
-        );
-      },
-    },
-    {
-      accessorKey: "portfolio",
-      header: "Portfolio",
-      cell: ({ row }) => {
-        const portfolioId = row.getValue("portfolio") as string;
-        return (
-          <div className="hidden md:block">{getPortfolioName(portfolioId)}</div>
-        );
-      },
-    },
-    {
-      accessorKey: "type",
-      header: "Type",
-      cell: ({ row }) => {
-        const type = row.getValue("type") as string;
-        return type ? (
-          <Badge className={getTypeColor(type)}>
-            {type.charAt(0).toUpperCase() + type.slice(1)}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground">General</span>
         );
       },
     },
@@ -387,7 +427,9 @@ export default function TipsManagementPage() {
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return status ? (
-          <Badge className={getStatusColor(status)}>{status}</Badge>
+          <Badge className={getStatusColor(status)}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Badge>
         ) : (
           <span className="text-muted-foreground">-</span>
         );
@@ -395,13 +437,23 @@ export default function TipsManagementPage() {
     },
     {
       accessorKey: "targetPrice",
-      header: "Target Price",
+      header: "Target",
       cell: ({ row }) => {
-        const targetPrice = row.getValue("targetPrice") as number;
-        return targetPrice ? (
-          <div className="hidden md:block">₹{targetPrice.toLocaleString()}</div>
-        ) : (
-          <span className="hidden md:block text-muted-foreground">-</span>
+        const targetPrice = row.getValue("targetPrice") as string;
+        const targetPercentage = row.original.targetPercentage;
+        
+        return (
+          <div className="text-sm">
+            {targetPrice && (
+              <div className="font-medium">₹{targetPrice}</div>
+            )}
+            {targetPercentage && (
+              <div className="text-muted-foreground">{targetPercentage}</div>
+            )}
+            {!targetPrice && !targetPercentage && (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
         );
       },
     },
@@ -409,40 +461,53 @@ export default function TipsManagementPage() {
       accessorKey: "createdAt",
       header: "Created",
       cell: ({ row }) => {
-        const date = row.getValue("createdAt") as string;
-        return (
-          <div className="hidden md:block">
-            {new Date(date).toLocaleDateString()}
-          </div>
-        );
+        const date = row.original.createdAt as string;
+        return <div className="text-sm">{new Date(date).toLocaleDateString()}</div>;
       },
     },
     {
       id: "actions",
+      header: "Actions",
       cell: ({ row }) => {
         const tip = row.original;
+        const isGeneral = !tip.portfolio;
 
-        console.log("Rendering actions for tip:", tip);
         return (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center">
             {/* Desktop view - separate buttons */}
             <div className="hidden md:flex space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => openEditDialog(tip.id)}
-              >
-                <Pencil className="h-4 w-4" />
-                <span className="sr-only">Edit</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => openDeleteDialog(tip)}
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Delete</span>
-              </Button>
+              {isGeneral ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openEditDialog(tip.id)}
+                    title="Edit general tip"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span className="sr-only">Edit</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openDeleteDialog(tip)}
+                    title="Delete general tip"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Delete</span>
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/dashboard/portfolios/${tip.portfolio}/tips`)}
+                  title="Edit in portfolio page"
+                >
+                  <Building2 className="h-3 w-3 mr-1" />
+                  Portfolio
+                </Button>
+              )}
             </div>
 
             {/* Mobile view - dropdown menu */}
@@ -455,14 +520,23 @@ export default function TipsManagementPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => openEditDialog(tip.id)}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    <span>Edit</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openDeleteDialog(tip)}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    <span>Delete</span>
-                  </DropdownMenuItem>
+                  {isGeneral ? (
+                    <>
+                      <DropdownMenuItem onClick={() => openEditDialog(tip.id)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        <span>Edit</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openDeleteDialog(tip)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <DropdownMenuItem onClick={() => router.push(`/dashboard/portfolios/${tip.portfolio}/tips`)}>
+                      <Building2 className="mr-2 h-4 w-4" />
+                      <span>View in Portfolio</span>
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -481,12 +555,12 @@ export default function TipsManagementPage() {
               Investment Tips Management
             </h1>
             <p className="text-muted-foreground">
-              Manage investment tips for all portfolios
+              Unified view of all investment tips - portfolio-specific and general
             </p>
           </div>
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
             <Button
-              onClick={() => loadData()}
+              onClick={() => loadAllTips()}
               variant="outline"
               className="w-full sm:w-auto"
             >
@@ -498,10 +572,24 @@ export default function TipsManagementPage() {
               className="w-full sm:w-auto"
             >
               <PlusCircle className="mr-2 h-4 w-4" />
-              Add Tip
+              Add General Tip
             </Button>
           </div>
         </div>
+
+        {/* Information Alert */}
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Tip Management Info</AlertTitle>
+          <AlertDescription>
+            <div className="space-y-1">
+              <p>• <strong>General Tips:</strong> Can be created/edited here - visible to all users</p>
+              <p>• <strong>Portfolio Tips:</strong> Must be managed from individual portfolio pages</p>
+              <p>• <strong>Click title:</strong> View details (general) or go to portfolio page (portfolio tips)</p>
+              <p>• Use the portfolio filter below to view tips by category</p>
+            </div>
+          </AlertDescription>
+        </Alert>
 
         {/* Error alert */}
         {error && (
@@ -514,26 +602,32 @@ export default function TipsManagementPage() {
 
         <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle>Investment Tips</CardTitle>
+            <CardTitle>All Investment Tips</CardTitle>
             <CardDescription>
-              View and manage investment tips across all portfolios
+              View and manage all investment tips across portfolios and general tips
             </CardDescription>
 
             {/* Filters - responsive grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
               <div>
-                <Select
-                  value={selectedPortfolioId}
-                  onValueChange={setSelectedPortfolioId}
-                >
+                <Select value={portfolioFilter} onValueChange={setPortfolioFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Filter by Portfolio" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Portfolios</SelectItem>
+                    <SelectItem value="all">All Tips</SelectItem>
+                    <SelectItem value="general">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-purple-600" />
+                        General Tips
+                      </div>
+                    </SelectItem>
                     {portfolios.map((portfolio) => (
-                      <SelectItem key={portfolio.id} value={portfolio.id}>
-                        {portfolio.name}
+                      <SelectItem key={portfolio.id ?? ""} value={portfolio.id ?? ""}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-blue-600" />
+                          {portfolio.name}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -553,7 +647,23 @@ export default function TipsManagementPage() {
                 </Select>
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
+                <Select value={actionFilter} onValueChange={setActionFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by Action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Actions</SelectItem>
+                    <SelectItem value="buy">Buy</SelectItem>
+                    <SelectItem value="sell">Sell</SelectItem>
+                    <SelectItem value="partial sell">Partial Sell</SelectItem>
+                    <SelectItem value="partial profit">Partial Profit</SelectItem>
+                    <SelectItem value="hold">Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
                 <Input
                   placeholder="Search tips..."
                   value={searchQuery}
@@ -569,47 +679,70 @@ export default function TipsManagementPage() {
               </div>
             ) : filteredTips.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground mb-2">
                   No tips found matching your criteria.
                 </p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => setCreateDialogOpen(true)}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Your First Tip
-                </Button>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {portfolioFilter === "general" 
+                    ? "Create your first general investment tip for all users."
+                    : "Try adjusting your filters or create a new tip."
+                  }
+                </p>
+                {(portfolioFilter === "all" || portfolioFilter === "general") && (
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setCreateDialogOpen(true)}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add General Tip
+                  </Button>
+                )}
               </div>
             ) : (
-              <DataTable columns={columns} data={filteredTips} />
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground flex items-center justify-between">
+                  <span>Showing {filteredTips.length} tip{filteredTips.length !== 1 ? 's' : ''}</span>
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3 text-purple-600" />
+                      <span>General Tips: {filteredTips.filter(t => !t.portfolio).length}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Building2 className="h-3 w-3 text-blue-600" />
+                      <span>Portfolio Tips: {filteredTips.filter(t => t.portfolio).length}</span>
+                    </div>
+                  </div>
+                </div>
+                <DataTable 
+                  columns={columns} 
+                  data={filteredTips} 
+                  searchColumn="title"
+                  isLoading={isLoading}
+                />
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Create Tip Dialog */}
+        {/* Create General Tip Dialog - Only for general tips */}
         <TipFormDialog
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
           onSubmit={handleCreateTip}
-          title="Create Investment Tip"
-          description="Add a new investment tip for a portfolio"
-          portfolios={portfolios}
-          selectedPortfolioId={
-            selectedPortfolioId === "all" ? "" : selectedPortfolioId
-          }
+          title="Create General Investment Tip"
+          description="Add a new general investment tip visible to all users (not tied to any portfolio)"
         />
 
-        {/* Edit Tip Dialog */}
-        {selectedTip && (
+        {/* Edit Tip Dialog - Only for general tips */}
+        {selectedTip && !selectedTip.portfolio && (
           <TipFormDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
             onSubmit={handleEditTip}
             initialData={selectedTip}
-            title="Edit Investment Tip"
-            description="Modify an existing investment tip"
-            portfolios={portfolios}
+            title="Edit General Investment Tip"
+            description="Modify an existing general investment tip"
           />
         )}
 
@@ -621,6 +754,14 @@ export default function TipsManagementPage() {
           title="Delete Investment Tip"
           description={`Are you sure you want to delete this tip? This action cannot be undone.`}
           confirmText="Delete"
+        />
+
+        {/* Tip Details Modal - For viewing general tips */}
+        <TipDetailsModal
+          open={viewModalOpen}
+          onOpenChange={setViewModalOpen}
+          tip={selectedTip}
+          portfolio={selectedTip?.portfolio ? portfolios.find(p => p.id === selectedTip.portfolio) : undefined}
         />
       </div>
     </div>
