@@ -1,20 +1,21 @@
 import { API_BASE_URL, getAdminAccessToken } from "@/lib/auth";
 import { Portfolio } from "./api";
 
-// Check if we're in development mode or if mock data is enabled
-const IS_DEV = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === "true";
-
 // Bundle Types
 export interface PortfolioReference {
   id: string;
   name?: string;
   description?: string;
+  subscriptionFee?: Array<{
+    type: "monthly" | "quarterly" | "yearly";
+    price: number;
+  }>;
 }
 
 export interface Bundle {
+ _id?: string;
   id?: string;
-  _id?: string;
-  name: string;
+   name: string;
   description: string;
   portfolios: Array<string | Portfolio | PortfolioReference>;
   discountPercentage: number;
@@ -28,6 +29,59 @@ export interface CreateBundleRequest {
   portfolios: Array<string | PortfolioReference>;
   discountPercentage: number;
 }
+
+// Helper function to safely extract portfolio ID
+export const getPortfolioId = (portfolioItem: string | Portfolio | PortfolioReference): string => {
+  if (typeof portfolioItem === 'string') {
+    return portfolioItem;
+  }
+  if (typeof portfolioItem === 'object' && portfolioItem !== null) {
+    return (portfolioItem as any).id || (portfolioItem as any)._id || '';
+  }
+  return '';
+};
+
+// Helper function to get portfolio name safely
+export const getPortfolioName = (
+  portfolioItem: string | Portfolio | PortfolioReference,
+  portfolioLookup: Record<string, Portfolio> = {}
+): string => {
+  if (typeof portfolioItem === 'string') {
+    const portfolio = portfolioLookup[portfolioItem];
+    return portfolio?.name || `Portfolio ${portfolioItem.substring(0, 8)}...`;
+  }
+  if (typeof portfolioItem === 'object' && portfolioItem !== null) {
+    return (portfolioItem as any).name || `Portfolio ${getPortfolioId(portfolioItem).substring(0, 8)}...`;
+  }
+  return 'Unknown Portfolio';
+};
+
+// Helper function to get primary subscription fee
+export const getPortfolioPrimaryFee = (
+  portfolioItem: string | Portfolio | PortfolioReference,
+  portfolioLookup: Record<string, Portfolio> = {}
+): number => {
+  let portfolio: Portfolio | undefined;
+  
+  if (typeof portfolioItem === 'string') {
+    portfolio = portfolioLookup[portfolioItem];
+  } else if (typeof portfolioItem === 'object' && portfolioItem !== null) {
+    portfolio = portfolioItem as Portfolio;
+  }
+  
+  if (!portfolio || !Array.isArray(portfolio.subscriptionFee) || portfolio.subscriptionFee.length === 0) {
+    return 0;
+  }
+  
+  // First try to find monthly fee
+  const monthlyFee = portfolio.subscriptionFee.find(fee => fee.type === 'monthly');
+  if (monthlyFee) {
+    return monthlyFee.price;
+  }
+  
+  // Otherwise return the first fee
+  return portfolio.subscriptionFee[0].price;
+};
 
 // Bundle API Functions
 export const fetchBundles = async (): Promise<Bundle[]> => {
@@ -427,60 +481,6 @@ export const deleteBundle = async (id: string): Promise<void> => {
   }
 };
 
-// Helper for mock data to include actual portfolio objects
-export function getMockBundles(): Bundle[] {
-  // We can't import mock portfolios directly due to circular dependencies
-  // Just return the basic mock bundles with IDs
-  return [
-    {
-      id: "61a2d4b87d9c34f7d4f8a101",
-      name: "Beginner Investment Pack",
-      description: "A collection of low-risk portfolios for new investors",
-      portfolios: [
-        "615a2d4b87d9c34f7d4f8a12",
-        "615a2d4b87d9c34f7d4f8a13"
-      ],
-      discountPercentage: 15,
-      createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-    },
-    {
-      id: "61a2d4b87d9c34f7d4f8a102",
-      name: "Diversified Growth Bundle",
-      description: "Mixed portfolios for balanced growth",
-      portfolios: [
-        "615a2d4b87d9c34f7d4f8a14",
-        "615a2d4b87d9c34f7d4f8a15",
-        "615a2d4b87d9c34f7d4f8a16"
-      ],
-      discountPercentage: 20,
-      createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-    },
-    {
-      id: "61a2d4b87d9c34f7d4f8a103",
-      name: "High Growth Pack",
-      description: "Higher risk portfolios for aggressive growth",
-      portfolios: [
-        "615a2d4b87d9c34f7d4f8a17",
-        "615a2d4b87d9c34f7d4f8a18"
-      ],
-      discountPercentage: 10,
-      createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 15 * 86400000).toISOString(),
-    },
-  ];
-}
-
-export function getMockCreatedBundle(bundleData: CreateBundleRequest): Bundle {
-  return {
-    id: `mock_${Math.random().toString(36).substring(2, 9)}`,
-    ...bundleData,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-}
-
 // Enhanced fetch function to include portfolio details
 export const fetchBundleWithPortfolioDetails = async (id: string): Promise<Bundle> => {
   try {
@@ -499,12 +499,18 @@ export const fetchBundleWithPortfolioDetails = async (id: string): Promise<Bundl
         const portfolioIds = bundle.portfolios as string[];
         const portfolioObjects = portfolioIds.map(portfolioId => {
           const portfolio = portfolios.find(p => p.id === portfolioId);
+          
           // If we can't find the portfolio, return a simple object with id, name, and description
-          return portfolio || { 
-            id: portfolioId, 
-            name: `Portfolio ${portfolioId.substring(0, 8)}...`, 
-            description: "Portfolio details not available" 
-          };
+          if (!portfolio) {
+            return { 
+              id: portfolioId, 
+              name: `Portfolio ${portfolioId.substring(0, 8)}...`, 
+              description: "Portfolio details not available",
+              subscriptionFee: []
+            };
+          }
+          
+          return portfolio;
         });
         
         // Return the bundle with full portfolio objects
@@ -524,4 +530,59 @@ export const fetchBundleWithPortfolioDetails = async (id: string): Promise<Bundl
     console.error(`Error fetching bundle with ID ${id}:`, error);
     throw error;
   }
-}; 
+};
+
+// Helper function to safely create portfolio options for MultiSelect
+export const createPortfolioOptions = (portfolios: Portfolio[]) => {
+  return portfolios
+    .filter(portfolio => {
+      const id = portfolio.id || portfolio._id;
+      return id && id.trim() !== '';
+    })
+    .map((portfolio) => {
+      const id = portfolio.id || portfolio._id || "";
+      
+      // Get home card description
+      const homeCardDesc = Array.isArray(portfolio.description) 
+        ? portfolio.description.find(d => d.key === "home card")?.value || ""
+        : "";
+      
+      // Get primary subscription fee (monthly preferred, otherwise first)
+      const primaryFee = Array.isArray(portfolio.subscriptionFee) && portfolio.subscriptionFee.length > 0
+        ? (() => {
+            const monthlyFee = portfolio.subscriptionFee.find(fee => fee.type === 'monthly');
+            return monthlyFee ? monthlyFee.price : portfolio.subscriptionFee[0].price;
+          })()
+        : 0;
+      
+      return {
+        label: portfolio.name || `Portfolio ${id.substring(0, 8)}...`,
+        value: id,
+        description: primaryFee > 0 
+          ? `Fee: ₹${primaryFee}` 
+          : homeCardDesc || ''
+      };
+    });
+};
+
+// Helper function to format portfolio data for display
+export const formatPortfolioForDisplay = (portfolio: Portfolio) => {
+  const homeCardDescription = Array.isArray(portfolio.description)
+    ? portfolio.description.find(d => d.key === "home card")?.value || ""
+    : "";
+    
+  const primaryFee = Array.isArray(portfolio.subscriptionFee) && portfolio.subscriptionFee.length > 0
+    ? (() => {
+        const monthlyFee = portfolio.subscriptionFee.find(fee => fee.type === 'monthly');
+        return monthlyFee ? monthlyFee.price : portfolio.subscriptionFee[0].price;
+      })()
+    : 0;
+    
+  return {
+    id: portfolio.id || portfolio._id || "",
+    name: portfolio.name || "Unknown Portfolio",
+    description: homeCardDescription,
+    primaryFee: primaryFee,
+    category: portfolio.PortfolioCategory || "Basic"
+  };
+};

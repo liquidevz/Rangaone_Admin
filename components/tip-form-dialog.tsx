@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,70 +27,55 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "@/components/ui/use-toast";
-import { fetchPortfolios } from "@/lib/api-portfolios";
-import type { CreateTipRequest, Tip } from "@/lib/api-tips";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
+import { useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
+import type { CreateTipRequest, Tip } from "@/lib/api-tips";
 
-// Form schema
-const tipFormSchema = z.object({
+// Validation schema for the general tip form
+const tipSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  stockId: z.string().min(1, "Stock symbol is required"),
   content: z
     .array(
-      z
-        .string()
-        .min(10, "Each content item must be at least 10 characters")
-        .max(500, "Each content item must be less than 500 characters")
+      z.object({
+        key: z.string().min(1, "Key is required"),
+        value: z.string().min(1, "Value is required"),
+      })
     )
     .min(1, "At least one content item is required"),
-  status: z.enum(["Active", "Closed"]).default("Active"),
-  type: z.enum(["general", "buy", "sell", "hold"]).default("general"),
-  targetPrice: z.union([
-    z.number().positive("Target price must be positive").optional(),
-    z
-      .string()
-      .transform((val) => {
-        const num = Number.parseFloat(val);
-        return isNaN(num) ? undefined : num;
-      })
-      .optional(),
-  ]),
-  buyRange: z
-    .string()
-    .regex(/^\d+\s*-\s*\d+$/, "Must be in format 'number - number'")
-    .optional(),
-  addMoreAt: z.union([
-    z.number().positive("Add more price must be positive").optional(),
-    z
-      .string()
-      .transform((val) => {
-        const num = Number.parseFloat(val);
-        return isNaN(num) ? undefined : num;
-      })
-      .optional(),
-  ]),
-  tipUrl: z.string().url("Must be a valid URL").optional(),
-  horizon: z
-    .enum(["Short Term", "Medium Term", "Long Term"])
-    .default("Medium Term"),
-  portfolio: z.string().min(1, "Portfolio is required"),
+  description: z.string().min(1, "Description is required"),
+  status: z.enum(["Active", "Closed"]),
+  action: z.string().optional(),
+  buyRange: z.string().optional(),
+  targetPrice: z.string().optional(),
+  targetPercentage: z.string().optional(), 
+  addMoreAt: z.string().optional(), 
+  tipUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")), 
+  exitPrice: z.string().optional(),
+  exitStatus: z.string().optional(),
+  exitStatusPercentage: z.string().optional(),
+  horizon: z.string().optional(),
+  downloadLinks: z.array(
+    z.object({
+      name: z.string().min(1, "Name is required"),
+      url: z.string().url("Must be a valid URL"),
+    })
+  ).optional(),
 });
 
-type TipFormValues = z.infer<typeof tipFormSchema>;
+type TipFormValues = z.infer<typeof tipSchema>;
 
 interface TipFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: CreateTipRequest) => Promise<void>;
+  onSubmit: (tipData: CreateTipRequest) => Promise<void>;
   initialData?: Tip;
   title: string;
   description: string;
-  portfolios?: { id: string; name: string }[];
-  selectedPortfolioId?: string;
 }
 
 export function TipFormDialog({
@@ -99,201 +85,154 @@ export function TipFormDialog({
   initialData,
   title,
   description,
-  portfolios = [],
-  selectedPortfolioId,
 }: TipFormDialogProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(false);
-  const [availablePortfolios, setAvailablePortfolios] =
-    useState<{ id: string; name: string }[]>(portfolios);
-
-  console.log("Available portfolios:", initialData);
-
-  // Default values for the form
-  const defaultValues: Partial<TipFormValues> = {
-    title: initialData?.title || "",
-    content: initialData?.content ? [initialData.content] : [""],
-    status: (initialData?.status as any) || "Active",
-    type: (initialData?.type as any) || "general",
-    targetPrice: initialData?.targetPrice || undefined,
-    buyRange: initialData?.buyRange || "",
-    addMoreAt: initialData?.addMoreAt || undefined,
-    tipUrl: initialData?.tipUrl || "",
-    horizon: (initialData?.horizon as any) || "Medium Term",
-    portfolio: initialData?.portfolio || selectedPortfolioId || "",
-  };
+  const { toast } = useToast();
 
   const form = useForm<TipFormValues>({
-    resolver: zodResolver(tipFormSchema),
-    defaultValues,
+    resolver: zodResolver(tipSchema),
+    defaultValues: {
+      title: "",
+      stockId: "",
+      content: [{ key: "", value: "" }],
+      description: "",
+      status: "Active",
+      action: undefined,
+      buyRange: "",
+      targetPrice: "",
+      targetPercentage: "",
+      addMoreAt: "", 
+      tipUrl: "",
+      exitPrice: "", 
+      exitStatus: "", 
+      exitStatusPercentage: "",
+      horizon: "Long Term",
+      downloadLinks: [],
+    },
   });
 
-  // Watch the type field to conditionally show target price
-  const watchType = form.watch("type");
-  const showTargetPrice = watchType === "buy" || watchType === "sell";
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { isSubmitting },
+  } = form;
 
-  // Handle adding new content field
-  const addContentField = () => {
-    const currentContent = form.getValues("content") || [];
-    form.setValue("content", [...currentContent, ""]);
-  };
+  const { fields: contentFields, append: appendContent, remove: removeContent } = useFieldArray({
+    control,
+    name: "content",
+  });
 
-  // Handle removing content field
-  const removeContentField = (index: number) => {
-    const currentContent = form.getValues("content") || [];
-    if (currentContent.length <= 1) return; // Don't remove the last one
+  const { fields: downloadFields, append: appendDownload, remove: removeDownload } = useFieldArray({
+    control,
+    name: "downloadLinks",
+  });
 
-    const newContent = currentContent.filter((_, i) => i !== index);
-    form.setValue("content", newContent);
-  };
+  const watchedAction = watch("action");
+  const showTargetFields = watchedAction === "buy" || watchedAction === "sell";
+  const showExitFields = watchedAction === "sell" || watchedAction === "partial sell" || watchedAction === "partial profit";
 
-  // Fetch portfolios on component mount
-  useEffect(() => {
-    const fetchAvailablePortfolios = async () => {
-      setIsLoadingPortfolios(true);
-      try {
-        const fetchedPortfolios = await fetchPortfolios();
-        setAvailablePortfolios(
-          fetchedPortfolios.map((p) => ({ id: p.id, name: p.name }))
-        );
-
-        // If we have portfolios and no portfolio is selected, select the first one
-        if (fetchedPortfolios.length > 0 && !form.getValues("portfolio")) {
-          form.setValue("portfolio", fetchedPortfolios[0].id);
-        }
-      } catch (error) {
-        console.error("Error fetching portfolios:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load portfolios. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingPortfolios(false);
-      }
-    };
-
-    fetchAvailablePortfolios();
-  }, [form, toast]);
-
-  async function handleSubmit(values: TipFormValues) {
-    setIsSubmitting(true);
-    try {
-      // Extract portfolio from values if it exists
-      const { portfolio, ...tipData } = values;
-
-      // Combine content array into a single string for the API
-      const requestData: CreateTipRequest = {
-        ...tipData,
-        content: tipData.content.join("\n\n"), // Join with double newlines
-        portfolio: portfolio,
+  // Reset form when dialog opens/closes or initialData changes
+  React.useEffect(() => {
+    if (open) {
+      const defaultValues: TipFormValues = {
+        title: initialData?.title || "",
+        stockId: initialData?.stockId || "",
+        content: initialData?.content && initialData.content.length > 0 
+          ? initialData.content 
+          : [{ key: "", value: "" }],
+        description: initialData?.description || "",
+        status: initialData?.status || "Active",
+        action: initialData?.action || undefined,
+        buyRange: initialData?.buyRange || "", 
+        targetPrice: initialData?.targetPrice || "", 
+        targetPercentage: initialData?.targetPercentage || "", 
+        addMoreAt: initialData?.addMoreAt || "", 
+        tipUrl: initialData?.tipUrl || "",
+        exitPrice: initialData?.exitPrice || "",
+        exitStatus: initialData?.exitStatus || "",
+        exitStatusPercentage: initialData?.exitStatusPercentage || "",
+        horizon: initialData?.horizon || "Long Term",
+        downloadLinks: initialData?.downloadLinks || [],
       };
 
-      console.log("Submitting tip data:", requestData);
+      reset(defaultValues);
+    }
+  }, [open, initialData, reset]);
 
-      await onSubmit(requestData);
-      onOpenChange(false);
-      form.reset(defaultValues);
-    } catch (error) {
-      console.error("Error submitting form:", error);
+  const onValidSubmit = async (data: TipFormValues) => {
+    try {
+      const tipData: CreateTipRequest = {
+        title: data.title,
+        stockId: data.stockId,
+        content: data.content.filter(item => item.key.trim() && item.value.trim()),
+        description: data.description,
+        status: data.status,
+        action: data.action,
+        buyRange: data.buyRange || undefined,
+        targetPrice: data.targetPrice || undefined,
+        targetPercentage: data.targetPercentage || undefined,
+        addMoreAt: data.addMoreAt || undefined,
+        tipUrl: data.tipUrl || undefined,
+        exitPrice: data.exitPrice || undefined,
+        exitStatus: data.exitStatus || undefined,
+        exitStatusPercentage: data.exitStatusPercentage || undefined,
+        horizon: data.horizon,
+        downloadLinks: data.downloadLinks?.filter(link => link.name.trim() && link.url.trim()) || [],
+      };
+
+      console.log("Submitting general tip data:", tipData);
+
+      await onSubmit(tipData);
       toast({
-        title: "Error",
-        description: "Failed to submit tip. Please try again.",
+        title: "Success",
+        description: initialData ? "Tip updated successfully" : "Tip created successfully",
+      });
+      onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred";
+      
+      toast({
+        title: "Failed to save tip",
+        description: msg,
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
-  }
+  };
+
+  const addContentField = () => {
+    appendContent({ key: "", value: "" });
+  };
+
+  const addDownloadLink = () => {
+    appendDownload({ name: "", url: "" });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-
+      <DialogContent className="sm:max-w-[800px] overflow-y-auto max-h-[90vh]">
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-6"
-          >
-            <FormField
-              control={form.control}
-              name="portfolio"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Portfolio</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={isSubmitting || isLoadingPortfolios}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select portfolio" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {isLoadingPortfolios ? (
-                        <SelectItem value="loading" disabled>
-                          Loading portfolios...
-                        </SelectItem>
-                      ) : availablePortfolios.length > 0 ? (
-                        availablePortfolios.map((portfolio) => (
-                          <SelectItem key={portfolio.id} value={portfolio.id}>
-                            {portfolio.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="none" disabled>
-                          No portfolios available
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Select the portfolio this tip belongs to
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={handleSubmit(onValidSubmit)}>
+            <DialogHeader>
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription>{description}</DialogDescription>
+            </DialogHeader>
 
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter tip title"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Title for this investment tip
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="space-y-4">
-              <FormLabel>Content</FormLabel>
-              {form.watch("content")?.map((_, index) => (
-                <div key={index} className="flex items-start gap-2">
+            <div className="grid gap-6 py-4">
+              {/* Basic Information Section */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-lg border-b pb-2">Basic Information</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
-                    control={form.control}
-                    name={`content.${index}`}
+                    control={control}
+                    name="title"
                     render={({ field }) => (
-                      <FormItem className="flex-1">
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Title *</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder={`Content ${index + 1}`}
+                            placeholder="Enter tip title"
                             {...field}
                             disabled={isSubmitting}
                           />
@@ -302,225 +241,425 @@ export function TipFormDialog({
                       </FormItem>
                     )}
                   />
-                  {index > 0 && (
+
+                  <FormField
+                    control={control}
+                    name="stockId" 
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Stock Symbol *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., AAPL, TSLA, RELIANCE"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Enter the stock symbol this tip is about
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status *</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={isSubmitting}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Closed">Closed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description *</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter tip description"
+                          className="min-h-[80px]"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Content Section */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-lg border-b pb-2">Content (Key-Value Pairs)</h4>
+                {contentFields.map((field, index) => (
+                  <div key={field.id} className="flex items-start gap-2 p-3 border rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
+                      <FormField
+                        control={control}
+                        name={`content.${index}.key`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Key</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Strategy, Analysis, Outlook"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={control}
+                        name={`content.${index}.value`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Value</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Enter content value"
+                                className="min-h-[60px]"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    {contentFields.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeContent(index)}
+                        className="mt-6"
+                        disabled={isSubmitting}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addContentField}
+                  className="gap-1"
+                  disabled={isSubmitting}
+                >
+                  <Plus className="h-4 w-4" /> Add Content Item
+                </Button>
+              </div>
+
+              {/* Action & Investment Details Section */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-lg border-b pb-2">Investment Details</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="action"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Action</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || ""}
+                          disabled={isSubmitting}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select action" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="buy">Buy</SelectItem>
+                            <SelectItem value="sell">Sell</SelectItem>
+                            <SelectItem value="partial sell">Partial Sell</SelectItem>
+                            <SelectItem value="partial profit">Partial Profit</SelectItem>
+                            <SelectItem value="hold">Hold</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="horizon"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Investment Horizon *</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={isSubmitting}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select horizon" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Short Term">Short Term</SelectItem>
+                            <SelectItem value="Medium Term">Medium Term</SelectItem>
+                            <SelectItem value="Long Term">Long Term</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="buyRange" 
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Buy Range (₹)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 1000-1200"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="addMoreAt" 
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Add More At (₹)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter additional buy price"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {showTargetFields && (
+                    <>
+                      <FormField
+                        control={control}
+                        name="targetPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Target Price (₹)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter target price"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={control}
+                        name="targetPercentage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Target Percentage (%)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., 15%"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  )}
+
+                  {showExitFields && (
+                    <>
+                      <FormField
+                        control={control}
+                        name="exitPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Exit Price (₹)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter exit price"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={control}
+                        name="exitStatus"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Exit Status</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Target Achieved"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={control}
+                        name="exitStatusPercentage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Exit Status Percentage (%)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., 20%"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  )}
+                </div>
+
+                <FormField
+                  control={control}
+                  name="tipUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tip URL</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="https://example.com/analysis"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Download Links Section */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-lg border-b pb-2">Download Links</h4>
+                {downloadFields.map((field, index) => (
+                  <div key={field.id} className="flex items-start gap-2 p-3 border rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
+                      <FormField
+                        control={control}
+                        name={`downloadLinks.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Link Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Research Report"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={control}
+                        name={`downloadLinks.${index}.url`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Download URL</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="https://example.com/file.pdf"
+                                {...field}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => removeContentField(index)}
+                      onClick={() => removeDownload(index)}
+                      className="mt-6"
                       disabled={isSubmitting}
-                      className="mt-1.5"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
-                  )}
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addContentField}
-                disabled={isSubmitting}
-                className="gap-1"
-              >
-                <Plus className="h-4 w-4" />
-                Add another input
-              </Button>
-              <FormDescription>
-                Provide multiple short content points. Each input should be at
-                least 10 characters.
-              </FormDescription>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addDownloadLink}
+                  className="gap-1"
+                  disabled={isSubmitting}
+                >
+                  <Plus className="h-4 w-4" /> Add Download Link
+                </Button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={isSubmitting}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        <SelectItem value="buy">Buy</SelectItem>
-                        <SelectItem value="sell">Sell</SelectItem>
-                        <SelectItem value="hold">Hold</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={isSubmitting}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Closed">Closed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="horizon"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Investment Horizon</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={isSubmitting}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select horizon" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Short Term">Short Term</SelectItem>
-                        <SelectItem value="Medium Term">Medium Term</SelectItem>
-                        <SelectItem value="Long Term">Long Term</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="tipUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tip URL</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="https://example.com/tip"
-                        {...field}
-                        disabled={isSubmitting}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      URL with more details about this tip
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {showTargetPrice && (
-              <FormField
-                control={form.control}
-                name="targetPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Target Price (₹)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Enter target price"
-                        {...field}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          field.onChange(
-                            value === "" ? undefined : Number.parseFloat(value)
-                          );
-                        }}
-                        value={field.value === undefined ? "" : field.value}
-                        disabled={isSubmitting}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Target price for buy/sell recommendations
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="buyRange"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Buy Range (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="1000 - 2000"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Recommended buy range (e.g., 1000 - 2000)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="addMoreAt"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Add More At (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter add more price"
-                      {...field}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        field.onChange(
-                          value === "" ? undefined : Number.parseFloat(value)
-                        );
-                      }}
-                      value={field.value === undefined ? "" : field.value}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Price at which to add more to the position
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -530,7 +669,7 @@ export function TipFormDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : initialData ? "Update" : "Create"}
+                {isSubmitting ? "Saving..." : "Save Tip"}
               </Button>
             </DialogFooter>
           </form>

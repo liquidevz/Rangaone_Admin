@@ -59,6 +59,29 @@ interface BundleFormDialogProps {
   mode: "create" | "edit"
 }
 
+// Helper function to get description by key
+const getPortfolioDescription = (portfolio: Portfolio, key: string): string => {
+  if (!Array.isArray(portfolio.description)) return ""
+  const desc = portfolio.description.find(d => d.key === key)
+  return desc?.value || ""
+}
+
+// Helper function to get primary subscription fee
+const getPrimarySubscriptionFee = (portfolio: Portfolio): number => {
+  if (!Array.isArray(portfolio.subscriptionFee) || portfolio.subscriptionFee.length === 0) {
+    return 0
+  }
+  
+  // First try to find monthly fee
+  const monthlyFee = portfolio.subscriptionFee.find(fee => fee.type === 'monthly')
+  if (monthlyFee) {
+    return monthlyFee.price
+  }
+  
+  // Otherwise return the first fee
+  return portfolio.subscriptionFee[0].price
+}
+
 export function BundleFormDialog({
   open,
   onOpenChange,
@@ -102,12 +125,13 @@ export function BundleFormDialog({
   const createOptionFromPortfolioId = (portfolioId: string, portfolioLookup: Record<string, Portfolio>) => {
     const portfolio = portfolioLookup[portfolioId]
     if (portfolio) {
+      const primaryFee = getPrimarySubscriptionFee(portfolio)
       return {
         label: portfolio.name || `Portfolio ${portfolioId.substring(0, 8)}...`,
         value: portfolioId,
-        description: portfolio.riskLevel ? 
-          `Risk Level: ${portfolio.riskLevel}${portfolio.subscriptionFee ? ` | Fee: ₹${portfolio.subscriptionFee}` : ''}` : 
-          portfolio.description || ''
+        description: primaryFee > 0 ? 
+          `Fee: ₹${primaryFee}` : 
+          getPortfolioDescription(portfolio, "home card") || ''
       }
     }
     return {
@@ -160,12 +184,13 @@ export function BundleFormDialog({
         })
         .map((portfolio) => {
           const id = portfolio.id || portfolio._id || "";
+          const primaryFee = getPrimarySubscriptionFee(portfolio)
           const option = {
             label: portfolio.name || `Portfolio ${id.substring(0, 8)}...`,
             value: id,
-            description: portfolio.riskLevel ? 
-              `Risk Level: ${portfolio.riskLevel}${portfolio.subscriptionFee ? ` | Fee: ₹${portfolio.subscriptionFee}` : ''}` : 
-              portfolio.description || ''
+            description: primaryFee > 0 ? 
+              `Fee: ₹${primaryFee}` : 
+              getPortfolioDescription(portfolio, "home card") || ''
           };
           console.log("Created option:", option);
           return option;
@@ -416,15 +441,21 @@ export function BundleFormDialog({
                             {field.value.map((portfolioId, index) => {
                               const portfolio = selectedPortfolioDetails[portfolioId];
                               const uniqueKey = portfolioId || `portfolio-${index}`;
+                              const primaryFee = portfolio ? getPrimarySubscriptionFee(portfolio) : 0;
+                              const homeCardDescription = portfolio ? getPortfolioDescription(portfolio, "home card") : "";
+                              
                               return (
                                 <span key={uniqueKey} className="block rounded-md border p-3 text-sm">
-                                  <span className="block font-medium">{portfolio?.name || `Portfolio ${portfolioId ? portfolioId.substring(0, 8) : 'Unknown'}...`}</span>
+                                  <span className="block font-medium">
+                                    {portfolio?.name || `Portfolio ${portfolioId ? portfolioId.substring(0, 8) : 'Unknown'}...`}
+                                  </span>
                                   {portfolio && (
                                     <span className="block mt-1 space-y-1 text-muted-foreground">
-                                      <span className="block">Risk Level: {portfolio.riskLevel}</span>
-                                      <span className="block">Subscription Fee: ₹{portfolio.subscriptionFee || 0}</span>
-                                      {portfolio.description && (
-                                        <span className="block truncate">{portfolio.description}</span>
+                                      <span className="block">
+                                        Subscription Fee: ₹{primaryFee || 0}
+                                      </span>
+                                      {homeCardDescription && (
+                                        <span className="block truncate">{homeCardDescription}</span>
                                       )}
                                     </span>
                                   )}
