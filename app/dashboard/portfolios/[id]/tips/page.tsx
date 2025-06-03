@@ -2,6 +2,7 @@
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PortfolioTipDialog } from "@/components/portfolio-tip-dialog";
+import { TipDetailsDialog } from "@/components/tip-details-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,16 +14,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
-  deleteTip,
   fetchPortfolioById,
-  fetchPortfolioTips,
   type Portfolio,
-  type PortfolioTip,
 } from "@/lib/api";
-import { createTip, CreateTipRequest, Tip, updateTip } from "@/lib/api-tips";
-import { formatUsdToInr } from "@/lib/currency";
+import { 
+  createTip, 
+  updateTip, 
+  deleteTip,
+  fetchPortfolioTips,
+  type CreateTipRequest, 
+  type Tip 
+} from "@/lib/api-tips";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertCircle,
@@ -31,9 +43,13 @@ import {
   PlusCircle,
   RefreshCw,
   Trash2,
+  ExternalLink,
+  Download,
+  Filter,
+  X,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 export default function PortfolioTipsPage() {
   const params = useParams();
@@ -42,14 +58,19 @@ export default function PortfolioTipsPage() {
   const { toast } = useToast();
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [tips, setTips] = useState<PortfolioTip[]>([]);
+  const [tips, setTips] = useState<Tip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInvalid, setIsInvalid] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedTip, setSelectedTip] = useState<PortfolioTip | null>(null);
+  const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [actionFilter, setActionFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -145,6 +166,56 @@ export default function PortfolioTipsPage() {
     loadData();
   }, [portfolioId]);
 
+  // Filter tips based on selected filters and search term
+  const filteredTips = useMemo(() => {
+    let filtered = tips;
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(tip => 
+        tip.status.toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
+
+    // Filter by action
+    if (actionFilter !== "all") {
+      filtered = filtered.filter(tip => 
+        tip.action?.toLowerCase() === actionFilter.toLowerCase()
+      );
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(tip => 
+        tip.title.toLowerCase().includes(search) ||
+        tip.stockId?.toLowerCase().includes(search) ||
+        tip.description?.toLowerCase().includes(search)
+      );
+    }
+
+    return filtered;
+  }, [tips, statusFilter, actionFilter, searchTerm]);
+
+  // Get unique actions from tips for action filter
+  const availableActions = useMemo(() => {
+    const actions = tips
+      .map(tip => tip.action)
+      .filter((action): action is string => action !== undefined && action !== null) // Type guard
+      .filter((action, index, arr) => arr.indexOf(action) === index); // Remove duplicates
+    return actions.sort();
+  }, [tips]);
+
+  // Clear all filters
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setActionFilter("all");
+    setSearchTerm("");
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = statusFilter !== "all" || actionFilter !== "all" || searchTerm.trim() !== "";
+
   const handleCreateTip = async (tipData: CreateTipRequest) => {
     if (!portfolioId || portfolioId === "undefined") {
       toast({
@@ -191,6 +262,8 @@ export default function PortfolioTipsPage() {
     if (!selectedTip) return;
 
     try {
+      console.log(`Updating tip ${selectedTip.id}:`, tipData);
+      
       await updateTip(selectedTip.id, tipData);
       toast({
         title: "Tip Updated",
@@ -240,11 +313,10 @@ export default function PortfolioTipsPage() {
 
   const openEditDialog = async (tip: Tip) => {
     try {
-      // const tip = await fetchTipById(id);
       setSelectedTip(tip);
       setEditDialogOpen(true);
     } catch (error) {
-      console.error("Error fetching tip:", error);
+      console.error("Error opening edit dialog:", error);
       toast({
         title: "Failed to load tip",
         description:
@@ -254,17 +326,23 @@ export default function PortfolioTipsPage() {
     }
   };
 
-  const openDeleteDialog = (tip: PortfolioTip) => {
+  const openDeleteDialog = (tip: Tip) => {
     setSelectedTip(tip);
     setDeleteDialogOpen(true);
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type?.toLowerCase()) {
+  const getActionColor = (action?: string) => {
+    if (!action) return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+    
+    switch (action.toLowerCase()) {
       case "buy":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "sell":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+      case "partial sell":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+      case "partial profit":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       case "hold":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       default:
@@ -276,46 +354,82 @@ export default function PortfolioTipsPage() {
     switch (status?.toLowerCase()) {
       case "active":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "inactive":
+      case "closed":
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
   };
 
-  const columns: ColumnDef<PortfolioTip>[] = [
+  const formatContentPreview = (content: any) => {
+    if (!content) return "No content";
+    
+    // Handle array of key-value pairs
+    if (Array.isArray(content) && content.length > 0) {
+      const firstItem = content[0];
+      if (firstItem?.key && firstItem?.value) {
+        return `${firstItem.key}: ${firstItem.value.substring(0, 50)}${firstItem.value.length > 50 ? '...' : ''}`;
+      }
+    }
+    
+    // Handle string content
+    if (typeof content === 'string') {
+      return content.substring(0, 50) + (content.length > 50 ? '...' : '');
+    }
+    
+    return "No content";
+  };
+
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedTipForView, setSelectedTipForView] = useState<Tip | null>(null);  
+
+  const openViewDialog = (tip: Tip) => {
+    setSelectedTipForView(tip);
+    setViewDialogOpen(true);
+  };  
+
+  const columns: ColumnDef<Tip>[] = [
     {
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("title")}</div>
+        <div 
+          className="font-medium max-w-[200px] truncate cursor-pointer text-blue-600 hover:text-blue-800 hover:underline" 
+          title={row.getValue("title")}
+          onClick={() => openViewDialog(row.original)}
+        >
+          {row.getValue("title")}
+        </div>
       ),
     },
     {
-      accessorKey: "content",
-      header: "Content",
+      accessorKey: "stockId",
+      header: "Stock",
       cell: ({ row }) => {
-        const content = row.getValue("content") as string;
+        const stockId = row.getValue("stockId") as string;
+        const holding = portfolio?.holdings?.find(h => h.symbol === stockId);
+        
         return (
-          <div className="max-w-[120px] sm:max-w-[200px] md:max-w-[300px] truncate">
-            {content || (
-              <span className="text-muted-foreground italic">No content</span>
+          <div className="flex flex-col">
+            <span className="font-medium">{stockId}</span>
+            {holding && (
+              <span className="text-xs text-muted-foreground">{holding.sector}</span>
             )}
           </div>
         );
       },
     },
     {
-      accessorKey: "type",
-      header: "Type",
+      accessorKey: "action",
+      header: "Action",
       cell: ({ row }) => {
-        const type = row.getValue("type") as string;
-        return type ? (
-          <Badge className={getTypeColor(type)}>
-            {type.charAt(0).toUpperCase() + type.slice(1)}
+        const action = row.getValue("action") as string;
+        return action ? (
+          <Badge className={getActionColor(action)}>
+            {action.charAt(0).toUpperCase() + action.slice(1)}
           </Badge>
         ) : (
-          <span className="text-muted-foreground">General</span>
+          <span className="text-muted-foreground">-</span>
         );
       },
     },
@@ -335,37 +449,39 @@ export default function PortfolioTipsPage() {
     },
     {
       accessorKey: "targetPrice",
-      header: "Target Price",
+      header: "Target",
       cell: ({ row }) => {
-        const targetPrice = row.getValue("targetPrice") as number;
-        return targetPrice ? (
-          <div>{formatUsdToInr(targetPrice)}</div>
-        ) : (
-          <span className="text-muted-foreground">-</span>
+        const targetPrice = row.getValue("targetPrice") as string;
+        const targetPercentage = row.original.targetPercentage;
+        
+        return (
+          <div className="text-sm">
+            {targetPrice && (
+              <div className="font-medium">₹{targetPrice}</div>
+            )}
+            {targetPercentage && (
+              <div className="text-muted-foreground">{targetPercentage}%</div>
+            )}
+            {!targetPrice && !targetPercentage && (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
         );
       },
     },
     {
-      accessorKey: "createdAt",
-      header: "Created",
-      cell: ({ row }) => {
-        const date = row.original.createdAt as string;
-
-        console.log("Created date:", row.original);
-        return <div>{new Date(date).toLocaleDateString()}</div>;
-      },
-    },
-    {
       id: "actions",
+      header: "Actions",
       cell: ({ row }) => {
         const tip = row.original;
 
         return (
-          <div className="flex items-center justify-end space-x-2">
+          <div className="flex items-center space-x-2">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => openEditDialog(tip)}
+              title="Edit tip"
             >
               <Pencil className="h-4 w-4" />
               <span className="sr-only">Edit</span>
@@ -374,6 +490,7 @@ export default function PortfolioTipsPage() {
               variant="ghost"
               size="icon"
               onClick={() => openDeleteDialog(tip)}
+              title="Delete tip"
             >
               <Trash2 className="h-4 w-4" />
               <span className="sr-only">Delete</span>
@@ -433,13 +550,21 @@ export default function PortfolioTipsPage() {
           <p className="text-muted-foreground">
             Manage investment tips for this portfolio
           </p>
+          {portfolio && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              Portfolio has {portfolio.holdings?.length || 0} holdings available for tip creation
+            </div>
+          )}
         </div>
         <div className="flex space-x-2">
           <Button onClick={() => loadData()} variant="outline">
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button 
+            onClick={() => setCreateDialogOpen(true)}
+            disabled={!portfolio || !portfolio.holdings || portfolio.holdings.length === 0}
+          >
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Tip
           </Button>
@@ -450,7 +575,7 @@ export default function PortfolioTipsPage() {
         <CardHeader>
           <CardTitle>Portfolio Tips</CardTitle>
           <CardDescription>
-            View and manage investment tips for this portfolio
+            View and manage investment tips for this portfolio. Tips provide actionable insights for your holdings.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 sm:px-6">
@@ -461,26 +586,152 @@ export default function PortfolioTipsPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          
+          {!portfolio?.holdings || portfolio.holdings.length === 0 ? (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>No Holdings Available</AlertTitle>
+              <AlertDescription>
+                This portfolio has no holdings. You need to add holdings to the portfolio before creating tips.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {/* Filters and Search Section */}
+          <div className="mb-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filters:</span>
+              </div>
+              
+              <div className="flex flex-wrap gap-3 flex-1">
+                {/* Search Input */}
+                <div className="flex-1 min-w-[200px]">
+                  <Input
+                    placeholder="Search tips by title, stock, or description..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Status Filter */}
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[130px] h-9">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Action Filter */}
+                <Select value={actionFilter} onValueChange={setActionFilter}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="Action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Actions</SelectItem>
+                    {availableActions.map((action) => (
+                      <SelectItem key={action} value={action}>
+                        {action.charAt(0).toUpperCase() + action.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Clear Filters Button */}
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-9 px-3"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Active filters:</span>
+                <div className="flex gap-1">
+                  {searchTerm && (
+                    <Badge variant="secondary" className="text-xs">
+                      Search: "{searchTerm}"
+                    </Badge>
+                  )}
+                  {statusFilter !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Status: {statusFilter}
+                    </Badge>
+                  )}
+                  {actionFilter !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Action: {actionFilter}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
             </div>
-          ) : tips.length === 0 ? (
+          ) : filteredTips.length === 0 && tips.length > 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                No tips found for this portfolio.
+              <p className="text-muted-foreground mb-2">
+                No tips match your current filters.
               </p>
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={() => setCreateDialogOpen(true)}
+                onClick={clearFilters}
               >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Your First Tip
+                Clear Filters
               </Button>
             </div>
+          ) : tips.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-2">
+                No tips found for this portfolio.
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Create your first tip to provide investment insights for your holdings.
+              </p>
+              {portfolio && portfolio.holdings && portfolio.holdings.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setCreateDialogOpen(true)}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add Your First Tip
+                </Button>
+              )}
+            </div>
           ) : (
-            <DataTable columns={columns} data={tips} />
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredTips.length} of {tips.length} tip{tips.length !== 1 ? 's' : ''} 
+                {hasActiveFilters && " (filtered)"}
+              </div>
+              <DataTable 
+                columns={columns} 
+                data={filteredTips} 
+                searchColumn="title"
+                isLoading={isLoading}
+              />
+            </div>
           )}
         </CardContent>
       </Card>
@@ -490,6 +741,7 @@ export default function PortfolioTipsPage() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         onSubmit={handleCreateTip}
+        portfolio={portfolio || undefined}
         title="Create Portfolio Tip"
         description="Add a new investment tip for this portfolio"
       />
@@ -501,12 +753,11 @@ export default function PortfolioTipsPage() {
           onOpenChange={setEditDialogOpen}
           onSubmit={handleEditTip}
           initialData={selectedTip}
+          portfolio={portfolio || undefined}
           title="Edit Portfolio Tip"
           description="Modify an existing portfolio tip"
         />
       )}
-
-      {/* Delete Confirmation Dialog */}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
@@ -517,6 +768,14 @@ export default function PortfolioTipsPage() {
         description={`Are you sure you want to delete this tip? This action cannot be undone.`}
         confirmText="Delete"
       />
+
+      {/* View Tip Details Dialog */}
+      <TipDetailsDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        tip={selectedTipForView}
+        portfolio={portfolio || undefined}
+      />      
     </div>
   );
 }
