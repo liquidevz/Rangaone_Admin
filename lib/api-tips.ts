@@ -1,31 +1,60 @@
 import { API_BASE_URL, fetchWithAuth } from "@/lib/auth";
 
+// Content for Tips (key-value pairs)
+export interface TipContent {
+  key: string;
+  value: string;
+}
+
 // Tip Types
 export interface Tip {
   _id: string;
-  portfolio: string;
+  id: string;
+  portfolio?: string;
   title: string;
-  content: string;
+  stockId: string;
+  content: TipContent[];
+  description: string;
   status: "Active" | "Closed";
+  action?: string;
   buyRange?: string;
-  targetprice?: string;
+  targetPrice?: string;
+  targetPercentage?: string;
   addMoreAt?: string;
   tipUrl?: string;
-  horizon?: "Short Term" | "Medium Term" | "Long Term";
+  exitPrice?: string;
+  exitStatus?: string;
+  exitStatusPercentage?: string;
+  horizon?: string;
+  downloadLinks?: Array<{
+    _id?: string;
+    name: string;
+    url: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateTipRequest {
-  portfolio: string;
   title: string;
-  content: string;
-  status: "Active" | "Inactive" | "Closed";
+  stockId: string;
+  content: TipContent[];
+  description: string;
+  status?: "Active" | "Closed";
+  action?: string;
   buyRange?: string;
-  targetprice?: string;
+  targetPrice?: string;
+  targetPercentage?: string;
   addMoreAt?: string;
   tipUrl?: string;
-  horizon?: "Short Term" | "Medium Term" | "Long Term";
+  exitPrice?: string;
+  exitStatus?: string;
+  exitStatusPercentage?: string;
+  horizon?: string;
+  downloadLinks?: Array<{
+    name: string;
+    url: string;
+  }>;
 }
 
 // Get a single tip by ID
@@ -49,7 +78,14 @@ export const fetchTipById = async (id: string): Promise<Tip> => {
       throw new Error(error.message || "Failed to fetch tip details");
     }
 
-    return await response.json();
+    const tip = await response.json();
+    return {
+      ...tip,
+      id: tip._id || tip.id,
+      content: Array.isArray(tip.content) ? tip.content : 
+               typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
+      downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
+    };
   } catch (error) {
     console.error(`Error fetching tip with id ${id}:`, error);
     throw error;
@@ -59,12 +95,14 @@ export const fetchTipById = async (id: string): Promise<Tip> => {
 // Update an existing tip
 export const updateTip = async (
   id: string,
-  tipData: Partial<CreateTipRequest>
+  tipData: CreateTipRequest
 ): Promise<Tip> => {
   try {
     if (!id) {
       throw new Error("Invalid tip ID");
     }
+
+    console.log('Updating tip with data:', tipData);
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/tips/${id}`, {
       method: "PUT",
@@ -83,7 +121,14 @@ export const updateTip = async (
       throw new Error(error.message || "Failed to update tip");
     }
 
-    return await response.json();
+    const tip = await response.json();
+    return {
+      ...tip,
+      id: tip._id || tip.id,
+      content: Array.isArray(tip.content) ? tip.content : 
+               typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
+      downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
+    };
   } catch (error) {
     console.error(`Error updating tip with id ${id}:`, error);
     throw error;
@@ -130,14 +175,13 @@ export const createTip = async (
       throw new Error("Invalid portfolio ID");
     }
 
+    console.log('Creating tip for portfolio:', portfolioId, 'with data:', tipData);
+
     const response = await fetchWithAuth(
       `${API_BASE_URL}/api/tips/portfolios/${portfolioId}/tips`,
       {
         method: "POST",
-        body: JSON.stringify({
-          ...tipData,
-          content: tipData.content.toString(),
-        }),
+        body: JSON.stringify(tipData),
       }
     );
 
@@ -153,7 +197,14 @@ export const createTip = async (
       throw new Error(error.message || "Failed to create tip");
     }
 
-    return await response.json();
+    const tip = await response.json();
+    return {
+      ...tip,
+      id: tip._id || tip.id,
+      content: Array.isArray(tip.content) ? tip.content : 
+               typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
+      downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
+    };
   } catch (error) {
     console.error("Error creating tip:", error);
     throw error;
@@ -165,21 +216,17 @@ export const fetchPortfolioTips = async (
   portfolioId: string
 ): Promise<Tip[]> => {
   try {
-    let response;
+    if (!portfolioId || portfolioId === "undefined") {
+      throw new Error("Invalid portfolio ID");
+    }
 
     console.log("Fetching portfolio tips for ID:", portfolioId);
 
-    if (portfolioId) {
-      // Updated endpoint according to the API documentation
-      response = await fetchWithAuth(
-        `${API_BASE_URL}/api/tips/portfolios/${portfolioId}/tips`
-      );
-    } else {
-      response = await fetchWithAuth(`${API_BASE_URL}/api/tips`);
-    }
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/api/tips/portfolios/${portfolioId}/tips`
+    );
 
-    // Check if response is OK and is JSON
-    if (!response?.ok) {
+    if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
         throw new Error("Server returned an HTML response instead of JSON");
@@ -189,78 +236,161 @@ export const fetchPortfolioTips = async (
       throw new Error(error.message || "Failed to fetch portfolio tips");
     }
 
-    if (response?.ok) {
-      // If we get here, we have a valid JSON response
-      return await response.json();
-    }
-
-    return {} as unknown as Tip[];
+    const tips = await response.json();
+    
+    // Ensure all tips have proper structure and an id property
+    return tips.map((tip: any) => ({
+      ...tip,
+      id: tip._id || tip.id,
+      content: Array.isArray(tip.content) ? tip.content : 
+               typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
+      downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
+    }));
   } catch (error) {
     console.error("Error fetching portfolio tips:", error);
     throw error;
   }
 };
 
-// Helper function to generate MongoDB-like ObjectIDs for new entities
-function generateMockObjectId(): string {
-  const timestamp = Math.floor(Date.now() / 1000)
-    .toString(16)
-    .padStart(8, "0");
-  const machineId = Math.floor(Math.random() * 16777216)
-    .toString(16)
-    .padStart(6, "0");
-  const processId = Math.floor(Math.random() * 65536)
-    .toString(16)
-    .padStart(4, "0");
-  const counter = Math.floor(Math.random() * 16777216)
-    .toString(16)
-    .padStart(6, "0");
+// Get all tips (not portfolio specific)
+export const fetchAllTips = async (): Promise<Tip[]> => {
+  try {
+    console.log("Fetching all tips");
 
-  return timestamp + machineId + processId + counter;
-}
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/tips`);
 
-// Add this helper function to generate mock tips
-export const getMockTips = (portfolioId?: string): Tip[] => {
-  const id = portfolioId || generateMockObjectId();
-  return [
-    {
-      _id: generateMockObjectId(),
-      portfolio: id,
-      title: "Consider increasing exposure to technology sector",
-      content:
-        "With the recent market trends, technology stocks are showing strong growth potential. Consider increasing your allocation to this sector for better returns.",
-      status: "active",
-      type: "suggestion",
-      createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    },
-    {
-      _id: generateMockObjectId(),
-      portfolio: id,
-      title: "Potential buying opportunity for HDFC Bank",
-      content:
-        "HDFC Bank has recently corrected by 5% due to market volatility. This presents a good buying opportunity as the fundamentals remain strong.",
-      status: "active",
-      targetPrice: 1600,
-      type: "buy",
-      createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-    },
-    {
-      _id: generateMockObjectId(),
-      portfolio: id,
-      title: "Consider booking profits in ITC",
-      content:
-        "ITC has rallied significantly in the last quarter and is now trading at a premium valuation. Consider booking partial profits.",
-      status: "active",
-      targetPrice: 450,
-      type: "sell",
-      createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-    },
-  ];
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error("Server returned an HTML response instead of JSON");
+      }
+
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch tips");
+    }
+
+    const tips = await response.json();
+    
+    // Ensure all tips have proper structure and an id property
+    return tips.map((tip: any) => ({
+      ...tip,
+      id: tip._id || tip.id,
+      content: Array.isArray(tip.content) ? tip.content : 
+               typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
+      downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
+    }));
+  } catch (error) {
+    console.error("Error fetching all tips:", error);
+    throw error;
+  }
 };
 
-export const usingMockData =
-  process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === "true" ||
-  process.env.NODE_ENV === "development";
+// Create a general tip (not tied to a portfolio)
+export const createGeneralTip = async (
+  tipData: CreateTipRequest
+): Promise<Tip> => {
+  try {
+    console.log('Creating general tip with data:', tipData);
+
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/tips`, {
+      method: "POST",
+      body: JSON.stringify(tipData),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error(
+          "Server returned an HTML response instead of JSON"
+        );
+      }
+
+      const error = await response.json();
+      throw new Error(error.message || "Failed to create tip");
+    }
+
+    const tip = await response.json();
+    return {
+      ...tip,
+      id: tip._id || tip.id,
+      content: Array.isArray(tip.content) ? tip.content : 
+               typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
+      downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
+    };
+  } catch (error) {
+    console.error("Error creating general tip:", error);
+    throw error;
+  }
+};
+
+// Helper function for validation
+export const validateTipData = (data: CreateTipRequest): string[] => {
+  const errors: string[] = [];
+
+  if (!data.title?.trim()) {
+    errors.push("Title is required");
+  }
+
+  if (!data.stockId?.trim()) {
+    errors.push("Stock selection is required");
+  }
+
+  if (!data.content || data.content.length === 0) {
+    errors.push("At least one content item is required");
+  } else {
+    data.content.forEach((item, index) => {
+      if (!item.key?.trim()) {
+        errors.push(`Content item ${index + 1}: Key is required`);
+      }
+      if (!item.value?.trim()) {
+        errors.push(`Content item ${index + 1}: Value is required`);
+      }
+    });
+  }
+
+  if (!data.description?.trim()) {
+    errors.push("Description is required");
+  }
+
+  // Validate URLs if provided
+  if (data.tipUrl && data.tipUrl.trim()) {
+    try {
+      new URL(data.tipUrl);
+    } catch {
+      errors.push("Tip URL must be a valid URL");
+    }
+  }
+
+  // Validate download links if provided
+  if (data.downloadLinks && data.downloadLinks.length > 0) {
+    data.downloadLinks.forEach((link, index) => {
+      if (!link.name?.trim()) {
+        errors.push(`Download link ${index + 1}: Name is required`);
+      }
+      if (!link.url?.trim()) {
+        errors.push(`Download link ${index + 1}: URL is required`);
+      } else {
+        try {
+          new URL(link.url);
+        } catch {
+          errors.push(`Download link ${index + 1}: URL must be valid`);
+        }
+      }
+    });
+  }
+
+  // Validate action-specific fields
+  if (data.action === "buy" || data.action === "sell") {
+    if (!data.targetPrice && !data.targetPercentage) {
+      errors.push("Target price or target percentage is recommended for buy/sell actions");
+    }
+  }
+
+  if (data.action === "sell" || data.action === "partial sell" || data.action === "partial profit") {
+    if (!data.exitPrice && !data.exitStatus) {
+      errors.push("Exit price or exit status is recommended for sell actions");
+    }
+  }
+
+  return errors;
+};
