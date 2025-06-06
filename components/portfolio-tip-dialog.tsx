@@ -366,7 +366,7 @@ export function PortfolioTipDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] overflow-y-auto max-h-[90vh]">
+      <DialogContent className="sm:max-w-[800px] overflow-y-auto max-h-[90vh]" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         <Form {...form}>
           <form onSubmit={handleSubmit(onValidSubmit)}>
             <DialogHeader>

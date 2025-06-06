@@ -312,7 +312,7 @@ export function BundleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Create Bundle" : "Edit Bundle"}</DialogTitle>
           <DialogDescription>
@@ -443,6 +443,8 @@ export function BundleFormDialog({
                               const uniqueKey = portfolioId || `portfolio-${index}`;
                               const primaryFee = portfolio ? getPrimarySubscriptionFee(portfolio) : 0;
                               const homeCardDescription = portfolio ? getPortfolioDescription(portfolio, "home card") : "";
+                              // const truncatedDescription = homeCardDescription.slice(0, 50);
+                              const truncatedDescription = homeCardDescription.length > 50 ? homeCardDescription.slice(0, 50) + "..." : homeCardDescription;
                               
                               return (
                                 <span key={uniqueKey} className="block rounded-md border p-3 text-sm">
@@ -455,7 +457,7 @@ export function BundleFormDialog({
                                         Subscription Fee: ₹{primaryFee || 0}
                                       </span>
                                       {homeCardDescription && (
-                                        <span className="block truncate">{homeCardDescription}</span>
+                                        <span className="block truncate">{truncatedDescription}</span>
                                       )}
                                     </span>
                                   )}
