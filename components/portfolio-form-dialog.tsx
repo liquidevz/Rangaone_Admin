@@ -699,7 +699,7 @@ export function PortfolioFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
@@ -1401,7 +1401,7 @@ export function PortfolioFormDialog({
       {/* Edit Holding Dialog */}
       {editingHolding && (
         <Dialog open={true} onOpenChange={() => setEditingHolding(null)}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px]" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <DialogHeader>
               <DialogTitle>Edit Stock Details</DialogTitle>
               <DialogDescription>
