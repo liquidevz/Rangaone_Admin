@@ -1,3 +1,4 @@
+// components\portfolio-tip-dialog.tsx  
 "use client";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL, getAdminAccessToken } from "@/lib/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, AlertTriangle, LogOut, Plus, Trash2, TrendingUp, DollarSign, Target, BarChart3 } from "lucide-react";
+import { AlertCircle, AlertTriangle, LogOut, Plus, Trash2, TrendingUp, Target, BarChart3, IndianRupee } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -533,7 +534,7 @@ export function PortfolioTipDialog({
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-green-600" />
+                          <IndianRupee className="h-4 w-4 text-green-600" />
                           <div>
                             <p className="text-muted-foreground">Buy Price</p>
                             <p className="font-semibold">₹{selectedStock.buyPrice.toLocaleString()}</p>

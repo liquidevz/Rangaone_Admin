@@ -1,3 +1,4 @@
+// components\payment-verification-dialog.tsx  
 "use client"
 
 import React, { useState } from "react"
@@ -14,7 +15,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { verifyPayment } from "@/lib/api"
-import { formatInr } from "@/lib/currency"
 
 interface PaymentVerificationDialogProps {
   open: boolean
@@ -121,7 +121,7 @@ export function PaymentVerificationDialog({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount:</span>
-                    <span>{formatInr(orderData.amount)}</span>
+                    <span>(orderData.amount)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Currency:</span>

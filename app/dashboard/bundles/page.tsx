@@ -1,3 +1,4 @@
+// app\dashboard\bundles\page.tsx  
 "use client"
 
 import { useState, useEffect } from "react"
@@ -17,8 +18,6 @@ import {
   updateBundle,
   type Bundle,
   type CreateBundleRequest,
-  getMockCreatedBundle,
-  getMockBundles,
 } from "@/lib/api-bundles"
 import { Portfolio, fetchPortfolios } from "@/lib/api"
 import { isAuthenticated } from "@/lib/auth"
@@ -27,9 +26,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
-// Check if we're in development mode or if mock data is enabled
-const IS_DEV = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === "true"
 
 export default function BundlesPage() {
   const [isLoading, setIsLoading] = useState(true)

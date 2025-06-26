@@ -1,3 +1,4 @@
+// components\tip-details-dialog.tsx  
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import {
   Calendar,
-  DollarSign,
   Download,
   ExternalLink,
   Target,
@@ -21,6 +21,7 @@ import {
   Clock,
   Lightbulb,
   Info,
+  IndianRupee,
 } from "lucide-react";
 import type { Portfolio } from "@/lib/api";
 import type { Tip } from "@/lib/api-tips";
@@ -128,7 +129,7 @@ export function TipDetailsDialog({
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <IndianRupee className="h-4 w-4 text-green-600" />
                     <div>
                       <p className="text-muted-foreground">Current Price</p>
                       <p className="font-semibold">₹{selectedStock.buyPrice.toLocaleString()}</p>

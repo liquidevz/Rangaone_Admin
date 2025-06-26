@@ -1,3 +1,4 @@
+// app\dashboard\layout.tsx  
 import type { ReactNode } from "react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Toaster } from "@/components/ui/toaster"

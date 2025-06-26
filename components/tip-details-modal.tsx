@@ -1,3 +1,4 @@
+// components\tip-details-modal.tsx  
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import {
   Calendar,
-  DollarSign,
   Download,
   ExternalLink,
   Target,
@@ -23,6 +23,7 @@ import {
   Info,
   Building2,
   Activity,
+  IndianRupee,
 } from "lucide-react";
 import type { Tip } from "@/lib/api-tips";
 import type { Portfolio } from "@/lib/api";
@@ -227,7 +228,7 @@ export function TipDetailsModal({
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
+                  <IndianRupee className="h-5 w-5" />
                   Price Levels & Targets
                 </CardTitle>
               </CardHeader>
@@ -244,7 +245,7 @@ export function TipDetailsModal({
                     <DisplayField
                       label="Add More At"
                       value={`₹${tip.addMoreAt}`}
-                      icon={DollarSign}
+                      icon={IndianRupee}
                     />
                   )}
                   {tip.targetPrice && (
@@ -281,7 +282,7 @@ export function TipDetailsModal({
                     <DisplayField
                       label="Exit Price"
                       value={`₹${tip.exitPrice}`}
-                      icon={DollarSign}
+                      icon={IndianRupee}
                     />
                   )}
                   {tip.exitStatus && (

@@ -1,3 +1,4 @@
+// lib\auth-config.ts  
 import { AuthOptions, DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { API_BASE_URL } from "./auth";
