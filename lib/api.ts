@@ -1,3 +1,4 @@
+// lib\api.ts  
 import { API_BASE_URL, fetchWithAuth, getAdminAccessToken } from "@/lib/auth";
 import { User } from "./api-users";
 
@@ -259,11 +260,10 @@ export interface PortfolioHolding {
   weight: number;
   sector: string;
   stockCapType?: "small cap" | "mid cap" | "large cap" | "micro cap" | "mega cap";
-  status: "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "Addon";
+  status: "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "addon-buy";
   buyPrice: number;
   quantity: number;
   minimumInvestmentValueStock: number;
-  price?: number; // For backward compatibility
 }
 
 export interface DownloadLink {

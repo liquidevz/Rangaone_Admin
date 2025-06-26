@@ -1,3 +1,4 @@
+// components\subscription-form-dialog.tsx  
 "use client"
 
 import type React from "react"
@@ -15,7 +16,6 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createSubscriptionOrder, fetchPortfolios, type Portfolio } from "@/lib/api"
-import { formatUsdToInr } from "@/lib/currency"
 
 interface SubscriptionFormDialogProps {
   open: boolean
@@ -115,7 +115,7 @@ export function SubscriptionFormDialog({ open, onOpenChange, onSuccess }: Subscr
                   </SelectTrigger>
                   <SelectContent>
                     {portfolios.map((portfolio) => (
-                      <SelectItem key={portfolio.id} value={portfolio.id}>
+                      <SelectItem key={portfolio.id ?? ""} value={portfolio.id ?? ""}>
                         {portfolio.name}
                       </SelectItem>
                     ))}
@@ -138,11 +138,11 @@ export function SubscriptionFormDialog({ open, onOpenChange, onSuccess }: Subscr
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subscription Fee:</span>
-                    <span>{formatUsdToInr(getSelectedPortfolio()?.subscriptionFee)}</span>
+                    <span>(getSelectedPortfolio()?.subscriptionFee)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Min Investment:</span>
-                    <span>{formatUsdToInr(getSelectedPortfolio()?.minInvestment)}</span>
+                    <span>(getSelectedPortfolio()?.minInvestment)</span>
                   </div>
                 </div>
               </div>

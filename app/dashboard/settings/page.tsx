@@ -1,3 +1,4 @@
+// app\dashboard\settings\page.tsx  
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -16,17 +17,6 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ColumnDef } from "@tanstack/react-table"
-
-// Add this helper function at the top of the component
-const formatCurrency = (value: number) => {
-  // Convert USD to INR
-  const inrValue = value * 83.5
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(inrValue)
-}
 
 export default function SettingsPage() {
   const [configs, setConfigs] = useState<Config[]>([])
@@ -203,16 +193,6 @@ export default function SettingsPage() {
           // Not JSON, use as is
         }
 
-        try {
-          // If the value is a number, format it as currency
-          const numValue = Number(value)
-          if (!isNaN(numValue)) {
-            displayValue = formatCurrency(numValue)
-          }
-        } catch (e) {
-          // Not a number, use as is
-        }
-
         return <div className="max-w-[200px] md:max-w-[500px] truncate font-mono text-sm">{displayValue}</div>
       },
     },
@@ -360,7 +340,7 @@ export default function SettingsPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <DataTable columns={columns} data={filteredConfigs} pagination />
+                <DataTable columns={columns} data={filteredConfigs} />
               )}
             </CardContent>
           </Card>

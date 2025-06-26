@@ -1,3 +1,4 @@
+// lib\api-tips.ts  
 import { API_BASE_URL, fetchWithAuth } from "@/lib/auth";
 
 // Content for Tips (key-value pairs)

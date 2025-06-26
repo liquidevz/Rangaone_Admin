@@ -1,3 +1,4 @@
+// components\auth-guard.tsx  
 "use client"
 
 import type React from "react"

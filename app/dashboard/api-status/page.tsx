@@ -1,3 +1,4 @@
+// app\dashboard\api-status\page.tsx
 import { ApiStatus } from "@/components/api-status"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { API_BASE_URL } from "@/lib/config"

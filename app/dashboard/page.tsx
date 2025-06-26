@@ -1,3 +1,4 @@
+// app\dashboard\page.tsx  
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, Briefcase, CreditCard, ArrowUpRight, ArrowDownRight, Lightbulb } from "lucide-react"

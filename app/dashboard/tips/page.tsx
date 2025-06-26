@@ -1,3 +1,4 @@
+// app\dashboard\tips\page.tsx  
 "use client";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";

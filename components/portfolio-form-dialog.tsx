@@ -1,3 +1,4 @@
+// components\portfolio-form-dialog.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type {
   CreatePortfolioRequest,
@@ -31,7 +33,27 @@ import type {
   DownloadLink,
   YouTubeLink,
 } from "@/lib/api";
-import { Plus, Trash2, Edit, AlertCircle } from "lucide-react";
+import { StockSearch } from "@/components/stock-search";
+import { 
+  fetchStockSymbolBySymbol, 
+  updateStockPrices, 
+  type StockSymbol 
+} from "@/lib/api-stock-symbols";
+import { 
+  Plus, 
+  Trash2, 
+  Edit, 
+  AlertCircle, 
+  RefreshCw, 
+  TrendingUp, 
+  TrendingDown, 
+  IndianRupee,
+  DollarSign,
+  Target,
+  Calculator,
+  AlertTriangle,
+  CheckCircle2
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -45,17 +67,44 @@ interface PortfolioFormDialogProps {
 }
 
 interface ExtendedHolding extends PortfolioHolding {
-  allocatedAmount: number; // Original allocated amount (weight * totalInvestment)
-  leftoverAmount: number; // Difference between allocated and actual investment
+  allocatedAmount: number;
+  leftoverAmount: number;
   originalWeight?: number;
+  stockDetails?: StockSymbol;
+  currentMarketPrice?: number;
+  priceChange?: number;
+  priceChangePercent?: number;
+  originalBuyPrice?: number; // NEW: Track original purchase price for P&L
+  totalQuantityOwned?: number; // NEW: Track total quantity for partial sells
+  realizedPnL?: number; // NEW: Track realized profit/loss
+}
+
+interface PnLCalculation {
+  quantitySold: number;
+  saleValue: number;
+  originalCost: number;
+  profitLoss: number;
+  profitLossPercent: number;
+  remainingQuantity: number;
+  remainingValue: number;
 }
 
 interface EditHoldingState {
   index: number;
   originalHolding: ExtendedHolding;
   newWeight: number;
-  status: "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "Addon";
+  status: "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "addon-buy";
+  action: "buy" | "sell" | "partial-sell" | "addon" | "hold";
   weightChange: number;
+  latestPrice?: number;
+  isUpdatingPrice: boolean;
+  priceImpact?: {
+    oldValue: number;
+    newValue: number;
+    change: number;
+    changePercent: number;
+  };
+  pnlPreview?: PnLCalculation; // NEW: P&L calculation for sell operations
 }
 
 export function PortfolioFormDialog({
@@ -79,8 +128,6 @@ export function PortfolioFormDialog({
   // Financial Details State
   const [minInvestment, setMinInvestment] = useState("");
   const [subscriptionFees, setSubscriptionFees] = useState<SubscriptionFee[]>([]);
-  const [durationMonths, setDurationMonths] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
 
   // Portfolio Characteristics State
   const [portfolioCategory, setPortfolioCategory] = useState("Basic");
@@ -105,16 +152,54 @@ export function PortfolioFormDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // New holding form state
+  // === NEW STATE FOR STOCK MANAGEMENT ===
+  const [isUpdatingAllPrices, setIsUpdatingAllPrices] = useState(false);
+  
+  // Updated new holding state to work with StockSearch
   const [newHolding, setNewHolding] = useState({
     symbol: "",
     weight: 0,
     buyPrice: 0,
     sector: "",
     stockCapType: "" as "small cap" | "mid cap" | "large cap" | "micro cap" | "mega cap" | "",
+    stockDetails: undefined as StockSymbol | undefined,
   });
 
-  // Helper function to calculate proper investment amounts
+  // === NEW: P&L CALCULATION FUNCTIONS ===
+  
+  const calculatePnL = (
+    originalQuantity: number,
+    originalBuyPrice: number,
+    currentMarketPrice: number,
+    proportionToSell: number // 0 to 1 (e.g., 0.5 for 50%)
+  ): PnLCalculation => {
+    const quantitySold = Math.floor(originalQuantity * proportionToSell);
+    const saleValue = quantitySold * currentMarketPrice;
+    const originalCost = quantitySold * originalBuyPrice;
+    const profitLoss = saleValue - originalCost;
+    const profitLossPercent = originalCost > 0 ? (profitLoss / originalCost) * 100 : 0;
+    const remainingQuantity = originalQuantity - quantitySold;
+    const remainingValue = remainingQuantity * currentMarketPrice;
+
+    return {
+      quantitySold,
+      saleValue,
+      originalCost,
+      profitLoss,
+      profitLossPercent,
+      remainingQuantity,
+      remainingValue
+    };
+  };
+
+  const formatCurrency = (value: number): string => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
   const calculateInvestmentDetails = (weightPercent: number, buyPrice: number, totalInvestment: number) => {
     const allocatedAmount = (weightPercent / 100) * totalInvestment;
     const quantity = Math.floor(allocatedAmount / buyPrice);
@@ -129,28 +214,109 @@ export function PortfolioFormDialog({
     };
   };
 
-  // Calculate financial summary with proper leftover handling
   const totalWeightUsed = holdings.reduce((sum, holding) => sum + holding.weight, 0);
   const totalActualInvestment = holdings.reduce((sum, holding) => sum + holding.minimumInvestmentValueStock, 0);
   const totalLeftover = holdings.reduce((sum, holding) => sum + holding.leftoverAmount, 0);
   const totalAllocated = holdings.reduce((sum, holding) => sum + holding.allocatedAmount, 0);
-  const cashBalance = Number(minInvestment || 0) - totalActualInvestment; // Cash = Total - Actual Investment
+  const cashBalance = Number(minInvestment || 0) - totalActualInvestment;
   const currentValue = Number(minInvestment || 0);
   const holdingsValue = totalActualInvestment;
   const remainingWeight = 100 - totalWeightUsed;
 
-  // Reset new holding function
-  const resetNewHolding = () => {
+  // NEW: Calculate total unrealized P&L for portfolio
+  const totalUnrealizedPnL = holdings.reduce((sum, holding) => {
+    if (holding.currentMarketPrice && holding.originalBuyPrice) {
+      const currentValue = holding.quantity * holding.currentMarketPrice;
+      const originalCost = holding.quantity * holding.originalBuyPrice;
+      return sum + (currentValue - originalCost);
+    }
+    return sum;
+  }, 0);
+
+  // Update all stock prices
+  const handleUpdateAllPrices = async () => {
+    setIsUpdatingAllPrices(true);
+    try {
+      const result = await updateStockPrices();
+      toast({
+        title: "Stock Prices Updated",
+        description: `Updated ${result.updated} stocks successfully. ${result.failed} failed.`,
+        variant: result.failed > 0 ? "destructive" : "default",
+      });
+
+      // Refresh stock details for current holdings
+      await refreshAllHoldingsStockData();
+    } catch (error) {
+      console.error("Error updating stock prices:", error);
+      toast({
+        title: "Failed to Update Prices",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingAllPrices(false);
+    }
+  };
+
+  // Refresh stock data for all holdings
+  const refreshAllHoldingsStockData = async (holdingsToRefresh?: ExtendedHolding[]) => {
+    const holdingsArray = holdingsToRefresh || holdings;
+    
+    console.log("Refreshing stock data for holdings:", holdingsArray);
+    
+    if (holdingsArray.length === 0) {
+      console.log("No holdings to refresh");
+      return;
+    }
+
+    try {
+      const updatedHoldings = await Promise.all(
+        holdingsArray.map(async (holding) => {
+          try {
+            console.log(`Fetching stock data for ${holding.symbol}`);
+            const stockDetails = await fetchStockSymbolBySymbol(holding.symbol);
+            console.log(`Stock data for ${holding.symbol}:`, stockDetails);
+            
+            const updatedHolding = {
+              ...holding,
+              stockDetails,
+              currentMarketPrice: parseFloat(stockDetails.currentPrice),
+              priceChange: parseFloat(stockDetails.currentPrice) - parseFloat(stockDetails.previousPrice),
+              priceChangePercent: parseFloat(stockDetails.previousPrice) > 0 
+                ? ((parseFloat(stockDetails.currentPrice) - parseFloat(stockDetails.previousPrice)) / parseFloat(stockDetails.previousPrice)) * 100 
+                : 0,
+              // Preserve original buy price for P&L calculations
+              originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
+              totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
+            };
+            
+            console.log(`Updated holding for ${holding.symbol}:`, updatedHolding);
+            return updatedHolding;
+          } catch (error) {
+            console.error(`Failed to fetch data for ${holding.symbol}:`, error);
+            return holding;
+          }
+        })
+      );
+      
+      console.log("Setting updated holdings:", updatedHoldings);
+      setHoldings(updatedHoldings);
+    } catch (error) {
+      console.error("Error in refreshAllHoldingsStockData:", error);
+    }
+  };
+
+  // Handle stock selection from StockSearch
+  const handleStockSelect = (symbol: string, stockDetails: StockSymbol) => {
     setNewHolding({
-      symbol: "",
-      weight: 0,
-      buyPrice: 0,
+      ...newHolding,
+      symbol: symbol,
+      stockDetails: stockDetails,
+      buyPrice: parseFloat(stockDetails.currentPrice),
       sector: "",
-      stockCapType: "",
     });
   };
 
-  // Initialize form data when dialog opens
   useEffect(() => {
     if (open) {
       if (initialData) {
@@ -189,8 +355,6 @@ export function PortfolioFormDialog({
 
         // Financial Details
         setMinInvestment(initialData.minInvestment?.toString() || "");
-        setDurationMonths(initialData.durationMonths?.toString() || "");
-        setExpiryDate(initialData.expiryDate ? new Date(initialData.expiryDate).toISOString().split('T')[0] : "");
 
         // Handle subscription fees
         if (Array.isArray(initialData.subscriptionFee)) {
@@ -208,7 +372,7 @@ export function PortfolioFormDialog({
         setOneYearGains(initialData.oneYearGains || "");
         setCompareWith(initialData.compareWith || "");
 
-        // Handle holdings with proper calculation
+        // Handle holdings with enhanced P&L tracking
         if (Array.isArray(initialData.holdings)) {
           const convertedHoldings: ExtendedHolding[] = initialData.holdings.map(h => {
             const allocatedAmount = (h.weight / 100) * (initialData.minInvestment || 0);
@@ -217,21 +381,27 @@ export function PortfolioFormDialog({
             
             return {
               ...h,
-              buyPrice: h.buyPrice || h.price || 0,
+              buyPrice: h.buyPrice || 0,
               quantity: h.quantity || 0,
               minimumInvestmentValueStock: actualInvestmentAmount,
               allocatedAmount: allocatedAmount,
-              leftoverAmount: Math.max(0, leftoverAmount), // Ensure no negative leftovers
+              leftoverAmount: Math.max(0, leftoverAmount),
               stockCapType: h.stockCapType || undefined,
-              originalWeight: h.weight, // Store original weight for edit calculations
+              originalWeight: h.weight,
+              // NEW: Enhanced P&L tracking fields
+              originalBuyPrice: h.buyPrice, // Track original purchase price
+              totalQuantityOwned: h.quantity, // Track total quantity
+              realizedPnL: 0, // Initialize realized P&L
             };
           });
           setHoldings(convertedHoldings);
+          
+          // Load stock details for existing holdings
+          refreshAllHoldingsStockData();
         }
 
         // Handle download links
         if (Array.isArray(initialData.downloadLinks)) {
-          // Ensure linkDiscription is always defined
           const normalizedDownloadLinks: DownloadLink[] = initialData.downloadLinks.map(link => ({
             ...link,
             linkDiscription: link.linkDiscription || ""
@@ -250,8 +420,6 @@ export function PortfolioFormDialog({
         setYouTubeLinks([]);
         setMinInvestment("");
         setSubscriptionFees([]);
-        setDurationMonths("");
-        setExpiryDate("");
         setPortfolioCategory("Basic");
         setTimeHorizon("");
         setRebalancing("");
@@ -271,7 +439,6 @@ export function PortfolioFormDialog({
     }
   }, [open, initialData]);
 
-  // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -303,15 +470,6 @@ export function PortfolioFormDialog({
       return;
     }
 
-    if (!durationMonths || Number(durationMonths) <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Duration in months is required and must be greater than 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Validate total weight doesn't exceed 100%
     if (totalWeightUsed > 100) {
       toast({
@@ -323,7 +481,7 @@ export function PortfolioFormDialog({
       return;
     }
 
-    // Cash balance should never be negative with proper calculation
+    // Cash balance validation
     if (cashBalance < 0) {
       toast({
         title: "Validation Error",
@@ -353,7 +511,6 @@ export function PortfolioFormDialog({
         buyPrice: holding.buyPrice,
         quantity: holding.quantity,
         minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
-        price: holding.price
       }));
 
       const portfolioData: CreatePortfolioRequest = {
@@ -361,8 +518,7 @@ export function PortfolioFormDialog({
         description: allDescriptions.filter(d => d.value.trim() !== ""),
         subscriptionFee: subscriptionFees,
         minInvestment: Number(minInvestment),
-        durationMonths: Number(durationMonths),
-        expiryDate: expiryDate || undefined,
+        durationMonths: 12,
         holdings: portfolioHoldings.length > 0 ? portfolioHoldings : undefined,
         PortfolioCategory: portfolioCategory,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
@@ -392,14 +548,23 @@ export function PortfolioFormDialog({
     } finally {
       setIsSubmitting(false);
     }
+  };  
+  const resetNewHolding = () => {
+    setNewHolding({
+      symbol: "",
+      weight: 0,
+      buyPrice: 0,
+      sector: "",
+      stockCapType: "",
+      stockDetails: undefined,
+    });
   };
 
-  // Holdings Helper Functions
   const addHolding = () => {
     if (!newHolding.symbol.trim()) {
       toast({
         title: "Validation Error",
-        description: "Symbol is required",
+        description: "Stock symbol is required",
         variant: "destructive",
       });
       return;
@@ -462,15 +627,20 @@ export function PortfolioFormDialog({
       symbol: newHolding.symbol,
       weight: newHolding.weight,
       sector: newHolding.sector,
-      status: "Fresh-Buy", // Only Fresh-Buy for new holdings
-      price: newHolding.buyPrice,
+      status: "Fresh-Buy",
       buyPrice: newHolding.buyPrice,
       quantity: investmentDetails.quantity,
       minimumInvestmentValueStock: investmentDetails.actualInvestmentAmount,
       allocatedAmount: investmentDetails.allocatedAmount,
       leftoverAmount: investmentDetails.leftoverAmount,
       stockCapType: newHolding.stockCapType || undefined,
-      originalWeight: newHolding.weight, // Set original weight
+      originalWeight: newHolding.weight,
+      stockDetails: newHolding.stockDetails,
+      currentMarketPrice: newHolding.stockDetails ? parseFloat(newHolding.stockDetails.currentPrice) : newHolding.buyPrice,
+      // NEW: Enhanced P&L tracking fields
+      originalBuyPrice: newHolding.buyPrice,
+      totalQuantityOwned: investmentDetails.quantity,
+      realizedPnL: 0,
     };
 
     setHoldings([...holdings, holdingToAdd]);
@@ -490,15 +660,28 @@ export function PortfolioFormDialog({
     updated.splice(index, 1);
     setHoldings(updated);
   };
-
-  const startEditHolding = (index: number) => {
+  
+  const startEditHolding = async (index: number) => {
     const holding = holdings[index];
+    
+    // Fetch latest stock price
+    let latestPrice = holding.buyPrice;
+    try {
+      const stockDetails = await fetchStockSymbolBySymbol(holding.symbol);
+      latestPrice = parseFloat(stockDetails.currentPrice);
+    } catch (error) {
+      console.error(`Failed to fetch latest price for ${holding.symbol}:`, error);
+    }
+
     setEditingHolding({
       index,
       originalHolding: holding,
       newWeight: holding.weight,
       status: holding.status,
+      action: "hold",
       weightChange: 0,
+      latestPrice,
+      isUpdatingPrice: false,
     });
   };
 
@@ -508,31 +691,35 @@ export function PortfolioFormDialog({
     const updated = { ...editingHolding, [field]: value };
     const originalWeight = updated.originalHolding.originalWeight || updated.originalHolding.weight;
 
-    // Calculate based on status and change weight
-    if (field === 'status') {
+    // Calculate based on action
+    if (field === 'action') {
       updated.weightChange = 0;
       
-      switch (updated.status) {
-        case 'Fresh-Buy':
-        case 'Addon':
+      switch (updated.action) {
+        case 'buy':
+        case 'addon':
+          updated.status = updated.action === 'buy' ? 'Fresh-Buy' : 'addon-buy';
           updated.newWeight = originalWeight;
           break;
         case 'partial-sell':
+          updated.status = 'partial-sell';
           updated.newWeight = originalWeight;
           break;
-        case 'Sell':
+        case 'sell':
+          updated.status = 'Sell';
           updated.newWeight = 0;
           updated.weightChange = originalWeight;
           break;
-        case 'Hold':
+        case 'hold':
+          updated.status = 'Hold';
           updated.newWeight = originalWeight;
           updated.weightChange = 0;
           break;
       }
     } else if (field === 'weightChange') {
-      switch (updated.status) {
-        case 'Fresh-Buy':
-        case 'Addon':
+      switch (updated.action) {
+        case 'buy':
+        case 'addon':
           updated.newWeight = originalWeight + value;
           break;
         case 'partial-sell':
@@ -546,68 +733,92 @@ export function PortfolioFormDialog({
             return;
           }
           break;
-        case 'Sell':
+        case 'sell':
           updated.newWeight = 0;
           updated.weightChange = originalWeight;
           break;
-        case 'Hold':
+        case 'hold':
           updated.newWeight = originalWeight;
           updated.weightChange = 0;
           break;
       }
     }
 
+    // NEW: Calculate P&L preview for sell operations
+    if ((updated.action === 'partial-sell' || updated.action === 'sell') && updated.latestPrice) {
+      const holding = updated.originalHolding;
+      const originalBuyPrice = holding.originalBuyPrice || holding.buyPrice;
+      const currentQuantity = holding.totalQuantityOwned || holding.quantity;
+      
+      let proportionToSell = 0;
+      if (updated.action === 'sell') {
+        proportionToSell = 1; // Sell everything
+      } else if (updated.action === 'partial-sell' && updated.weightChange > 0) {
+        // Calculate proportion based on weight change
+        const originalWeight = holding.originalWeight || holding.weight;
+        proportionToSell = updated.weightChange / originalWeight;
+      }
+
+      if (proportionToSell > 0) {
+        updated.pnlPreview = calculatePnL(
+          currentQuantity,
+          originalBuyPrice,
+          updated.latestPrice,
+          proportionToSell
+        );
+      }
+    } else {
+      updated.pnlPreview = undefined;
+    }
+
     setEditingHolding(updated);
+  };
+
+  const refreshStockPrice = async () => {
+    if (!editingHolding) return;
+
+    setEditingHolding({ ...editingHolding, isUpdatingPrice: true });
+    
+    try {
+      // Update all stock prices first
+      await updateStockPrices();
+      
+      // Then fetch specific stock details
+      const stockDetails = await fetchStockSymbolBySymbol(editingHolding.originalHolding.symbol);
+      const latestPrice = parseFloat(stockDetails.currentPrice);
+      
+      setEditingHolding({
+        ...editingHolding,
+        latestPrice,
+        isUpdatingPrice: false,
+      });
+
+      toast({
+        title: "Price Updated",
+        description: `Latest price for ${editingHolding.originalHolding.symbol}: ₹${latestPrice.toLocaleString()}`,
+      });
+    } catch (error) {
+      console.error("Error updating stock price:", error);
+      toast({
+        title: "Failed to Update Price",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+      setEditingHolding({ ...editingHolding, isUpdatingPrice: false });
+    }
   };
 
   const saveEditedHolding = () => {
     if (!editingHolding) return;
 
-    const { index, newWeight, status, weightChange } = editingHolding;
+    const { index, newWeight, status, action, pnlPreview } = editingHolding;
     const originalHolding = editingHolding.originalHolding;
-    const originalWeight = originalHolding.originalWeight || originalHolding.weight;
 
-    // Validation
-    if (status === 'partial-sell' && weightChange > originalWeight) {
-      toast({
-        title: "Validation Error",
-        description: `Cannot sell more than original weight (${originalWeight.toFixed(2)}%)`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if ((status === 'Fresh-Buy' || status === 'Addon') && weightChange <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Change weight must be greater than 0 for buy operations",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (status === 'partial-sell' && weightChange <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Change weight must be greater than 0 for sell operations",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newWeight < 0) {
-      toast({
-        title: "Validation Error",
-        description: "Final weight cannot be negative",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Calculate new investment amounts with proper handling
+    // Calculate new investment amounts
+    const investmentPrice = editingHolding.latestPrice || originalHolding.buyPrice;
     const investmentDetails = calculateInvestmentDetails(
       newWeight, 
-      originalHolding.buyPrice, 
+      investmentPrice, 
       Number(minInvestment)
     );
 
@@ -615,10 +826,16 @@ export function PortfolioFormDialog({
       ...originalHolding,
       weight: newWeight,
       status: status,
+      buyPrice: investmentPrice,
       quantity: investmentDetails.quantity,
       minimumInvestmentValueStock: investmentDetails.actualInvestmentAmount,
       allocatedAmount: investmentDetails.allocatedAmount,
       leftoverAmount: investmentDetails.leftoverAmount,
+      currentMarketPrice: editingHolding.latestPrice,
+      // Preserve P&L tracking fields
+      originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
+      totalQuantityOwned: investmentDetails.quantity,
+      realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
     };
 
     const updatedHoldings = [...holdings];
@@ -631,15 +848,39 @@ export function PortfolioFormDialog({
     }
 
     setHoldings(updatedHoldings);
-    setEditingHolding(null);
 
-    toast({
-      title: "Success",
-      description: `Holding updated successfully. ${status === 'Sell' ? 'Position closed.' : `New weight: ${newWeight.toFixed(2)}%`}`,
-    });
+    // NEW: Handle profit reinvestment for profitable sales
+    if (pnlPreview && pnlPreview.profitLoss > 0 && (action === 'partial-sell' || action === 'sell')) {
+      const currentMin = Number(minInvestment);
+      const newMinInvestment = currentMin + pnlPreview.profitLoss;
+      setMinInvestment(newMinInvestment.toString());
+
+      // Enhanced success notification with P&L details
+      toast({
+        title: "Sale Completed! 📈",
+        description: `Profit: ${formatCurrency(pnlPreview.profitLoss)} added to investment pool. New pool: ${formatCurrency(newMinInvestment)}`,
+        duration: 5000,
+      });
+    } else if (pnlPreview && pnlPreview.profitLoss < 0 && (action === 'partial-sell' || action === 'sell')) {
+      // Loss notification
+      toast({
+        title: "Sale Completed 📉",
+        description: `Loss: ${formatCurrency(Math.abs(pnlPreview.profitLoss))} realized. Continuing with portfolio.`,
+        variant: "destructive",
+        duration: 5000,
+      });
+    } else {
+      // Regular operation notification
+      const actionText = action.charAt(0).toUpperCase() + action.slice(1).replace('-', ' ');
+      toast({
+        title: "Success",
+        description: `${actionText} completed. ${status === 'Sell' ? 'Position closed.' : `New weight: ${newWeight.toFixed(2)}%`}`,
+      });
+    }
+
+    setEditingHolding(null);
   };
 
-  // Subscription fees helper functions
   const addSubscriptionFee = () => {
     setSubscriptionFees([...subscriptionFees, { type: "monthly", price: 0 }]);
   };
@@ -649,7 +890,6 @@ export function PortfolioFormDialog({
     if (field === "price") {
       updated[index] = { ...updated[index], [field]: Number(value) };
     } else {
-      // Ensure type is one of the allowed values
       const typeValue = value as "monthly" | "quarterly" | "yearly";
       updated[index] = { ...updated[index], [field]: typeValue };
     }
@@ -662,7 +902,6 @@ export function PortfolioFormDialog({
     setSubscriptionFees(updated);
   };
 
-  // YouTube links helper functions
   const addYouTubeLink = () => {
     setYouTubeLinks([...youTubeLinks, { link: "" }]);
   };
@@ -679,7 +918,6 @@ export function PortfolioFormDialog({
     setYouTubeLinks(updated);
   };
 
-  // Download links helper functions
   const addDownloadLink = () => {
     setDownloadLinks([...downloadLinks, { linkType: "", linkUrl: "", linkDiscription: "" }]);
   };
@@ -695,6 +933,77 @@ export function PortfolioFormDialog({
     updated.splice(index, 1);
     setDownloadLinks(updated);
   };
+
+  // NEW: P&L Preview Component
+  const PnLPreviewCard = ({ pnlData }: { pnlData: PnLCalculation }) => (
+    <Card className={`border-2 ${pnlData.profitLoss >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          {pnlData.profitLoss >= 0 ? (
+            <>
+              <TrendingUp className="h-5 w-5 text-green-600" />
+              <span className="text-green-800">Profit Preview</span>
+            </>
+          ) : (
+            <>
+              <TrendingDown className="h-5 w-5 text-red-600" />
+              <span className="text-red-800">Loss Preview</span>
+            </>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="text-center">
+            <p className="text-muted-foreground">Quantity Sold</p>
+            <p className="font-bold text-lg">{pnlData.quantitySold.toLocaleString()}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground">Sale Value</p>
+            <p className="font-bold text-lg text-blue-600">{formatCurrency(pnlData.saleValue)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground">Original Cost</p>
+            <p className="font-bold text-lg">{formatCurrency(pnlData.originalCost)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground">P&L</p>
+            <div className={`font-bold text-lg ${pnlData.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p>{pnlData.profitLoss >= 0 ? '+' : ''}{formatCurrency(pnlData.profitLoss)}</p>
+              <p className="text-xs">({pnlData.profitLossPercent >= 0 ? '+' : ''}{pnlData.profitLossPercent.toFixed(2)}%)</p>
+            </div>
+          </div>
+        </div>
+        
+        {pnlData.remainingQuantity > 0 && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="text-center">
+                <p className="text-muted-foreground">Remaining Quantity</p>
+                <p className="font-medium">{pnlData.remainingQuantity.toLocaleString()}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-muted-foreground">Remaining Value</p>
+                <p className="font-medium">{formatCurrency(pnlData.remainingValue)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {pnlData.profitLoss > 0 && (
+          <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-md">
+            <div className="flex items-center gap-2 text-green-800">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="font-medium">Profit will be added to investment pool</span>
+            </div>
+            <p className="text-sm text-green-700 mt-1">
+              New minimum investment: {formatCurrency(Number(minInvestment) + pnlData.profitLoss)}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <>
@@ -714,8 +1023,8 @@ export function PortfolioFormDialog({
                 <TabsTrigger value="pdfLinks">PDF Links</TabsTrigger>
               </TabsList>
 
-              {/* Basic Info Tab */}
               <TabsContent value="basic" className="space-y-4 py-4">
+                {/* All Basic Info content remains exactly the same */}
                 <div className="grid gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="portfolio-name">Portfolio Name *</Label>
@@ -729,7 +1038,7 @@ export function PortfolioFormDialog({
                     />
                   </div>
 
-                  {/* Descriptions */}
+                  {/* Descriptions section */}
                   <div className="space-y-3">
                     <Label>Descriptions</Label>
                     {descriptions.map((desc, index) => (
@@ -753,7 +1062,6 @@ export function PortfolioFormDialog({
                     ))}
                   </div>
 
-                  {/* Methodology PDF Link */}
                   <div className="grid gap-2">
                     <Label htmlFor="methodology-pdf-link">Methodology PDF Link</Label>
                     <Input
@@ -765,9 +1073,8 @@ export function PortfolioFormDialog({
                     />
                   </div>
 
-                  {/* YouTube Links */}
                   <div className="space-y-3">
-                    <Label>YouTube Video Links</Label>&nbsp;&nbsp;
+                    <Label>YouTube Video Links</Label>
                     {youTubeLinks.map((link, index) => (
                       <div key={index} className="flex items-center gap-2">
                         <Input
@@ -786,7 +1093,7 @@ export function PortfolioFormDialog({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    ))}
+                    ))}<br />
                     <Button
                       type="button"
                       variant="outline"
@@ -799,8 +1106,6 @@ export function PortfolioFormDialog({
                   </div>
                 </div>
               </TabsContent>
-
-              {/* Financial Details Tab */}
               <TabsContent value="financial" className="space-y-4 py-4">
                 <div className="grid gap-4">
                   <div className="grid gap-2">
@@ -817,7 +1122,7 @@ export function PortfolioFormDialog({
                     />
                   </div>
 
-                  {/* Subscription Fees */}
+                  {/* Subscription Fees section */}
                   <div className="space-y-3 border p-4 rounded-md bg-muted">
                     <Label>Subscription Fees *</Label>&nbsp;&nbsp;
                     {subscriptionFees.map((fee, index) => (
@@ -870,32 +1175,6 @@ export function PortfolioFormDialog({
                       <Plus className="mr-2 h-4 w-4" />
                       Add Subscription Fee
                     </Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="duration-months">Duration (Months) *</Label>
-                      <Input
-                        id="duration-months"
-                        type="number"
-                        min="1"
-                        value={durationMonths}
-                        onChange={(e) => setDurationMonths(e.target.value)}
-                        placeholder="Enter duration"
-                        disabled={isSubmitting}
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="expiry-date">Expiry Date</Label>
-                      <Input
-                        id="expiry-date"
-                        type="date"
-                        value={expiryDate}
-                        onChange={(e) => setExpiryDate(e.target.value)}
-                        disabled={isSubmitting}
-                      />
-                    </div>
                   </div>
 
                   <hr className="mt-2"/>
@@ -1006,22 +1285,41 @@ export function PortfolioFormDialog({
                 </div>
               </TabsContent>
 
-              {/* Holdings Tab with Updated Financial Summary */}
               <TabsContent value="holdings" className="py-4">
                 <div className="space-y-6">
-                  {/* Enhanced Financial Summary */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Financial Summary</CardTitle>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>Financial Summary</CardTitle>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleUpdateAllPrices}
+                          disabled={isUpdatingAllPrices || isSubmitting}
+                        >
+                          {isUpdatingAllPrices ? (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Update All Prices
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                         <div>
-                          <p className="text-muted-foreground">Total Investment</p>
-                          <p className="font-semibold">₹{Number(minInvestment || 0).toLocaleString()}</p>
+                          <p className="text-muted-foreground">Total Investment Pool</p>
+                          <p className="font-semibold text-lg">₹{Number(minInvestment || 0).toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Actual Holdings Value</p>
+                          <p className="text-muted-foreground">Holdings Value</p>
                           <p className="font-semibold">₹{holdingsValue.toLocaleString()}</p>
                         </div>
                         <div>
@@ -1037,8 +1335,22 @@ export function PortfolioFormDialog({
                           </p>
                         </div>
                       </div>
+
+                      {/* NEW: Total Unrealized P&L Display */}
+                      {totalUnrealizedPnL !== 0 && (
+                        <div className="mt-4 p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Calculator className="h-4 w-4 text-blue-600" />
+                              <span className="font-medium">Total Unrealized P&L</span>
+                            </div>
+                            <div className={`font-bold text-lg ${totalUnrealizedPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {totalUnrealizedPnL >= 0 ? '+' : ''}{formatCurrency(totalUnrealizedPnL)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       
-                      {/* Show leftover amounts if any */}
                       {totalLeftover > 0 && (
                         <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
                           <div className="flex items-center gap-2">
@@ -1057,149 +1369,148 @@ export function PortfolioFormDialog({
                     </CardContent>
                   </Card>
 
-                  {/* Add New Holding with Enhanced Calculation Preview */}
                   <Card>
                     <CardHeader>
                       <CardTitle>Add New Holding</CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        New holdings can only be added with "Fresh-Buy" status
+                        Search and select stocks to add to your portfolio
                       </p>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="grid gap-2">
-                          <Label htmlFor="symbol">Symbol *</Label>
-                          <Input
-                            id="symbol"
-                            value={newHolding.symbol}
-                            onChange={(e) => setNewHolding({ ...newHolding, symbol: e.target.value.toUpperCase() })}
-                            placeholder="e.g., RELIANCE"
-                            disabled={isSubmitting}
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="buy-price">Buy Price (₹) *</Label>
-                          <Input
-                            id="buy-price"
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={newHolding.buyPrice || ""}
-                            onChange={(e) => setNewHolding({ ...newHolding, buyPrice: Number(e.target.value) })}
-                            placeholder="Current market price"
-                            disabled={isSubmitting}
-                          />
-                        </div>                      
-                        <div className="grid gap-2">
-                          <Label htmlFor="weight">Weight (%) *</Label>
-                          <Input
-                            id="weight"
-                            type="number"
-                            min="0.01"
-                            max={remainingWeight}
-                            step="0.01"
-                            value={newHolding.weight || ""}
-                            onChange={(e) => setNewHolding({ ...newHolding, weight: Number(e.target.value) })}
-                            placeholder={`Max: ${remainingWeight.toFixed(2)}%`}
-                            disabled={isSubmitting}
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="sector">Sector *</Label>
-                          <Input
-                            id="sector"
-                            value={newHolding.sector}
-                            onChange={(e) => setNewHolding({ ...newHolding, sector: e.target.value })}
-                            placeholder="e.g., Energy"
-                            disabled={isSubmitting}
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="stock-cap-type">Stock Cap Type</Label>
-                          <Select
-                            value={newHolding.stockCapType}
-                            onValueChange={(value) => setNewHolding({ ...newHolding, stockCapType: value as "small cap" | "mid cap" | "large cap" | "micro cap" | "mega cap" | "" })}
-                            disabled={isSubmitting}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select cap type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="micro cap">Micro Cap</SelectItem>
-                              <SelectItem value="small cap">Small Cap</SelectItem>
-                              <SelectItem value="mid cap">Mid Cap</SelectItem>
-                              <SelectItem value="large cap">Large Cap</SelectItem>
-                              <SelectItem value="mega cap">Mega Cap</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label>Status</Label>
-                          <div className="p-2 bg-muted rounded-md">
-                            <span className="text-sm font-medium">Fresh-Buy</span>
-                            <p className="text-xs text-muted-foreground">Only Fresh-Buy allowed for new holdings</p>
+                      <div className="grid gap-4">
+                        <StockSearch
+                          value={newHolding.symbol}
+                          onSelect={handleStockSelect}
+                          onClear={() => setNewHolding({ ...newHolding, symbol: "", stockDetails: undefined })}
+                          placeholder="Search for stocks..."
+                          disabled={isSubmitting}
+                          showDetails={true}
+                        />
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="grid gap-2">
+                            <Label htmlFor="buy-price">Buy Price (₹) *</Label>
+                            <Input
+                              id="buy-price"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={newHolding.buyPrice || ""}
+                              onChange={(e) => setNewHolding({ ...newHolding, buyPrice: Number(e.target.value) })}
+                              placeholder="Current market price"
+                              disabled={isSubmitting}
+                            />
+                            {newHolding.stockDetails && (
+                              <p className="text-xs text-muted-foreground">
+                                Current market price: ₹{parseFloat(newHolding.stockDetails.currentPrice).toLocaleString()}
+                              </p>
+                            )}
+                          </div>                      
+                          
+                          <div className="grid gap-2">
+                            <Label htmlFor="weight">Weight (%) *</Label>
+                            <Input
+                              id="weight"
+                              type="number"
+                              min="0.01"
+                              max={remainingWeight}
+                              step="0.01"
+                              value={newHolding.weight || ""}
+                              onChange={(e) => setNewHolding({ ...newHolding, weight: Number(e.target.value) })}
+                              placeholder={`Max: ${remainingWeight.toFixed(2)}%`}
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                          
+                          <div className="grid gap-2">
+                            <Label htmlFor="sector">Sector *</Label>
+                            <Input
+                              id="sector"
+                              value={newHolding.sector}
+                              onChange={(e) => setNewHolding({ ...newHolding, sector: e.target.value })}
+                              placeholder="e.g., Energy"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                          
+                          <div className="grid gap-2">
+                            <Label htmlFor="stock-cap-type">Stock Cap Type</Label>
+                            <Select
+                              value={newHolding.stockCapType}
+                              onValueChange={(value) => setNewHolding({ ...newHolding, stockCapType: value as "small cap" | "mid cap" | "large cap" | "micro cap" | "mega cap" | "" })}
+                              disabled={isSubmitting}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select cap type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="micro cap">Micro Cap</SelectItem>
+                                <SelectItem value="small cap">Small Cap</SelectItem>
+                                <SelectItem value="mid cap">Mid Cap</SelectItem>
+                                <SelectItem value="large cap">Large Cap</SelectItem>
+                                <SelectItem value="mega cap">Mega Cap</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Enhanced Calculation Preview */}
-                      {newHolding.weight > 0 && newHolding.buyPrice > 0 && Number(minInvestment) > 0 && (
-                        <div className="mt-4 p-4 bg-muted rounded-md">
-                          <h5 className="font-medium mb-3">Calculation Preview:</h5>
-                          {(() => {
-                            const details = calculateInvestmentDetails(
-                              newHolding.weight, 
-                              newHolding.buyPrice, 
-                              Number(minInvestment)
-                            );
-                            return (
-                              <div className="space-y-3">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-muted-foreground">Allocated Amount:</span>
-                                    <p className="font-medium">₹{details.allocatedAmount.toLocaleString()}</p>
+                        {newHolding.weight > 0 && newHolding.buyPrice > 0 && Number(minInvestment) > 0 && (
+                          <div className="mt-4 p-4 bg-muted rounded-md">
+                            <h5 className="font-medium mb-3">Calculation Preview:</h5>
+                            {(() => {
+                              const details = calculateInvestmentDetails(
+                                newHolding.weight, 
+                                newHolding.buyPrice, 
+                                Number(minInvestment)
+                              );
+                              return (
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Allocated Amount:</span>
+                                      <p className="font-medium">₹{details.allocatedAmount.toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Quantity:</span>
+                                      <p className="font-medium">{details.quantity} shares</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Actual Investment:</span>
+                                      <p className="font-medium">₹{details.actualInvestmentAmount.toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Leftover:</span>
+                                      <p className={`font-medium ${details.leftoverAmount > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                        ₹{details.leftoverAmount.toFixed(2)}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Quantity:</span>
-                                    <p className="font-medium">{details.quantity} shares</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Actual Investment:</span>
-                                    <p className="font-medium">₹{details.actualInvestmentAmount.toLocaleString()}</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Leftover:</span>
-                                    <p className={`font-medium ${details.leftoverAmount > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                                      ₹{details.leftoverAmount.toFixed(2)}
-                                    </p>
-                                  </div>
+                                  {details.leftoverAmount > 0 && (
+                                    <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
+                                      <strong>Note:</strong> ₹{details.leftoverAmount.toFixed(2)} will be credited back to your cash balance 
+                                      due to share quantity rounding.
+                                    </div>
+                                  )}
                                 </div>
-                                {details.leftoverAmount > 0 && (
-                                  <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
-                                    <strong>Note:</strong> ₹{details.leftoverAmount.toFixed(2)} will be credited back to your cash balance 
-                                    due to share quantity rounding.
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
+                              );
+                            })()}
+                          </div>
+                        )}
 
-                      <div className="mt-4">
-                        <Button
-                          type="button"
-                          onClick={addHolding}
-                          disabled={isSubmitting}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Holding
-                        </Button>
+                        <div className="mt-4">
+                          <Button
+                            type="button"
+                            onClick={addHolding}
+                            disabled={isSubmitting}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Holding
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  {/* Enhanced Current Holdings Display */}
                   <div>
                     <h4 className="font-medium mb-3">Current Holdings ({holdings.length})</h4>
                     {holdings.length === 0 ? (
@@ -1210,37 +1521,30 @@ export function PortfolioFormDialog({
                           <Card key={index}>
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between">
-                                <div className="grid gap-2">
+                                <div className="grid gap-2 flex-1">
                                   <div className="flex items-center gap-2">
                                     <span className="font-semibold text-lg">{holding.symbol}</span>
                                     <span className="text-sm text-muted-foreground">({holding.sector})</span>
                                     {holding.stockCapType && (
-                                      <span className="text-xs bg-gray-100 px-2 py-1 rounded capitalize">
+                                      <Badge variant="outline" className="text-xs capitalize">
                                         {holding.stockCapType}
-                                      </span>
+                                      </Badge>
                                     )}
-                                    <span className={`text-xs px-2 py-1 rounded ${
+                                    <Badge className={`text-xs ${
                                       holding.status === 'Fresh-Buy' ? 'bg-green-100 text-green-800' :
-                                      holding.status === 'Addon' ? 'bg-blue-100 text-blue-800' :
+                                      holding.status === 'addon-buy' ? 'bg-blue-100 text-blue-800' :
                                       holding.status === 'Hold' ? 'bg-gray-100 text-gray-800' :
                                       holding.status === 'partial-sell' ? 'bg-orange-100 text-orange-800' :
                                       'bg-red-100 text-red-800'
                                     }`}>
                                       {holding.status}
-                                    </span>
+                                    </Badge>
                                   </div>
-                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                  
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                                     <div>
                                       <span className="text-muted-foreground">Weight: </span>
                                       <span className="font-medium">{holding.weight.toFixed(2)}%</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Allocated: </span>
-                                      <span className="font-medium">₹{holding.allocatedAmount.toLocaleString()}</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Actual Investment: </span>
-                                      <span className="font-medium">₹{holding.minimumInvestmentValueStock.toLocaleString()}</span>
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Buy Price: </span>
@@ -1250,14 +1554,50 @@ export function PortfolioFormDialog({
                                       <span className="text-muted-foreground">Quantity: </span>
                                       <span className="font-medium">{holding.quantity}</span>
                                     </div>
-                                    {holding.leftoverAmount > 0 && (
-                                      <div>
-                                        <span className="text-muted-foreground">Leftover: </span>
-                                        <span className="font-medium text-orange-600">₹{holding.leftoverAmount.toFixed(2)}</span>
-                                      </div>
-                                    )}
+                                    <div>
+                                      <span className="text-muted-foreground">Investment: </span>
+                                      <span className="font-medium">₹{holding.minimumInvestmentValueStock.toLocaleString()}</span>
+                                    </div>
                                   </div>
+
+                                  {/* Enhanced P&L display */}
+                                  {holding.currentMarketPrice && holding.originalBuyPrice && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm pt-2 border-t">
+                                      <div>
+                                        <span className="text-muted-foreground">Current Price: </span>
+                                        <span className="font-medium">₹{holding.currentMarketPrice.toLocaleString()}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-muted-foreground">Price Change: </span>
+                                        <span className={`font-medium flex items-center gap-1 ${
+                                          holding.currentMarketPrice > holding.originalBuyPrice ? 'text-green-600' : 
+                                          holding.currentMarketPrice < holding.originalBuyPrice ? 'text-red-600' : 'text-gray-600'
+                                        }`}>
+                                          {holding.currentMarketPrice > holding.originalBuyPrice ? <TrendingUp className="h-3 w-3" /> : 
+                                           holding.currentMarketPrice < holding.originalBuyPrice ? <TrendingDown className="h-3 w-3" /> : null}
+                                          ₹{Math.abs(holding.currentMarketPrice - holding.originalBuyPrice).toFixed(2)}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Unrealized P&L: </span>
+                                        <span className={`font-medium ${
+                                          (holding.currentMarketPrice * holding.quantity) > (holding.originalBuyPrice * holding.quantity) ? 'text-green-600' : 'text-red-600'
+                                        }`}>
+                                          ₹{((holding.currentMarketPrice - holding.originalBuyPrice) * holding.quantity).toFixed(2)}
+                                        </span>
+                                      </div>
+                                      {holding.realizedPnL && holding.realizedPnL !== 0 && (
+                                        <div>
+                                          <span className="text-muted-foreground">Realized P&L: </span>
+                                          <span className={`font-medium ${holding.realizedPnL > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            ₹{holding.realizedPnL.toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
+                                
                                 <div className="flex items-center gap-2">
                                   <Button
                                     type="button"
@@ -1290,7 +1630,6 @@ export function PortfolioFormDialog({
                 </div>
               </TabsContent>
 
-              {/* PDF Links Tab */}
               <TabsContent value="pdfLinks" className="py-4">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -1398,154 +1737,272 @@ export function PortfolioFormDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Holding Dialog */}
+      {/* Enhanced Edit Holdings Dialog with P&L Preview */}
       {editingHolding && (
         <Dialog open={true} onOpenChange={() => setEditingHolding(null)}>
-          <DialogContent className="sm:max-w-[600px]" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <DialogHeader>
-              <DialogTitle>Edit Stock Details</DialogTitle>
+              <DialogTitle>Stock Management</DialogTitle>
               <DialogDescription>
-                {editingHolding.originalHolding.symbol} ({editingHolding.originalHolding.sector})
-                <br />
-                Original Weight: {editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight}% | 
-                Current Weight: {editingHolding.originalHolding.weight}% | 
-                Price: ₹{editingHolding.originalHolding.buyPrice} | 
-                Status: {editingHolding.originalHolding.status}
+                Manage stock position for {editingHolding.originalHolding.symbol} ({editingHolding.originalHolding.sector})
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            {/* Stock Summary Card */}
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="font-semibold text-lg">{editingHolding.originalHolding.symbol}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {editingHolding.originalHolding.sector}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Original Weight:</span>
+                    <span className="font-medium ml-2">{(editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight).toFixed(2)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Current Weight:</span>
+                    <span className="font-medium ml-2">{editingHolding.originalHolding.weight.toFixed(2)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Original Buy Price:</span>
+                    <span className="font-medium ml-2">₹{(editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice).toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Current Quantity:</span>
+                    <span className="font-medium ml-2">{editingHolding.originalHolding.totalQuantityOwned || editingHolding.originalHolding.quantity}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-6 py-4">
+              {/* Stock Price Section */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Current Market Data</CardTitle>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={refreshStockPrice}
+                      disabled={editingHolding.isUpdatingPrice}
+                    >
+                      {editingHolding.isUpdatingPrice ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Refresh Price
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Latest Price</p>
+                      <p className="font-semibold text-lg">₹{(editingHolding.latestPrice || editingHolding.originalHolding.buyPrice).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Original Buy Price</p>
+                      <p className="font-medium">₹{(editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Price Change</p>
+                      <div className={`flex items-center gap-1 font-medium ${
+                        (editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) > (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice)
+                          ? 'text-green-600' : 
+                        (editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) < (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice)
+                          ? 'text-red-600' : 'text-gray-600'
+                      }`}>
+                        {(editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) > (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice) ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : (editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) < (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice) ? (
+                          <TrendingDown className="h-3 w-3" />
+                        ) : null}
+                        <span>₹{Math.abs((editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) - (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice)).toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Change %</p>
+                      <div className={`font-medium ${
+                        (editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) > (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice)
+                          ? 'text-green-600' : 
+                        (editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) < (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice)
+                          ? 'text-red-600' : 'text-gray-600'
+                      }`}>
+                        {((((editingHolding.latestPrice || editingHolding.originalHolding.buyPrice) - (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice)) / (editingHolding.originalHolding.originalBuyPrice || editingHolding.originalHolding.buyPrice)) * 100).toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Action Selection */}
               <div className="grid gap-2">
-                <Label htmlFor="edit-status-select">Status *</Label>
+                <Label htmlFor="edit-action-select">Trading Action *</Label>
                 <Select
-                  value={editingHolding.status}
-                  onValueChange={(value) => updateEditingHolding('status', value as "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "Addon")}
+                  value={editingHolding.action}
+                  onValueChange={(value) => updateEditingHolding('action', value as "buy" | "sell" | "partial-sell" | "addon" | "hold")}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
+                    <SelectValue placeholder="Select action" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Fresh-Buy">Fresh-Buy</SelectItem>
-                    <SelectItem value="Addon">Addon</SelectItem>
-                    <SelectItem value="Hold">Hold</SelectItem>
+                    <SelectItem value="buy">Fresh Buy</SelectItem>
+                    <SelectItem value="addon">Add-on Buy</SelectItem>
+                    <SelectItem value="hold">Hold Position</SelectItem>
                     <SelectItem value="partial-sell">Partial Sell</SelectItem>
-                    <SelectItem value="Sell">Sell</SelectItem>
+                    <SelectItem value="sell">Complete Sell</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Weight Calculation with Simple Input */}
-              <div className="p-4 bg-muted rounded-md">
-                <h5 className="font-medium mb-3">Weight Calculation:</h5>
-                <div className="flex gap-5 items-center justify-center">
-                  {/* Original Weight */}
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">Original Weight <small>%</small></p>
-                    <Input
-                      value={(editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight).toFixed(2)}
-                      disabled
-                      className="w-20 text-center font-semibold"
-                    />
-                  </div>
+              {/* NEW: P&L Preview for Sell Operations */}
+              {editingHolding.pnlPreview && (editingHolding.action === 'partial-sell' || editingHolding.action === 'sell') && (
+                <PnLPreviewCard pnlData={editingHolding.pnlPreview} />
+              )}
 
-                  {/* Operation Symbol */}
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">Operation</p>
-                    <div className="w-12 h-10 ml-1 flex items-center justify-center bg-background rounded-md border">
-                      <span className="font-semibold text-lg">
-                        {editingHolding.status === 'Fresh-Buy' || editingHolding.status === 'Addon' ? '+' : 
-                         editingHolding.status === 'partial-sell' ? '-' : 
-                         editingHolding.status === 'Sell' ? '=' : '='}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Change weight Input */}
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">
-                      {editingHolding.status === 'Hold' ? 'No Change' :
-                       editingHolding.status === 'Sell' ? 'Complete Exit' :
-                       'Change Weight'} <small>%</small>
-                    </p>
-                    {editingHolding.status === 'Hold' ? (
-                      <Input
-                        value="No"
-                        disabled
-                        className="w-20 text-center font-medium text-gray-600"
-                      />
-                    ) : editingHolding.status === 'Sell' ? (
-                      <Input
-                        value="All"
-                        disabled
-                        className="w-20 text-center font-medium text-red-600"
-                      />
-                    ) : (
-                      <Input
-                        type="number"
-                        min="0.01"
-                        max={editingHolding.status === 'partial-sell' ? 
-                          (editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight) : 
-                          100 - (editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight)}
-                        step="0.01"
-                        value={editingHolding.weightChange || ""}
-                        onChange={(e) => updateEditingHolding('weightChange', Number(e.target.value))}
-                        placeholder="0"
-                        className="w-20 text-center"
-                      />
-                    )}
-                  </div>
-
-                  {/* Equals Symbol */}
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">&nbsp;</p>
-                    <div className="w-8 h-10 flex items-center justify-center">
-                      <span className="font-semibold text-lg">=</span>
-                    </div>
-                  </div>
-
-                  {/* Final Weight */}
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">Final Weight <small>%</small></p>
-                    <Input
-                      value={editingHolding.newWeight.toFixed(2)}
-                      disabled
-                      className="w-20 text-center font-semibold bg-blue-50"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Investment Calculation with proper leftover handling */}
-              <div className="p-4 bg-blue-50 rounded-md">
-                <h5 className="font-medium mb-3">Investment Impact:</h5>
-                {(() => {
-                  const investmentDetails = calculateInvestmentDetails(
-                    editingHolding.newWeight,
-                    editingHolding.originalHolding.buyPrice,
-                    Number(minInvestment)
-                  );
-                  return (
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Allocated Amount:</span>
-                        <p className="font-medium">₹{investmentDetails.allocatedAmount.toLocaleString()}</p>
+              {/* Weight Calculation Interface */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Position Calculation</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Visual Calculator */}
+                    <div className="flex gap-4 items-center justify-center">
+                      {/* Original Weight */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-1">Original Weight %</p>
+                        <div className="w-20 h-10 bg-blue-100 border border-blue-300 rounded flex items-center justify-center">
+                          <span className="font-semibold text-blue-800">
+                            {(editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight).toFixed(1)}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">New Quantity:</span>
-                        <p className="font-medium">{investmentDetails.quantity} shares</p>
+
+                      {/* Operation Symbol */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-1">Operation</p>
+                        <div className="w-12 h-10 flex items-center justify-center bg-background rounded-md border">
+                          <span className="font-semibold text-lg">
+                            {editingHolding.action === 'buy' || editingHolding.action === 'addon' ? '+' : 
+                             editingHolding.action === 'partial-sell' ? '-' : 
+                             editingHolding.action === 'sell' ? '=' : '='}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Actual Investment:</span>
-                        <p className="font-medium">₹{investmentDetails.actualInvestmentAmount.toLocaleString()}</p>
+
+                      {/* Change Weight Input */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-1">
+                          {editingHolding.action === 'hold' ? 'No Change' :
+                           editingHolding.action === 'sell' ? 'Complete Exit' :
+                           'Change Weight %'}
+                        </p>
+                        {editingHolding.action === 'hold' ? (
+                          <div className="w-20 h-10 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
+                            <span className="text-gray-600 font-medium text-sm">0</span>
+                          </div>
+                        ) : editingHolding.action === 'sell' ? (
+                          <div className="w-20 h-10 bg-red-100 border border-red-300 rounded flex items-center justify-center">
+                            <span className="text-red-600 font-medium text-sm">All</span>
+                          </div>
+                        ) : (
+                          <Input
+                            type="number"
+                            min="0.01"
+                            max={editingHolding.action === 'partial-sell' ? 
+                              (editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight) : 
+                              100 - (editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight)}
+                            step="0.01"
+                            value={editingHolding.weightChange || ""}
+                            onChange={(e) => updateEditingHolding('weightChange', Number(e.target.value))}
+                            placeholder="0"
+                            className="w-20 text-center"
+                          />
+                        )}
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Leftover:</span>
-                        <p className="font-medium text-orange-600">₹{investmentDetails.leftoverAmount.toFixed(2)}</p>
+
+                      {/* Equals Symbol */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-1">&nbsp;</p>
+                        <div className="w-8 h-10 flex items-center justify-center">
+                          <span className="font-semibold text-lg">=</span>
+                        </div>
+                      </div>
+
+                      {/* Final Weight */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-1">Final Weight %</p>
+                        <div className="w-20 h-10 bg-green-100 border border-green-300 rounded flex items-center justify-center">
+                          <span className="font-semibold text-green-800">
+                            {editingHolding.newWeight.toFixed(1)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
+
+                    {/* Investment Impact Calculation */}
+                    <div className="p-4 bg-blue-50 rounded-md">
+                      <h5 className="font-medium mb-3 flex items-center gap-2">
+                        <IndianRupee className="h-4 w-4" />
+                        Investment Impact:
+                      </h5>
+                      {(() => {
+                        const investmentPrice = editingHolding.latestPrice || editingHolding.originalHolding.buyPrice;
+                        const investmentDetails = calculateInvestmentDetails(
+                          editingHolding.newWeight,
+                          investmentPrice,
+                          Number(minInvestment)
+                        );
+                        const currentInvestment = editingHolding.originalHolding.minimumInvestmentValueStock;
+                        const investmentChange = investmentDetails.actualInvestmentAmount - currentInvestment;
+                        
+                        return (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">New Allocated:</span>
+                              <p className="font-medium">₹{investmentDetails.allocatedAmount.toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">New Quantity:</span>
+                              <p className="font-medium">{investmentDetails.quantity} shares</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">New Investment:</span>
+                              <p className="font-medium">₹{investmentDetails.actualInvestmentAmount.toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Investment Change:</span>
+                              <p className={`font-medium ${investmentChange >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {investmentChange >= 0 ? '+' : ''}₹{investmentChange.toLocaleString()}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Using Price:</span>
+                              <p className="font-medium">₹{investmentPrice.toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Leftover:</span>
+                              <p className="font-medium text-orange-600">₹{investmentDetails.leftoverAmount.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             <DialogFooter>
@@ -1557,7 +2014,7 @@ export function PortfolioFormDialog({
                 Cancel
               </Button>
               <Button onClick={saveEditedHolding}>
-                Update Holding
+                Execute {editingHolding.action.charAt(0).toUpperCase() + editingHolding.action.slice(1)}
               </Button>
             </DialogFooter>
           </DialogContent>
