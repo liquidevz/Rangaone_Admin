@@ -58,13 +58,14 @@ export interface Tip {
 export interface CreateTipRequest {
   title: string;
   stockId: string;
-  stockSymbol?: string;
+  content: Array<{ key: string; value: string }>;
+  description: string;
+  status?: "Active" | "Closed";
   action?: string;
   buyRange?: string;
   addMoreAt?: string;
-  weightage?: string;
-  description: string;
-  pdfLink?: string;
+  horizon?: string;
+  downloadLinks?: Array<{ name: string; url: string }>;
 }
 
 // Simplified validation schema for the tip form
@@ -183,18 +184,54 @@ export function PortfolioTipDialog({
         return;
       }
 
+      // Transform the simplified form data into the backend-expected format
+      const content: Array<{ key: string; value: string }> = [];
+      
+      // Add all the form fields as content items
+      if (data.action) {
+        content.push({ key: "Action", value: data.action });
+      }
+      if (data.buyRange) {
+        content.push({ key: "Buy Range (₹)", value: data.buyRange });
+      }
+      if (data.addMoreAt) {
+        content.push({ key: "Add More At (₹)", value: data.addMoreAt });
+      }
+      if (data.weightage) {
+        content.push({ key: "Weightage", value: data.weightage });
+      }
+      
+      // Add stock symbol to content for reference
+      const stockSymbolForContent = selectedStockDetails?.symbol || data.stockSymbol;
+      if (stockSymbolForContent) {
+        content.push({ key: "Stock Symbol", value: stockSymbolForContent });
+      }
+
+      // Transform download links
+      const downloadLinks: Array<{ name: string; url: string }> = [];
+      if (data.pdfLink && data.pdfLink.trim()) {
+        downloadLinks.push({
+          name: "PDF Document",
+          url: data.pdfLink,
+        });
+      }
+
+      // Create the backend-expected format
+      const stockSymbol = selectedStockDetails?.symbol || data.stockSymbol || "Unknown";
       const tipData: CreateTipRequest = {
-        title: `${data.stockSymbol} - ${data.action}`,
-        stockId: stockId as string, // We've already validated this exists above
-        stockSymbol: data.stockSymbol,
+        title: `${stockSymbol} - ${data.action}`,
+        stockId: stockId as string,
+        content: content,
+        description: data.description,
+        status: "Active" as const,
         action: data.action,
         buyRange: data.buyRange,
         addMoreAt: data.addMoreAt,
-        weightage: data.weightage,
-        description: data.description,
-        pdfLink: data.pdfLink,
+        horizon: "Long Term" as const,
+        downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
       };
 
+      console.log("Transformed tip data for backend:", tipData);
       await onSubmit(tipData);
       
       toast({
