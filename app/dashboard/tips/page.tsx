@@ -347,109 +347,100 @@ export default function TipsManagementPage() {
   // Check if tip can be edited (only general tips can be edited from this page)
   const canEditTip = (tip: Tip) => !tip.portfolio;
 
-  // Responsive columns configuration
+  // Mobile-optimized columns configuration
   const columns: ColumnDef<Tip>[] = [
     {
       accessorKey: "title",
-      header: "Title",
+      header: "Title & Stock",
+      size: 250,
       cell: ({ row }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
+        const stockSymbol = row.getValue("stockId") as string;
         
         return (
-          <div className="max-w-[200px]">
+          <div className="min-w-[200px] space-y-2">
             <button
               onClick={() => handleTitleClick(tip)}
-              className={`font-medium text-left truncate w-full hover:underline transition-colors ${
+              className={`font-medium text-left hover:underline transition-colors block w-full text-sm ${
                 isGeneral 
                   ? 'text-purple-600 hover:text-purple-800' 
                   : 'text-blue-600 hover:text-blue-800'
               }`}
               title={isGeneral ? "Click to view details" : "Click to go to portfolio page"}
             >
-              {row.getValue("title")}
+              <div className="line-clamp-2 break-words">
+                {row.getValue("title")}
+              </div>
             </button>
-            <div className="flex items-center gap-1 mt-1">
-              {isGeneral ? (
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-purple-600" />
-                  <span className="text-xs text-purple-600">General</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <Building2 className="h-3 w-3 text-blue-600" />
-                  <span className="text-xs text-blue-600">Portfolio</span>
-                </div>
-              )}
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                {isGeneral ? (
+                  <>
+                    <TrendingUp className="h-3 w-3 text-purple-600 shrink-0" />
+                    <span className="text-xs text-purple-600">General</span>
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="h-3 w-3 text-blue-600 shrink-0" />
+                    <span className="text-xs text-blue-600">Portfolio</span>
+                  </>
+                )}
+              </div>
+              <div className="font-mono text-sm font-medium text-blue-600 bg-blue-50 dark:bg-blue-950 px-2 py-1 rounded">
+                {stockSymbol}
+              </div>
             </div>
           </div>
         );
       },
     },
     {
-      accessorKey: "stockId",
-      header: "Stock Symbol",
-      cell: ({ row }) => {
-        const stockSymbol = row.getValue("stockId") as string;
-        return (
-          <div className="font-medium text-blue-600">{stockSymbol}</div>
-        );
-      },
-    },
-    {
       accessorKey: "action",
       header: "Action",
+      size: 120,
       cell: ({ row }) => {
         const action = row.getValue("action") as string;
         return action ? (
-          <Badge className={getActionColor(action)}>
+          <Badge className={getActionColor(action)} variant="secondary">
             {action.charAt(0).toUpperCase() + action.slice(1)}
           </Badge>
         ) : (
-          <span className="text-muted-foreground">-</span>
-        );
-      },
-    },
-    {
-      accessorKey: "content",
-      header: "Content",
-      cell: ({ row }) => {
-        const content = row.getValue("content");
-        return (
-          <div className="max-w-[150px] sm:max-w-[250px] truncate" title={formatContentPreview(content)}>
-            {formatContentPreview(content)}
-          </div>
+          <span className="text-muted-foreground text-sm">-</span>
         );
       },
     },
     {
       accessorKey: "status",
       header: "Status",
+      size: 100,
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return status ? (
-          <Badge className={getStatusColor(status)}>
+          <Badge className={getStatusColor(status)} variant="outline">
             {status.charAt(0).toUpperCase() + status.slice(1)}
           </Badge>
         ) : (
-          <span className="text-muted-foreground">-</span>
+          <span className="text-muted-foreground text-sm">-</span>
         );
       },
     },
     {
       accessorKey: "targetPrice",
       header: "Target",
+      size: 120,
       cell: ({ row }) => {
         const targetPrice = row.getValue("targetPrice") as string;
         const targetPercentage = row.original.targetPercentage;
         
         return (
-          <div className="text-sm">
+          <div className="text-sm space-y-1">
             {targetPrice && (
-              <div className="font-medium">₹{targetPrice}</div>
+              <div className="font-medium text-green-600">₹{targetPrice}</div>
             )}
             {targetPercentage && (
-              <div className="text-muted-foreground">{targetPercentage}</div>
+              <div className="text-muted-foreground text-xs">{targetPercentage}</div>
             )}
             {!targetPrice && !targetPercentage && (
               <span className="text-muted-foreground">-</span>
@@ -459,88 +450,74 @@ export default function TipsManagementPage() {
       },
     },
     {
+      accessorKey: "content",
+      header: "Details",
+      size: 200,
+      cell: ({ row }) => {
+        const content = row.getValue("content");
+        const preview = formatContentPreview(content);
+        return (
+          <div 
+            className="max-w-[180px] text-sm text-muted-foreground line-clamp-2 leading-relaxed" 
+            title={preview}
+          >
+            {preview}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "createdAt",
       header: "Created",
+      size: 100,
       cell: ({ row }) => {
         const date = row.original.createdAt as string;
-        return <div className="text-sm">{new Date(date).toLocaleDateString()}</div>;
+        const formattedDate = new Date(date).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: '2-digit'
+        });
+        return <div className="text-sm text-muted-foreground font-mono">{formattedDate}</div>;
       },
     },
     {
       id: "actions",
       header: "Actions",
+      size: 120,
       cell: ({ row }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
 
         return (
-          <div className="flex items-center">
-            {/* Desktop view - separate buttons */}
-            <div className="hidden md:flex space-x-2">
-              {isGeneral ? (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEditDialog(tip.id)}
-                    title="Edit general tip"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    <span className="sr-only">Edit</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openDeleteDialog(tip)}
-                    title="Delete general tip"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/dashboard/portfolios/${tip.portfolio}/tips`)}
-                  title="Edit in portfolio page"
-                >
-                  <Building2 className="h-3 w-3 mr-1" />
-                  Portfolio
+          <div className="flex items-center justify-end">
+            {/* Simplified actions for all screen sizes */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <Filter className="h-4 w-4" />
                 </Button>
-              )}
-            </div>
-
-            {/* Mobile view - dropdown menu */}
-            <div className="md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <span className="sr-only">Open menu</span>
-                    <Filter className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {isGeneral ? (
-                    <>
-                      <DropdownMenuItem onClick={() => openEditDialog(tip.id)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        <span>Edit</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openDeleteDialog(tip)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete</span>
-                      </DropdownMenuItem>
-                    </>
-                  ) : (
-                    <DropdownMenuItem onClick={() => router.push(`/dashboard/portfolios/${tip.portfolio}/tips`)}>
-                      <Building2 className="mr-2 h-4 w-4" />
-                      <span>View in Portfolio</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[160px]">
+                {isGeneral ? (
+                  <>
+                    <DropdownMenuItem onClick={() => openEditDialog(tip.id)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      <span>Edit Tip</span>
                     </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                    <DropdownMenuItem onClick={() => openDeleteDialog(tip)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Delete Tip</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem onClick={() => router.push(`/dashboard/portfolios/${tip.portfolio}/tips`)}>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    <span>View in Portfolio</span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
@@ -548,21 +525,22 @@ export default function TipsManagementPage() {
   ];
 
   return (
-    <div className="max-w-full overflow-x-hidden">
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">
+    <div className="min-h-screen w-full">
+      <div className="container mx-auto space-y-4 md:space-y-6 p-4 md:p-6">
+        <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-start lg:space-y-0">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
               Investment Tips Management
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               Unified view of all investment tips - portfolio-specific and general
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto lg:w-auto">
             <Button
               onClick={() => loadAllTips()}
               variant="outline"
+              size="sm"
               className="w-full sm:w-auto"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -570,6 +548,7 @@ export default function TipsManagementPage() {
             </Button>
             <Button
               onClick={() => setCreateDialogOpen(true)}
+              size="sm"
               className="w-full sm:w-auto"
             >
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -578,149 +557,174 @@ export default function TipsManagementPage() {
           </div>
         </div>
 
-        {/* Information Alert */}
-        <Alert>
+        {/* Information Alert - Better mobile spacing */}
+        <Alert className="mx-1 sm:mx-0">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Tip Management Info</AlertTitle>
-          <AlertDescription>
-            <div className="space-y-1">
+          <AlertTitle className="text-sm sm:text-base">Tip Management Info</AlertTitle>
+          <AlertDescription className="text-sm">
+            <div className="space-y-1 mt-2">
               <p>• <strong>General Tips:</strong> Can be created/edited here - visible to all users</p>
               <p>• <strong>Portfolio Tips:</strong> Must be managed from individual portfolio pages</p>
               <p>• <strong>Click title:</strong> View details (general) or go to portfolio page (portfolio tips)</p>
-              <p>• Use the portfolio filter below to view tips by category</p>
+              <p className="hidden sm:block">• Use the portfolio filter below to view tips by category</p>
             </div>
           </AlertDescription>
         </Alert>
 
         {/* Error alert */}
         {error && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="mx-1 sm:mx-0">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle className="text-sm sm:text-base">Error</AlertTitle>
+            <AlertDescription className="text-sm">{error}</AlertDescription>
           </Alert>
         )}
 
-        <Card className="overflow-hidden">
-          <CardHeader>
-            <CardTitle>All Investment Tips</CardTitle>
-            <CardDescription>
-              View and manage all investment tips across portfolios and general tips
-            </CardDescription>
+        <Card className="mx-1 sm:mx-0 shadow-sm">
+          <CardHeader className="space-y-4">
+            <div>
+              <CardTitle className="text-lg sm:text-xl">All Investment Tips</CardTitle>
+              <CardDescription className="text-sm">
+                View and manage all investment tips across portfolios and general tips
+              </CardDescription>
+            </div>
 
-            {/* Filters - responsive grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-              <div>
-                <Select value={portfolioFilter} onValueChange={setPortfolioFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by Portfolio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Tips</SelectItem>
-                    <SelectItem value="general">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-purple-600" />
-                        General Tips
-                      </div>
-                    </SelectItem>
-                    {portfolios.map((portfolio) => (
-                      <SelectItem key={portfolio.id ?? ""} value={portfolio.id ?? ""}>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-blue-600" />
-                          {portfolio.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Select value={actionFilter} onValueChange={setActionFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by Action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Actions</SelectItem>
-                    <SelectItem value="buy">Buy</SelectItem>
-                    <SelectItem value="sell">Sell</SelectItem>
-                    <SelectItem value="partial sell">Partial Sell</SelectItem>
-                    <SelectItem value="partial profit">Partial Profit</SelectItem>
-                    <SelectItem value="hold">Hold</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
+            {/* Mobile-first responsive filters */}
+            <div className="space-y-3 sm:space-y-4">
+              {/* Search bar - full width on mobile */}
+              <div className="w-full">
                 <Input
                   placeholder="Search tips..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full"
                 />
+              </div>
+              
+              {/* Filter dropdowns - responsive grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="w-full">
+                  <Select value={portfolioFilter} onValueChange={setPortfolioFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Tips" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tips</SelectItem>
+                      <SelectItem value="general">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-purple-600" />
+                          <span className="text-sm">General Tips</span>
+                        </div>
+                      </SelectItem>
+                      {portfolios.map((portfolio) => (
+                        <SelectItem key={portfolio.id ?? ""} value={portfolio.id ?? ""}>
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm truncate">{portfolio.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-full">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-full sm:col-span-2 xl:col-span-1">
+                  <Select value={actionFilter} onValueChange={setActionFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Actions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Actions</SelectItem>
+                      <SelectItem value="buy">Buy</SelectItem>
+                      <SelectItem value="sell">Sell</SelectItem>
+                      <SelectItem value="partial sell">Partial Sell</SelectItem>
+                      <SelectItem value="partial profit">Partial Profit</SelectItem>
+                      <SelectItem value="hold">Hold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="px-0 sm:px-6">
+          <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex justify-center py-8">
+              <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
               </div>
             ) : filteredTips.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-2">
-                  No tips found matching your criteria.
-                </p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {portfolioFilter === "general" 
-                    ? "Create your first general investment tip for all users."
-                    : "Try adjusting your filters or create a new tip."
-                  }
-                </p>
-                {(portfolioFilter === "all" || portfolioFilter === "general") && (
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => setCreateDialogOpen(true)}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add General Tip
-                  </Button>
-                )}
+              <div className="text-center py-12 px-4">
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="text-4xl">📈</div>
+                  <div>
+                    <p className="text-lg font-medium text-muted-foreground mb-2">
+                      No tips found matching your criteria
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {portfolioFilter === "general" 
+                        ? "Create your first general investment tip for all users."
+                        : "Try adjusting your filters or create a new tip."
+                      }
+                    </p>
+                  </div>
+                  {(portfolioFilter === "all" || portfolioFilter === "general") && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setCreateDialogOpen(true)}
+                      className="mt-4"
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Add General Tip
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="text-sm text-muted-foreground flex items-center justify-between">
-                  <span>Showing {filteredTips.length} tip{filteredTips.length !== 1 ? 's' : ''}</span>
-                  <div className="flex items-center gap-4 text-xs">
-                    <div className="flex items-center gap-1">
-                      <TrendingUp className="h-3 w-3 text-purple-600" />
-                      <span>General Tips: {filteredTips.filter(t => !t.portfolio).length}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Building2 className="h-3 w-3 text-blue-600" />
-                      <span>Portfolio Tips: {filteredTips.filter(t => t.portfolio).length}</span>
+                {/* Stats row - responsive */}
+                <div className="px-4 sm:px-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-muted-foreground">
+                    <span className="font-medium">
+                      Showing {filteredTips.length} tip{filteredTips.length !== 1 ? 's' : ''}
+                    </span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs">
+                      <div className="flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3 text-purple-600" />
+                        <span>General: {filteredTips.filter(t => !t.portfolio).length}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Building2 className="h-3 w-3 text-blue-600" />
+                        <span>Portfolio: {filteredTips.filter(t => t.portfolio).length}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <DataTable 
-                  columns={columns} 
-                  data={filteredTips} 
-                  searchColumn="title"
-                  isLoading={isLoading}
-                />
+                
+                {/* Table container with horizontal scroll */}
+                <div className="w-full">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[900px]">
+                      <DataTable 
+                        columns={columns} 
+                        data={filteredTips} 
+                        searchColumn="title"
+                        isLoading={isLoading}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

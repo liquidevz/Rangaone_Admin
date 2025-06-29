@@ -297,32 +297,32 @@ export function PortfolioDetailsDialog({
 
   const getStatusColor = (status: string) => {
     const statusColors = {
-      "fresh-buy": "bg-emerald-100 text-emerald-800 border-emerald-200",
-      "addon-buy": "bg-blue-100 text-blue-800 border-blue-200", 
-      "hold": "bg-gray-100 text-gray-800 border-gray-200",
-      "partial-sell": "bg-orange-100 text-orange-800 border-orange-200",
-      "sell": "bg-red-100 text-red-800 border-red-200",
+      "fresh-buy": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700",
+      "addon-buy": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700", 
+      "hold": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600",
+      "partial-sell": "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700",
+      "sell": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-200 dark:border-red-700",
     };
     return statusColors[status.toLowerCase() as keyof typeof statusColors] || statusColors.hold;
   };
 
   const getCapTypeColor = (capType?: string) => {
-    if (!capType) return "bg-gray-100 text-gray-800";
+    if (!capType) return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
     const capColors = {
-      "large cap": "bg-blue-100 text-blue-800",
-      "mega cap": "bg-blue-100 text-blue-800",
-      "mid cap": "bg-yellow-100 text-yellow-800",
-      "small cap": "bg-purple-100 text-purple-800",
-      "micro cap": "bg-purple-100 text-purple-800",
+      "large cap": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+      "mega cap": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+      "mid cap": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+      "small cap": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+      "micro cap": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
     };
-    return capColors[capType.toLowerCase() as keyof typeof capColors] || "bg-gray-100 text-gray-800";
+    return capColors[capType.toLowerCase() as keyof typeof capColors] || "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
   };
 
   const getCategoryColor = (category: string) => {
     const categoryColors = {
-      "basic": "bg-green-100 text-green-800 border-green-200",
-      "premium": "bg-purple-100 text-purple-800 border-purple-200", 
-      "advanced": "bg-red-100 text-red-800 border-red-200",
+      "basic": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200 dark:border-green-700",
+      "premium": "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700", 
+      "advanced": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-200 dark:border-red-700",
     };
     return categoryColors[category.toLowerCase() as keyof typeof categoryColors] || categoryColors.basic;
   };
@@ -389,7 +389,7 @@ export function PortfolioDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[95vw] lg:max-w-[700px] h-[95vh] flex flex-col p-0" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         {/* Compact Header */}
-        <DialogHeader className="px-4 py-3 border-b bg-gradient-to-r from-blue-50 to-purple-50">
+        <DialogHeader className="px-4 py-3 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
@@ -411,7 +411,7 @@ export function PortfolioDetailsDialog({
               </div>
             </div>
             <div className="text-right mr-6 mt-12">
-              <div className="text-xl font-bold text-green-600">
+              <div className="text-xl font-bold text-green-600 dark:text-green-400">
                 {formatCurrency(portfolio.minInvestment)}
               </div>
               <div className="text-xs text-muted-foreground">Min Investment</div>
@@ -465,36 +465,36 @@ export function PortfolioDetailsDialog({
               <TabsContent value="overview" className="space-y-4 mt-0">
                 {/* Compact Quick Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:from-blue-950 dark:to-blue-900 dark:border-blue-700">
                     <CardContent className="p-3 text-center">
-                      <IndianRupee className="h-5 w-5 mx-auto text-blue-600 mb-1" />
-                      <div className="text-lg font-bold text-blue-900">{holdingsWithPrices?.length || 0}</div>
-                      <div className="text-xs text-blue-700">Holdings</div>
+                      <IndianRupee className="h-5 w-5 mx-auto text-blue-600 dark:text-blue-400 mb-1" />
+                      <div className="text-lg font-bold text-blue-900 dark:text-blue-100">{holdingsWithPrices?.length || 0}</div>
+                      <div className="text-xs text-blue-700 dark:text-blue-300">Holdings</div>
                     </CardContent>
                   </Card>
                   
-                  <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:from-green-950 dark:to-green-900 dark:border-green-700">
                     <CardContent className="p-3 text-center">
-                      <Target className="h-5 w-5 mx-auto text-green-600 mb-1" />
-                      <div className="text-lg font-bold text-green-900">{totalWeight.toFixed(1)}%</div>
-                      <div className="text-xs text-green-700">Allocated</div>
+                      <Target className="h-5 w-5 mx-auto text-green-600 dark:text-green-400 mb-1" />
+                      <div className="text-lg font-bold text-green-900 dark:text-green-100">{totalWeight.toFixed(1)}%</div>
+                      <div className="text-xs text-green-700 dark:text-green-300">Allocated</div>
                     </CardContent>
                   </Card>
                   
-                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-700">
                     <CardContent className="p-3 text-center">
-                      <Banknote className="h-5 w-5 mx-auto text-purple-600 mb-1" />
-                      <div className="text-lg font-bold text-purple-900">
+                      <Banknote className="h-5 w-5 mx-auto text-purple-600 dark:text-purple-400 mb-1" />
+                      <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
                         {Object.keys(sectorBreakdown).length}
                       </div>
-                      <div className="text-xs text-purple-700">Sectors</div>
+                      <div className="text-xs text-purple-700 dark:text-purple-300">Sectors</div>
                     </CardContent>
                   </Card>
                   
-                  <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                  <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:from-orange-950 dark:to-orange-900 dark:border-orange-700">
                     <CardContent className="p-3 text-center">
-                      <Calendar className="h-5 w-5 mx-auto text-orange-600 mb-1" />
-                      <div className="text-lg font-bold text-orange-900">
+                      <Calendar className="h-5 w-5 mx-auto text-orange-600 dark:text-orange-400 mb-1" />
+                      <div className="text-lg font-bold text-orange-900 dark:text-orange-100">
                         {portfolio.createdAt ? 
                           (() => {
                             const created = new Date(portfolio.createdAt);
@@ -508,14 +508,14 @@ export function PortfolioDetailsDialog({
                           })()
                         : "0d"}
                       </div>
-                      <div className="text-xs text-orange-700">Age</div>
+                      <div className="text-xs text-orange-700 dark:text-orange-300">Age</div>
                     </CardContent>
                   </Card>
                 </div>
 
                 {/* Portfolio Performance Overview */}
                 {portfolioPerformance && portfolioPerformance.validHoldings > 0 && (
-                  <Card className={`border-2 ${overallGainPercent >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                  <Card className={`border-2 ${overallGainPercent >= 0 ? 'border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-950' : 'border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-950'}`}>
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-base">
                         <TrendingUp className="h-4 w-4" />
@@ -525,7 +525,7 @@ export function PortfolioDetailsDialog({
                     <CardContent className="pt-0">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                         <div>
-                          <div className="text-lg font-bold text-blue-600">
+                          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                             {formatCurrency(portfolioPerformance.totalCurrentValue)}
                           </div>
                           <div className="text-xs text-muted-foreground">Current Value</div>
@@ -537,13 +537,13 @@ export function PortfolioDetailsDialog({
                           <div className="text-xs text-muted-foreground">Invested</div>
                         </div>
                         <div>
-                          <div className={`text-lg font-bold ${overallGainPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <div className={`text-lg font-bold ${overallGainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {overallGainPercent >= 0 ? '+' : ''}{formatCurrency(portfolioPerformance.totalGain)}
                           </div>
                           <div className="text-xs text-muted-foreground">P&L</div>
                         </div>
                         <div>
-                          <div className={`text-lg font-bold ${overallGainPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <div className={`text-lg font-bold ${overallGainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {overallGainPercent >= 0 ? '+' : ''}{overallGainPercent.toFixed(2)}%
                           </div>
                           <div className="text-xs text-muted-foreground">Returns</div>
@@ -655,23 +655,23 @@ export function PortfolioDetailsDialog({
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50">
-                        <div className="text-xl font-bold text-green-600 mb-1">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+                        <div className="text-xl font-bold text-green-600 dark:text-green-400 mb-1">
                           {formatCurrency(portfolio.minInvestment)}
                         </div>
                         <div className="text-xs text-muted-foreground">Min Investment</div>
                       </div>
                       
-                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50">
-                        <div className="text-xl font-bold text-blue-600 mb-1">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950">
+                        <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-1">
                           {formatCurrency(totalHoldingsValue)}
                         </div>
                         <div className="text-xs text-muted-foreground">Holdings Value</div>
                       </div>
                       
-                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-violet-50">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950 dark:to-violet-950">
                         <div className={`text-xl font-bold mb-1 ${
-                          (portfolio.cashBalance || 0) < 0 ? 'text-red-600' : 'text-purple-600'
+                          (portfolio.cashBalance || 0) < 0 ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400'
                         }`}>
                           {formatCurrency(portfolio.cashBalance)}
                         </div>
@@ -713,7 +713,7 @@ export function PortfolioDetailsDialog({
                               <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
                                 {fee.type}
                               </div>
-                              <div className="text-xl font-bold text-blue-600 mb-1">
+                              <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-1">
                                 {formatCurrency(fee.price)}
                               </div>
                               <div className="text-xs text-muted-foreground">
@@ -769,20 +769,20 @@ export function PortfolioDetailsDialog({
                       </div>
                       <div className="text-center">
                         <div className={`text-lg font-bold ${
-                          totalWeight > 100 ? 'text-red-600' : 'text-green-600'
+                          totalWeight > 100 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                         }`}>
                           {totalWeight.toFixed(1)}%
                         </div>
                         <div className="text-xs text-muted-foreground">Weight</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-bold text-orange-600">
+                        <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
                           {(100 - totalWeight).toFixed(1)}%
                         </div>
                         <div className="text-xs text-muted-foreground">Remaining</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-bold text-blue-600">
+                        <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                           {formatCurrency(totalHoldingsValue)}
                         </div>
                         <div className="text-xs text-muted-foreground">Total Value</div>
@@ -834,13 +834,13 @@ export function PortfolioDetailsDialog({
                     ) : (
                       <div className="space-y-2">
                         {holdingsWithPrices.map((holding, index) => (
-                          <Card key={index} className="border-l-4 border-l-blue-500 hover:shadow-sm transition-shadow">
+                          <Card key={index} className="border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:shadow-sm transition-shadow">
                             <CardContent className="p-3">
                               <div className="space-y-2">
                                 {/* Compact Header */}
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-2">
-                                    <span className="text-base font-bold text-blue-600">
+                                    <span className="text-base font-bold text-blue-600 dark:text-blue-400">
                                       {holding.symbol}
                                     </span>
                                     <Badge className={getStatusColor(holding.status)} variant="outline">
@@ -858,7 +858,7 @@ export function PortfolioDetailsDialog({
                                     )}
                                   </div>
                                   <div className="text-right flex items-center gap-2">
-                                    <div className="text-lg font-bold text-green-600">
+                                    <div className="text-lg font-bold text-green-600 dark:text-green-400">
                                       {holding.weight.toFixed(2)}%
                                     </div>
                                     <Button
@@ -894,7 +894,7 @@ export function PortfolioDetailsDialog({
                                   </div>
                                   <div>
                                     <div className="text-muted-foreground">Investment</div>
-                                    <div className="font-medium text-green-600">
+                                    <div className="font-medium text-green-600 dark:text-green-400">
                                       {formatCurrency(holding.minimumInvestmentValueStock)}
                                     </div>
                                   </div>
@@ -908,14 +908,14 @@ export function PortfolioDetailsDialog({
                                         <span className="text-muted-foreground">Current Price:</span>
                                         <div className="flex items-center gap-2">
                                           <span className={`font-medium ${
-                                            holding.currentPrice > holding.buyPrice ? 'text-green-600' : 'text-red-600'
+                                            holding.currentPrice > holding.buyPrice ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                                           }`}>
                                             {formatCurrency(holding.currentPrice)}
                                           </span>
                                           <span className={`text-xs px-1.5 py-0.5 rounded ${
                                             holding.currentPrice > holding.buyPrice 
-                                              ? 'bg-green-100 text-green-800' 
-                                              : 'bg-red-100 text-red-800'
+                                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                           }`}>
                                             {holding.currentPrice > holding.buyPrice ? '+' : ''}
                                             {((holding.currentPrice - holding.buyPrice) / holding.buyPrice * 100).toFixed(2)}%
@@ -926,7 +926,7 @@ export function PortfolioDetailsDialog({
                                         <span className="text-muted-foreground">P&L:</span>
                                         <div className="flex items-center gap-2">
                                           <span className={`font-medium ${
-                                            holding.currentPrice > holding.buyPrice ? 'text-green-600' : 'text-red-600'
+                                            holding.currentPrice > holding.buyPrice ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                                           }`}>
                                             {holding.currentPrice > holding.buyPrice ? '+' : ''}
                                             {formatCurrency((holding.currentPrice - holding.buyPrice) * holding.quantity)}
@@ -945,7 +945,7 @@ export function PortfolioDetailsDialog({
                                 {/* Error state */}
                                 {holding.error && (
                                   <div className="pt-2 border-t">
-                                    <div className="flex items-center gap-1 text-xs text-red-600">
+                                    <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
                                       <AlertTriangle className="h-3 w-3" />
                                       <span>Failed to load current price: {holding.error}</span>
                                     </div>
@@ -982,25 +982,25 @@ export function PortfolioDetailsDialog({
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50">
-                        <TrendingUp className="h-6 w-6 text-green-600 mx-auto mb-2" />
-                        <div className="text-xl font-bold text-green-600 mb-1">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+                        <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                        <div className="text-xl font-bold text-green-600 dark:text-green-400 mb-1">
                           {formatPercentage(portfolio.monthlyGains)}
                         </div>
                         <div className="text-xs text-muted-foreground">Monthly Gains</div>
                       </div>
                       
-                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50">
-                        <Target className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                        <div className="text-xl font-bold text-blue-600 mb-1">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950">
+                        <Target className="h-6 w-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                        <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-1">
                           {formatPercentage(portfolio.CAGRSinceInception)}
                         </div>
                         <div className="text-xs text-muted-foreground">CAGR Since Inception</div>
                       </div>
                       
-                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-violet-50">
-                        <Activity className="h-6 w-6 text-purple-600 mx-auto mb-2" />
-                        <div className="text-xl font-bold text-purple-600 mb-1">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950 dark:to-violet-950">
+                        <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
+                        <div className="text-xl font-bold text-purple-600 dark:text-purple-400 mb-1">
                           {formatPercentage(portfolio.oneYearGains)}
                         </div>
                         <div className="text-xs text-muted-foreground">One Year Gains</div>
@@ -1016,16 +1016,16 @@ export function PortfolioDetailsDialog({
                           Real-time Performance
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="text-center p-3 border rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50">
-                            <div className="text-lg font-bold text-blue-600 mb-1">
+                          <div className="text-center p-3 border rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950">
+                            <div className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-1">
                               {formatCurrency(portfolioPerformance.totalCurrentValue)}
                             </div>
                             <div className="text-xs text-muted-foreground">Current Value</div>
                           </div>
                           
-                          <div className="text-center p-3 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50">
+                          <div className="text-center p-3 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
                             <div className={`text-lg font-bold mb-1 ${
-                              overallGainPercent >= 0 ? 'text-green-600' : 'text-red-600'
+                              overallGainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                             }`}>
                               {overallGainPercent >= 0 ? '+' : ''}{overallGainPercent.toFixed(2)}%
                             </div>
@@ -1060,19 +1060,19 @@ export function PortfolioDetailsDialog({
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <Play className="h-4 w-4 text-red-600" />
+                        <Play className="h-4 w-4 text-red-600 dark:text-red-400" />
                         Video Resources
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {portfolio.youTubeLinks.map((link, index) => (
-                          <Card key={index} className="border-l-4 border-l-red-500 hover:shadow-sm transition-shadow">
+                          <Card key={index} className="border-l-4 border-l-red-500 dark:border-l-red-400 hover:shadow-sm transition-shadow">
                             <CardContent className="p-3">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <div className="p-1.5 bg-red-100 rounded">
-                                    <Play className="h-3 w-3 text-red-600" />
+                                  <div className="p-1.5 bg-red-100 dark:bg-red-900 rounded">
+                                    <Play className="h-3 w-3 text-red-600 dark:text-red-400" />
                                   </div>
                                   <div>
                                     <div className="font-medium text-sm">Video {index + 1}</div>
@@ -1102,19 +1102,19 @@ export function PortfolioDetailsDialog({
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <Download className="h-4 w-4 text-blue-600" />
+                        <Download className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         Documents
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="space-y-2">
                         {portfolio.downloadLinks.map((link, index) => (
-                          <Card key={index} className="border-l-4 border-l-blue-500 hover:shadow-sm transition-shadow">
+                          <Card key={index} className="border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:shadow-sm transition-shadow">
                             <CardContent className="p-3">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <div className="p-1.5 bg-blue-100 rounded">
-                                    <FileText className="h-3 w-3 text-blue-600" />
+                                  <div className="p-1.5 bg-blue-100 dark:bg-blue-900 rounded">
+                                    <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                                   </div>
                                   <div>
                                     <div className="font-medium capitalize text-sm">{link.linkType}</div>
@@ -1146,17 +1146,17 @@ export function PortfolioDetailsDialog({
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <FileText className="h-4 w-4 text-green-600" />
+                        <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
                         Methodology
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
-                      <Card className="border-l-4 border-l-green-500 hover:shadow-sm transition-shadow">
+                      <Card className="border-l-4 border-l-green-500 dark:border-l-green-400 hover:shadow-sm transition-shadow">
                         <CardContent className="p-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <div className="p-1.5 bg-green-100 rounded">
-                                <FileText className="h-3 w-3 text-green-600" />
+                              <div className="p-1.5 bg-green-100 dark:bg-green-900 rounded">
+                                <FileText className="h-3 w-3 text-green-600 dark:text-green-400" />
                               </div>
                               <div>
                                 <div className="font-medium text-sm">Investment Methodology</div>
@@ -1197,7 +1197,7 @@ export function PortfolioDetailsDialog({
         </div>
 
         {/* Fixed Footer */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t p-3">
+        <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-950 border-t p-3">
           <Button onClick={() => onOpenChange(false)} className="w-full h-8 text-sm">
             Close Portfolio Details
           </Button>
