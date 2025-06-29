@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, Edit, Trash2, Plus, RefreshCw, Percent, Briefcase } from "lucide-react"
+import { Eye, Edit, Trash2, Plus, RefreshCw, Briefcase } from "lucide-react"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useToast } from "@/hooks/use-toast"
@@ -365,14 +365,42 @@ export default function BundlesPage() {
       },
     },
     {
-      accessorKey: "discountPercentage",
-      header: "Discount",
+      accessorKey: "category",
+      header: "Category",  
       cell: ({ row }) => {
-        const discount = row.original.discountPercentage
+        const category = row.original.category
         return (
-          <div className="font-medium flex items-center">
-            <Percent className="h-4 w-4 mr-1 text-muted-foreground" />
-            {discount}%
+          <Badge variant={category === "premium" ? "default" : "secondary"}>
+            {category.charAt(0).toUpperCase() + category.slice(1)}
+          </Badge>
+        )
+      },
+    },
+    {
+      id: "pricing",
+      header: "Pricing",
+      cell: ({ row }) => {
+        const { monthlyPrice, quarterlyPrice, yearlyPrice } = row.original
+        const prices = []
+        
+        if (monthlyPrice) prices.push(`Monthly: ₹${monthlyPrice}`)
+        if (quarterlyPrice) prices.push(`Quarterly: ₹${quarterlyPrice}`)
+        if (yearlyPrice) prices.push(`Yearly: ₹${yearlyPrice}`)
+        
+        return (
+          <div className="text-sm">
+            {prices.length > 0 ? (
+              <div className="space-y-1">
+                {prices.slice(0, 2).map((price, index) => (
+                  <div key={index} className="text-muted-foreground">{price}</div>
+                ))}
+                {prices.length > 2 && (
+                  <div className="text-xs text-muted-foreground">+{prices.length - 2} more</div>
+                )}
+              </div>
+            ) : (
+              <div className="text-muted-foreground">No pricing set</div>
+            )}
           </div>
         )
       },

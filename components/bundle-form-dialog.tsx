@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { useToast } from "@/hooks/use-toast"
 import { Bundle, CreateBundleRequest } from "@/lib/api-bundles"
@@ -45,10 +46,24 @@ const bundleFormSchema = z.object({
   portfolios: z.array(z.string()).min(1, {
     message: "At least one portfolio must be selected.",
   }),
-  discountPercentage: z.coerce.number().min(0).max(100, {
-    message: "Discount must be between 0 and 100 percent.",
+  category: z.enum(["basic", "premium"], {
+    message: "Category must be either basic or premium.",
   }),
-})
+  monthlyPrice: z.coerce.number().min(0).optional().nullable(),
+  quarterlyPrice: z.coerce.number().min(0).optional().nullable(),
+  yearlyPrice: z.coerce.number().min(0).optional().nullable(),
+}).refine(
+  (data) => {
+    const hasMonthly = data.monthlyPrice != null && data.monthlyPrice > 0;
+    const hasQuarterly = data.quarterlyPrice != null && data.quarterlyPrice > 0;
+    const hasYearly = data.yearlyPrice != null && data.yearlyPrice > 0;
+    return hasMonthly || hasQuarterly || hasYearly;
+  },
+  {
+    message: "At least one pricing option (monthly, quarterly, or yearly) is required.",
+    path: ["monthlyPrice"], // This will show the error on the monthly price field
+  }
+)
 
 type BundleFormValues = z.infer<typeof bundleFormSchema>
 
@@ -105,7 +120,10 @@ export function BundleFormDialog({
       name: "",
       description: "",
       portfolios: [],
-      discountPercentage: 0,
+      category: "basic",
+      monthlyPrice: null,
+      quarterlyPrice: null,
+      yearlyPrice: null,
     },
   })
 
@@ -256,7 +274,10 @@ export function BundleFormDialog({
           name: initialData.name,
           description: initialData.description,
           portfolios: portfolioIds,
-          discountPercentage: initialData.discountPercentage,
+          category: initialData.category || "basic",
+          monthlyPrice: initialData.monthlyPrice || null,
+          quarterlyPrice: initialData.quarterlyPrice || null,
+          yearlyPrice: initialData.yearlyPrice || null,
         })
       } else {
         console.log("No initial data, resetting form to defaults");
@@ -264,7 +285,10 @@ export function BundleFormDialog({
           name: "",
           description: "",
           portfolios: [],
-          discountPercentage: 0,
+          category: "basic",
+          monthlyPrice: null,
+          quarterlyPrice: null,
+          yearlyPrice: null,
         })
       }
     }
@@ -279,7 +303,15 @@ export function BundleFormDialog({
         description: `Bundle ${mode === "create" ? "created" : "updated"} successfully.`,
       })
       onOpenChange(false)
-      form.reset()
+      form.reset({
+        name: "",
+        description: "",
+        portfolios: [],
+        category: "basic",
+        monthlyPrice: null,
+        quarterlyPrice: null,
+        yearlyPrice: null,
+      })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
       toast({
@@ -320,7 +352,7 @@ export function BundleFormDialog({
             Create a bundle of portfolios with a discount to offer to your customers.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[70vh] overflow-y-auto pr-4">
+        <div className="pr-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
               <FormField
@@ -477,26 +509,120 @@ export function BundleFormDialog({
               />
               <FormField
                 control={form.control}
-                name="discountPercentage"
+                name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Discount Percentage</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        placeholder="Enter discount percentage"
-                        {...field}
-                      />
-                    </FormControl>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="basic">Basic</SelectItem>
+                        <SelectItem value="premium">Premium</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormDescription>
-                      The percentage discount applied when customers purchase the bundle instead of individual portfolios.
+                      The category that this bundle belongs to.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <FormLabel className="text-base font-medium">Pricing Options</FormLabel>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" type="button" className="h-5 w-5">
+                          <Info className="h-4 w-4" />
+                          <span className="sr-only">More information</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="start" className="max-w-[300px]">
+                        <p>Set pricing for different subscription periods. At least one pricing option is required.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="monthlyPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Monthly Price (₹)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="Enter monthly price"
+                            {...field}
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              field.onChange(value === "" ? null : parseFloat(value));
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="quarterlyPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quarterly Price (₹)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="Enter quarterly price"
+                            {...field}
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              field.onChange(value === "" ? null : parseFloat(value));
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="yearlyPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Yearly Price (₹)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="Enter yearly price"
+                            {...field}
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              field.onChange(value === "" ? null : parseFloat(value));
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
               <DialogFooter className="pt-4">
                 <Button
                   type="button"
@@ -513,7 +639,7 @@ export function BundleFormDialog({
               </DialogFooter>
             </form>
           </Form>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )

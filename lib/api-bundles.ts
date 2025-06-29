@@ -19,7 +19,10 @@ export interface Bundle {
    name: string;
   description: string;
   portfolios: Array<string | Portfolio | PortfolioReference>;
-  discountPercentage: number;
+  category: "basic" | "premium";
+  monthlyPrice?: number | null;
+  quarterlyPrice?: number | null;
+  yearlyPrice?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -28,7 +31,10 @@ export interface CreateBundleRequest {
   name: string;
   description: string;
   portfolios: Array<string | PortfolioReference>;
-  discountPercentage: number;
+  category: "basic" | "premium";
+  monthlyPrice?: number | null;
+  quarterlyPrice?: number | null;
+  yearlyPrice?: number | null;
 }
 
 // Helper function to safely extract portfolio ID
