@@ -43,9 +43,7 @@ const bundleFormSchema = z.object({
   description: z.string().min(10, {
     message: "Description must be at least 10 characters.",
   }),
-  portfolios: z.array(z.string()).min(1, {
-    message: "At least one portfolio must be selected.",
-  }),
+  portfolios: z.array(z.string()),
   category: z.enum(["basic", "premium"], {
     message: "Category must be either basic or premium.",
   }),

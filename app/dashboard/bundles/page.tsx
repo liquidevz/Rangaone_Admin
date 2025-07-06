@@ -145,16 +145,6 @@ export default function BundlesPage() {
     try {
       console.log("Creating bundle with data:", bundleData)
       
-      // Make sure we have at least one portfolio selected
-      if (!bundleData.portfolios || bundleData.portfolios.length === 0) {
-        toast({
-          title: "Error",
-          description: "Please select at least one portfolio for the bundle",
-          variant: "destructive",
-        })
-        return
-      }
-      
       // Create the bundle via API
       const createdBundle = await createBundle(bundleData)
 
@@ -332,8 +322,8 @@ export default function BundlesPage() {
           } else {
             // If we have portfolio objects, use their names
             portfolioElements = (portfolioData as Portfolio[]).map(portfolio => (
-              <Badge key={portfolio.id} variant="outline" className="mr-1 mb-1">
-                {portfolio.name || `Portfolio ${(portfolio.id || '').substring(0, 8)}...`}
+              <Badge key={portfolio?.id || Math.random()} variant="outline" className="mr-1 mb-1 bg-muted/50 hover:bg-muted">
+                {portfolio?.name || `Portfolio ${(portfolio?.id || '').substring(0, 8) || 'Unknown'}...`}
               </Badge>
             ))
           }
@@ -370,7 +360,7 @@ export default function BundlesPage() {
       cell: ({ row }) => {
         const category = row.original.category
         return (
-          <Badge variant={category === "premium" ? "default" : "secondary"}>
+          <Badge variant={category === "premium" ? "default" : "secondary"} className={category === "premium" ? "bg-primary/20 text-primary hover:bg-primary/30" : "bg-muted hover:bg-muted/80"}>
             {category.charAt(0).toUpperCase() + category.slice(1)}
           </Badge>
         )
@@ -390,16 +380,16 @@ export default function BundlesPage() {
         return (
           <div className="text-sm">
             {prices.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {prices.slice(0, 2).map((price, index) => (
-                  <div key={index} className="text-muted-foreground">{price}</div>
+                  <div key={index} className="text-muted-foreground/90 font-medium">{price}</div>
                 ))}
                 {prices.length > 2 && (
-                  <div className="text-xs text-muted-foreground">+{prices.length - 2} more</div>
+                  <div className="text-xs text-muted-foreground/70">+{prices.length - 2} more</div>
                 )}
               </div>
             ) : (
-              <div className="text-muted-foreground">No pricing set</div>
+              <div className="text-muted-foreground/70 italic">No pricing set</div>
             )}
           </div>
         )
@@ -413,23 +403,25 @@ export default function BundlesPage() {
             <Button
               variant="ghost"
               size="icon"
+              className="hover:bg-muted/50"
               onClick={() => {
                 setSelectedBundle(row.original)
                 setIsEditDialogOpen(true)
               }}
             >
-              <Edit className="h-4 w-4" />
+              <Edit className="h-4 w-4 text-muted-foreground" />
               <span className="sr-only">Edit</span>
             </Button>
             <Button
               variant="ghost"
               size="icon"
+              className="hover:bg-destructive/10 hover:text-destructive"
               onClick={() => {
                 setSelectedBundle(row.original)
                 setIsDeleteDialogOpen(true)
               }}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
               <span className="sr-only">Delete</span>
             </Button>
           </div>
@@ -454,20 +446,26 @@ export default function BundlesPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Portfolio Bundles</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Portfolio Bundles</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Create and manage portfolio bundles with custom pricing
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={loadBundles}
             disabled={isLoading}
+            className="text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="bg-primary">
             <Plus className="h-4 w-4 mr-2" />
             Add Bundle
           </Button>
@@ -475,21 +473,21 @@ export default function BundlesPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive" className="border-destructive/50 text-destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Bundles</CardTitle>
-          <CardDescription>
+      <Card className="border-border/40 shadow-md">
+        <CardHeader className="border-b border-border/40">
+          <CardTitle className="text-lg font-medium">Bundles</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">
             Manage your portfolio bundles. Bundles allow you to group portfolios together with a discount.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <DataTable
             columns={columns}
             data={bundles}
