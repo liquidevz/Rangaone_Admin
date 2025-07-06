@@ -49,6 +49,11 @@ const sidebarItems: SidebarItem[] = [
     icon: Lightbulb,
   },
   {
+    title: "Stock Symbols",
+    href: "/dashboard/stock-symbols",
+    icon: BarChart,
+  },
+  {
     title: "Subscriptions",
     href: "/dashboard/subscriptions",
     icon: CreditCard,
