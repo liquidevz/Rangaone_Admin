@@ -1048,19 +1048,21 @@ export function PortfolioFormDialog({
                           {desc.key}
                         </Label>
                         {desc.key === "portfolio card" ? (
-                          <QuillEditor
-                            id={`desc-${index}`}
-                            value={desc.value}
-                            onChange={(content: string) => {
-                              const updated = [...descriptions];
-                              updated[index].value = content;
-                              setDescriptions(updated);
-                            }}
-                            placeholder={`Enter ${desc.key} description`}
-                            height={150}
-                            disabled={isSubmitting}
-                            className="border border-zinc-700 rounded-md"
-                          />
+                          <div className="space-y-2">
+                            <QuillEditor
+                              id={`desc-${index}`}
+                              value={desc.value}
+                              onChange={(content: string) => {
+                                const updated = [...descriptions];
+                                updated[index].value = content;
+                                setDescriptions(updated);
+                              }}
+                              placeholder={`Enter ${desc.key} description`}
+                              height={150}
+                              disabled={isSubmitting}
+                              className="border border-zinc-700 rounded-md"
+                            />
+                          </div>
                         ) : (
                           <Textarea
                             id={`desc-${index}`}

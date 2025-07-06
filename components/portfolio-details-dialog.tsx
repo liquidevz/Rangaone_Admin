@@ -610,7 +610,7 @@ export function PortfolioDetailsDialog({
                                 className="text-xs leading-relaxed"
                               />
                             ) : (
-                              <p className="text-xs leading-relaxed">
+                          <p className="text-xs leading-relaxed">
                                 {description}
                               </p>
                             )
@@ -619,7 +619,7 @@ export function PortfolioDetailsDialog({
                               <span className="text-muted-foreground italic">
                                 No description provided
                               </span>
-                            </p>
+                          </p>
                           )}
                         </div>
                       );
@@ -1130,9 +1130,9 @@ export function PortfolioDetailsDialog({
                                   </div>
                                   <div>
                                     <div className="font-medium capitalize text-sm">{link.linkType}</div>
-                                                                  {link.linkDiscription && (
-                                <div className="text-xs text-muted-foreground">{link.linkDiscription}</div>
-                              )}
+                                    {link.linkDiscription && (
+                                      <div className="text-xs text-muted-foreground">{link.linkDiscription}</div>
+                                    )}
                                   </div>
                                 </div>
                                 <Button

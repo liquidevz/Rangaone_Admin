@@ -746,10 +746,10 @@ export default function StockSymbolsPage() {
         }`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-blue-400" />
-                <div>
-                  <p className="text-sm text-zinc-400">Total Symbols</p>
+            <div className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-blue-400" />
+              <div>
+                <p className="text-sm text-zinc-400">Total Symbols</p>
                   <div className="flex items-center gap-2">
                     <p className={`text-xl font-semibold text-white transition-all duration-300 ${
                       isRealTimeEnabled && updateCounter > 0 ? 'scale-105' : ''
@@ -762,9 +762,9 @@ export default function StockSymbolsPage() {
                         <Badge variant="outline" className="text-xs bg-blue-900/20 border-blue-700/50 text-blue-400">
                           Live
                         </Badge>
-                      </div>
+              </div>
                     )}
-                  </div>
+            </div>
                 </div>
               </div>
               {isRealTimeEnabled && updateCounter > 0 && (
@@ -790,10 +790,10 @@ export default function StockSymbolsPage() {
         }`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-green-400" />
-                <div>
-                  <p className="text-sm text-zinc-400">Current Page</p>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-green-400" />
+              <div>
+                <p className="text-sm text-zinc-400">Current Page</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xl font-semibold text-white">
                       {pagination.page}
@@ -802,7 +802,7 @@ export default function StockSymbolsPage() {
                     <p className="text-xl font-semibold text-white">
                       {pagination.pages || 1}
                     </p>
-                  </div>
+              </div>
                 </div>
               </div>
               {pagination.pages > 1 && (
@@ -828,11 +828,11 @@ export default function StockSymbolsPage() {
         <Card className="border-zinc-800 bg-zinc-900/50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-yellow-400" />
-                <div>
-                  <p className="text-sm text-zinc-400">Per Page</p>
-                  <p className="text-xl font-semibold text-white">{pagination.limit}</p>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-yellow-400" />
+              <div>
+                <p className="text-sm text-zinc-400">Per Page</p>
+                <p className="text-xl font-semibold text-white">{pagination.limit}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -1134,4 +1134,4 @@ function debounce<T extends (...args: any[]) => any>(
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
-}
+} 
