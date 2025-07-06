@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { QuillEditor } from "@/components/quill-editor";
 import type {
   CreatePortfolioRequest,
   Portfolio,
@@ -1039,25 +1040,41 @@ export function PortfolioFormDialog({
                   </div>
 
                   {/* Descriptions section */}
-                  <div className="space-y-3">
-                    <Label>Descriptions</Label>
+                  <div className="space-y-4">
+                    <Label className="text-base font-medium">Descriptions</Label>
                     {descriptions.map((desc, index) => (
-                      <div key={desc.key} className="grid gap-2">
+                      <div key={desc.key} className="space-y-2">
                         <Label htmlFor={`desc-${index}`} className="text-sm font-medium capitalize">
                           {desc.key}
                         </Label>
-                        <Textarea
-                          id={`desc-${index}`}
-                          value={desc.value}
-                          onChange={(e) => {
-                            const updated = [...descriptions];
-                            updated[index].value = e.target.value;
-                            setDescriptions(updated);
-                          }}
-                          placeholder={`Enter ${desc.key} description`}
-                          className="min-h-[80px]"
-                          disabled={isSubmitting}
-                        />
+                        {desc.key === "portfolio card" ? (
+                          <QuillEditor
+                            id={`desc-${index}`}
+                            value={desc.value}
+                            onChange={(content: string) => {
+                              const updated = [...descriptions];
+                              updated[index].value = content;
+                              setDescriptions(updated);
+                            }}
+                            placeholder={`Enter ${desc.key} description`}
+                            height={150}
+                            disabled={isSubmitting}
+                            className="border border-zinc-700 rounded-md"
+                          />
+                        ) : (
+                          <Textarea
+                            id={`desc-${index}`}
+                            value={desc.value}
+                            onChange={(e) => {
+                              const updated = [...descriptions];
+                              updated[index].value = e.target.value;
+                              setDescriptions(updated);
+                            }}
+                            placeholder={`Enter ${desc.key} description`}
+                            className="min-h-[80px]"
+                            disabled={isSubmitting}
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1691,7 +1708,7 @@ export function PortfolioFormDialog({
                                 <Label htmlFor={`link-description-${index}`}>Description</Label>
                                 <Textarea
                                   id={`link-description-${index}`}
-                                  value={link.linkDiscription}
+                                  value={link.linkDiscription || ""}
                                   onChange={(e) => updateDownloadLink(index, "linkDiscription", e.target.value)}
                                   placeholder="Enter description for this document"
                                   className="min-h-[80px]"

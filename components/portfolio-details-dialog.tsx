@@ -41,6 +41,7 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchStockSymbolBySymbol, updateStockPrices, type StockSymbol } from "@/lib/api-stock-symbols";
+import { HtmlContent } from "@/components/html-content";
 
 // Portfolio interface
 interface Portfolio {
@@ -602,13 +603,24 @@ export function PortfolioDetailsDialog({
                             <Eye className="h-2.5 w-2.5" />
                             {key}
                           </h4>
-                          <p className="text-xs leading-relaxed">
-                            {description || (
+                          {description ? (
+                            key === "portfolio card" ? (
+                              <HtmlContent 
+                                content={description} 
+                                className="text-xs leading-relaxed"
+                              />
+                            ) : (
+                              <p className="text-xs leading-relaxed">
+                                {description}
+                              </p>
+                            )
+                          ) : (
+                            <p className="text-xs leading-relaxed">
                               <span className="text-muted-foreground italic">
                                 No description provided
                               </span>
-                            )}
-                          </p>
+                            </p>
+                          )}
                         </div>
                       );
                     })}
@@ -1118,9 +1130,9 @@ export function PortfolioDetailsDialog({
                                   </div>
                                   <div>
                                     <div className="font-medium capitalize text-sm">{link.linkType}</div>
-                                    {link.linkDiscription && (
-                                      <div className="text-xs text-muted-foreground">{link.linkDiscription}</div>
-                                    )}
+                                                                  {link.linkDiscription && (
+                                <div className="text-xs text-muted-foreground">{link.linkDiscription}</div>
+                              )}
                                   </div>
                                 </div>
                                 <Button

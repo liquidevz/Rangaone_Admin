@@ -11,6 +11,17 @@ export interface StockSymbol {
   previousPrice: string;
   createdAt?: string;
   updatedAt?: string;
+  lastPriceUpdate?: string;
+  priceHistory?: PricePoint[];
+  marketStatus?: 'OPEN' | 'CLOSED' | 'PRE_MARKET' | 'AFTER_HOURS';
+  volume?: string;
+  marketCap?: string;
+}
+
+export interface PricePoint {
+  timestamp: string;
+  price: string;
+  volume?: string;
 }
 
 export interface CreateStockSymbolRequest {
@@ -39,6 +50,8 @@ export interface StockSymbolsResponse {
     total: number;
     pages: number;
   };
+  lastUpdated?: string;
+  marketStatus?: string;
 }
 
 export interface StockSearchResult {
@@ -54,7 +67,151 @@ export interface StockPriceUpdateResult {
   successSymbols: string[];
   failedSymbols: string[];
   message: string;
+  lastUpdateTime: string;
 }
+
+export interface ConnectionStatus {
+  isConnected: boolean;
+  lastPing: Date | null;
+  latency: number;
+  retryCount: number;
+}
+
+// Connection monitoring
+let connectionStatus: ConnectionStatus = {
+  isConnected: true,
+  lastPing: null,
+  latency: 0,
+  retryCount: 0,
+};
+
+// WebSocket connection for real-time updates
+let wsConnection: WebSocket | null = null;
+let wsReconnectTimeout: NodeJS.Timeout | null = null;
+
+// Real-time update callbacks
+const realtimeCallbacks = new Set<(data: StockSymbol[]) => void>();
+
+// Enhanced fetch function with connection monitoring
+const fetchWithErrorHandling = async (url: string, options?: RequestInit): Promise<Response> => {
+  const startTime = Date.now();
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(30000), // 30 second timeout
+    });
+    
+    const endTime = Date.now();
+    connectionStatus.latency = endTime - startTime;
+    connectionStatus.lastPing = new Date();
+    connectionStatus.isConnected = response.ok;
+    connectionStatus.retryCount = 0;
+    
+    return response;
+  } catch (error) {
+    connectionStatus.isConnected = false;
+    connectionStatus.retryCount++;
+    
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout - please check your connection');
+    }
+    
+    throw error;
+  }
+};
+
+// WebSocket connection management
+export const initializeRealtimeConnection = (onUpdate?: (data: StockSymbol[]) => void) => {
+  const wsUrl = API_BASE_URL.replace('http', 'ws') + '/ws/stock-prices';
+  
+  try {
+    wsConnection = new WebSocket(wsUrl);
+    
+    wsConnection.onopen = () => {
+      console.log('WebSocket connected for real-time stock updates');
+      connectionStatus.isConnected = true;
+      connectionStatus.retryCount = 0;
+      
+      // Send authentication
+      const token = getAdminAccessToken();
+      if (token) {
+        wsConnection?.send(JSON.stringify({ type: 'auth', token }));
+      }
+    };
+    
+    wsConnection.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'priceUpdate' && data.stocks) {
+          // Notify all registered callbacks
+          realtimeCallbacks.forEach(callback => {
+            try {
+              callback(data.stocks);
+            } catch (error) {
+              console.error('Error in real-time callback:', error);
+            }
+          });
+          
+          // Call specific update callback if provided
+          if (onUpdate) {
+            onUpdate(data.stocks);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+    
+    wsConnection.onclose = () => {
+      console.log('WebSocket disconnected');
+      connectionStatus.isConnected = false;
+      
+      // Attempt to reconnect after 5 seconds
+      wsReconnectTimeout = setTimeout(() => {
+        if (connectionStatus.retryCount < 5) {
+          console.log('Attempting to reconnect WebSocket...');
+          initializeRealtimeConnection(onUpdate);
+        }
+      }, 5000);
+    };
+    
+    wsConnection.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      connectionStatus.isConnected = false;
+    };
+  } catch (error) {
+    console.error('Failed to initialize WebSocket connection:', error);
+    connectionStatus.isConnected = false;
+  }
+};
+
+export const closeRealtimeConnection = () => {
+  if (wsConnection) {
+    wsConnection.close();
+    wsConnection = null;
+  }
+  
+  if (wsReconnectTimeout) {
+    clearTimeout(wsReconnectTimeout);
+    wsReconnectTimeout = null;
+  }
+  
+  realtimeCallbacks.clear();
+};
+
+export const subscribeToRealtimeUpdates = (callback: (data: StockSymbol[]) => void) => {
+  realtimeCallbacks.add(callback);
+  
+  return () => {
+    realtimeCallbacks.delete(callback);
+  };
+};
+
+export const getConnectionStatus = (): ConnectionStatus => {
+  return { ...connectionStatus };
+};
 
 // Search stock symbols by keyword
 export const searchStockSymbols = async (keyword: string): Promise<StockSymbol[]> => {
@@ -68,7 +225,7 @@ export const searchStockSymbols = async (keyword: string): Promise<StockSymbol[]
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(
+    const response = await fetchWithErrorHandling(
       `${API_BASE_URL}/api/stock-symbols/search?keyword=${encodeURIComponent(keyword)}`,
       {
         method: "GET",
@@ -82,7 +239,7 @@ export const searchStockSymbols = async (keyword: string): Promise<StockSymbol[]
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -109,7 +266,7 @@ export const fetchStockSymbolBySymbol = async (symbol: string): Promise<StockSym
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(
+    const response = await fetchWithErrorHandling(
       `${API_BASE_URL}/api/stock-symbols/ticker/${symbol}`,
       {
         method: "GET",
@@ -123,7 +280,7 @@ export const fetchStockSymbolBySymbol = async (symbol: string): Promise<StockSym
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -138,7 +295,7 @@ export const fetchStockSymbolBySymbol = async (symbol: string): Promise<StockSym
   }
 };
 
-// Update all stock prices
+// Update all stock prices with enhanced monitoring
 export const updateStockPrices = async (): Promise<StockPriceUpdateResult> => {
   try {
     const adminToken = getAdminAccessToken();
@@ -146,7 +303,7 @@ export const updateStockPrices = async (): Promise<StockPriceUpdateResult> => {
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(
+    const response = await fetchWithErrorHandling(
       `${API_BASE_URL}/api/stock-symbols/update-prices`,
       {
         method: "POST",
@@ -160,7 +317,7 @@ export const updateStockPrices = async (): Promise<StockPriceUpdateResult> => {
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -183,7 +340,7 @@ export const fetchAllStockSymbols = async (): Promise<StockSymbol[]> => {
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(
+    const response = await fetchWithErrorHandling(
       `${API_BASE_URL}/api/stock-symbols`,
       {
         method: "GET",
@@ -197,7 +354,7 @@ export const fetchAllStockSymbols = async (): Promise<StockSymbol[]> => {
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -220,7 +377,7 @@ export const createStockSymbol = async (stockData: CreateStockSymbolRequest): Pr
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/stock-symbols`, {
+    const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/stock-symbols`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -232,7 +389,7 @@ export const createStockSymbol = async (stockData: CreateStockSymbolRequest): Pr
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -247,7 +404,7 @@ export const createStockSymbol = async (stockData: CreateStockSymbolRequest): Pr
   }
 };
 
-// Get all stock symbols with pagination
+// Get all stock symbols with pagination and enhanced metadata
 export const fetchStockSymbols = async (page: number = 1, limit: number = 50): Promise<StockSymbolsResponse> => {
   try {
     const adminToken = getAdminAccessToken();
@@ -255,7 +412,7 @@ export const fetchStockSymbols = async (page: number = 1, limit: number = 50): P
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(
+    const response = await fetchWithErrorHandling(
       `${API_BASE_URL}/api/stock-symbols?page=${page}&limit=${limit}`,
       {
         method: "GET",
@@ -269,7 +426,7 @@ export const fetchStockSymbols = async (page: number = 1, limit: number = 50): P
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -277,7 +434,14 @@ export const fetchStockSymbols = async (page: number = 1, limit: number = 50): P
     }
 
     const result = await response.json();
-    return result;
+    
+    // Add client-side metadata
+    const enhancedResult: StockSymbolsResponse = {
+      ...result,
+      lastUpdated: new Date().toISOString(),
+    };
+    
+    return enhancedResult;
   } catch (error) {
     console.error("Error fetching stock symbols:", error);
     throw error;
@@ -296,7 +460,7 @@ export const fetchStockSymbolById = async (id: string): Promise<StockSymbol> => 
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/stock-symbols/${id}`, {
+    const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/stock-symbols/${id}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -307,7 +471,7 @@ export const fetchStockSymbolById = async (id: string): Promise<StockSymbol> => 
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -334,7 +498,7 @@ export const updateStockSymbol = async (id: string, stockData: UpdateStockSymbol
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/stock-symbols/${id}`, {
+    const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/stock-symbols/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -346,7 +510,7 @@ export const updateStockSymbol = async (id: string, stockData: UpdateStockSymbol
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -373,7 +537,7 @@ export const deleteStockSymbol = async (id: string): Promise<void> => {
       throw new Error("Admin authentication required");
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/stock-symbols/${id}`, {
+    const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/stock-symbols/${id}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -384,7 +548,7 @@ export const deleteStockSymbol = async (id: string): Promise<void> => {
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
-        throw new Error("Server returned HTML instead of JSON");
+        throw new Error("Server returned HTML instead of JSON - API may be unavailable");
       }
 
       const errorData = await response.json();
@@ -393,5 +557,22 @@ export const deleteStockSymbol = async (id: string): Promise<void> => {
   } catch (error) {
     console.error(`Error deleting stock symbol ${id}:`, error);
     throw error;
+  }
+};
+
+// Health check function for API connectivity
+export const checkApiHealth = async (): Promise<boolean> => {
+  try {
+    const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/health`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error("API health check failed:", error);
+    return false;
   }
 };
