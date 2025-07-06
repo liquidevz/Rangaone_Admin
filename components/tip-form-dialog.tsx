@@ -211,381 +211,152 @@ export function TipFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] overflow-y-auto max-h-[90vh]" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-[600px] p-0 bg-zinc-900 border-zinc-800" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         <Form {...form}>
-          <form onSubmit={handleSubmit(onValidSubmit)}>
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>{description}</DialogDescription>
+          <form onSubmit={handleSubmit(onValidSubmit)} className="space-y-0">
+            <DialogHeader className="p-6 pb-4">
+              <DialogTitle className="text-xl font-semibold text-white">Create Rangaone Wealth Tips</DialogTitle>
+              <DialogDescription className="text-zinc-400 text-sm">Add Tip Details</DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-6 py-4">
-              {/* Basic Information Section */}
-              <div className="space-y-4">
-                <h4 className="font-medium text-lg border-b pb-2">Basic Information</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Title *</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter tip title"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            <div className="px-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Subscription Type */}
+              <FormField
+                control={control}
+                name="action"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Subscription Type</FormLabel>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                          <SelectValue placeholder="Drop down of BASIC / PREMIUM / SOCIAL MEDIA" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-800 border-zinc-700">
+                          <SelectItem value="basic" className="text-white hover:bg-zinc-700">BASIC</SelectItem>
+                          <SelectItem value="premium" className="text-white hover:bg-zinc-700">PREMIUM</SelectItem>
+                          <SelectItem value="social_media" className="text-white hover:bg-zinc-700">SOCIAL MEDIA</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                  <FormField
-                    control={control}
-                    name="stockId" 
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Stock Symbol *</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., AAPL, TSLA, RELIANCE"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Enter the stock symbol this tip is about
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status *</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          disabled={isSubmitting}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Active">Active</SelectItem>
-                            <SelectItem value="Closed">Closed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description *</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter tip description"
-                          className="min-h-[80px]"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Content Section */}
-              <div className="space-y-4">
-                <h4 className="font-medium text-lg border-b pb-2">Content (Key-Value Pairs)</h4>
-                {contentFields.map((field, index) => (
-                  <div key={field.id} className="flex items-start gap-2 p-3 border rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
-                      <FormField
-                        control={control}
-                        name={`content.${index}.key`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm">Key</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., Strategy, Analysis, Outlook"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={control}
-                        name={`content.${index}.value`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm">Value</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Enter content value"
-                                className="min-h-[60px]"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    {contentFields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeContent(index)}
-                        className="mt-6"
+              {/* Symbol */}
+              <FormField
+                control={control}
+                name="stockId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Symbol</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="STOCK ID"
+                        {...field}
                         disabled={isSubmitting}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addContentField}
-                  className="gap-1"
-                  disabled={isSubmitting}
-                >
-                  <Plus className="h-4 w-4" /> Add Content Item
-                </Button>
-              </div>
-
-              {/* Action & Investment Details Section */}
-              <div className="space-y-4">
-                <h4 className="font-medium text-lg border-b pb-2">Investment Details</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={control}
-                    name="action"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Action</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value || ""}
-                          disabled={isSubmitting}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select action" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="buy">Buy</SelectItem>
-                            <SelectItem value="sell">Sell</SelectItem>
-                            <SelectItem value="partial sell">Partial Sell</SelectItem>
-                            <SelectItem value="partial profit">Partial Profit</SelectItem>
-                            <SelectItem value="hold">Hold</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={control}
-                    name="horizon"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Investment Horizon *</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          disabled={isSubmitting}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select horizon" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Short Term">Short Term</SelectItem>
-                            <SelectItem value="Medium Term">Medium Term</SelectItem>
-                            <SelectItem value="Long Term">Long Term</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={control}
-                    name="buyRange" 
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Buy Range (₹)</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., 1000-1200"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={control}
-                    name="addMoreAt" 
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Add More At (₹)</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter additional buy price"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {showTargetFields && (
-                    <>
-                      <FormField
-                        control={control}
-                        name="targetPrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Target Price (₹)</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter target price"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                      <FormField
-                        control={control}
-                        name="targetPercentage"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Target Percentage (%)</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., 15%"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+              {/* Action */}
+              <FormField
+                control={control}
+                name="action"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Action</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Actions like BUY / SELL / PARTIAL PROFIT"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                       />
-                    </>
-                  )}
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                  {showExitFields && (
-                    <>
-                      <FormField
-                        control={control}
-                        name="exitPrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Exit Price (₹)</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter exit price"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+              {/* Buy Range */}
+              <FormField
+                control={control}
+                name="buyRange"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Buy Range (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="1000 - 2000"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                      <FormField
-                        control={control}
-                        name="exitStatus"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Exit Status</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., Target Achieved"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+              {/* Add More At */}
+              <FormField
+                control={control}
+                name="addMoreAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Add More At (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter additional buy price"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                      <FormField
-                        control={control}
-                        name="exitStatusPercentage"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Exit Status Percentage (%)</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., 20%"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </>
-                  )}
-                </div>
-
+              {/* Target Price and Target Percentage */}
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={control}
-                  name="tipUrl"
+                  name="targetPrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tip URL</FormLabel>
+                      <FormLabel className="text-white text-sm">Target Price</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="https://example.com/analysis"
+                          placeholder="Target Price"
                           {...field}
                           disabled={isSubmitting}
+                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={control}
+                  name="targetPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm">Target Percentage</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter Target Percentage"
+                          {...field}
+                          disabled={isSubmitting}
+                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                         />
                       </FormControl>
                       <FormMessage />
@@ -594,83 +365,112 @@ export function TipFormDialog({
                 />
               </div>
 
-              {/* Download Links Section */}
-              <div className="space-y-4">
-                <h4 className="font-medium text-lg border-b pb-2">Download Links</h4>
-                {downloadFields.map((field, index) => (
-                  <div key={field.id} className="flex items-start gap-2 p-3 border rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
-                      <FormField
-                        control={control}
-                        name={`downloadLinks.${index}.name`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm">Link Name</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., Research Report"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={control}
-                        name={`downloadLinks.${index}.url`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm">Download URL</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="https://example.com/file.pdf"
-                                {...field}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeDownload(index)}
-                      className="mt-6"
-                      disabled={isSubmitting}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addDownloadLink}
-                  className="gap-1"
-                  disabled={isSubmitting}
-                >
-                  <Plus className="h-4 w-4" /> Add Download Link
-                </Button>
+              {/* Horizon and Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={control}
+                  name="horizon"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm">Horizon</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                            <SelectValue placeholder="Drop down of horizons" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                            <SelectItem value="Short Term" className="text-white hover:bg-zinc-700">Short Term</SelectItem>
+                            <SelectItem value="Medium Term" className="text-white hover:bg-zinc-700">Medium Term</SelectItem>
+                            <SelectItem value="Long Term" className="text-white hover:bg-zinc-700">Long Term</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm">Status</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                            <SelectValue placeholder="Drop down of Status" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                            <SelectItem value="Active" className="text-white hover:bg-zinc-700">Active</SelectItem>
+                            <SelectItem value="Closed" className="text-white hover:bg-zinc-700">Closed</SelectItem>
+                            <SelectItem value="Pending" className="text-white hover:bg-zinc-700">Pending</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
+
+              {/* Description */}
+              <FormField
+                control={control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="WHY BUY THIS / Summary"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[80px]"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* PDF Link */}
+              <FormField
+                control={control}
+                name="tipUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">PDF Link</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Paste Link here"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <DialogFooter className="mt-4">
+            <DialogFooter className="p-6 pt-4 bg-zinc-900 border-t border-zinc-800">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
+                className="bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-white"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Tip"}
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="bg-white text-black hover:bg-zinc-200"
+              >
+                {isSubmitting ? "Saving..." : "Save"}
               </Button>
             </DialogFooter>
           </form>
