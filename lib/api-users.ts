@@ -14,6 +14,7 @@ export interface User {
   status?: string // We'll derive this from emailVerified
   lastLogin?: string // Not in the API response, but we'll keep it for UI
   isBanned?: boolean // We'll derive this from other fields if available
+  banInfo?: boolean // Ban information for consistency
 }
 
 export interface CreateUserRequest {

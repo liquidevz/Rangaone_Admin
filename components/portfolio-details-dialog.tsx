@@ -122,13 +122,21 @@ export function PortfolioDetailsDialog({
 
   // Initialize holdings with prices when portfolio changes
   useEffect(() => {
+    // Always clear holdings first to prevent stale data
+    setHoldingsWithPrices([]);
+    
     if (portfolio?.holdings) {
+      console.log(`Portfolio Details Dialog - Loading holdings for portfolio: ${portfolio.name} (ID: ${portfolio.id || portfolio._id})`);
+      console.log("Portfolio holdings:", portfolio.holdings);
+      
       const initialHoldings: HoldingWithPrice[] = portfolio.holdings.map(holding => ({
         ...holding,
         isLoading: true
       }));
       setHoldingsWithPrices(initialHoldings);
       fetchAllHoldingPrices(portfolio.holdings);
+    } else {
+      console.log("Portfolio Details Dialog - No portfolio or holdings found, clearing holdings");
     }
   }, [portfolio]);
 

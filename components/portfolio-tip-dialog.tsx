@@ -34,7 +34,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { Portfolio } from "@/lib/api";
 import { searchStockSymbols, type StockSymbol } from "@/lib/api-stock-symbols";
-import { Search, X, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, X, Loader2, TrendingUp, TrendingDown, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // Simplified Tip interface
@@ -68,13 +68,15 @@ export interface CreateTipRequest {
   downloadLinks?: Array<{ name: string; url: string }>;
 }
 
-// Simplified validation schema for the tip form
+// Enhanced validation schema for the new dynamic form
 const tipSchema = z.object({
   stockSymbol: z.string().min(1, "Stock symbol is required"),
-  stockId: z.string().optional(), // Internal ID, will be set automatically
+  stockId: z.string().optional(),
   action: z.string().min(1, "Action is required"),
-  buyRange: z.string().min(1, "Buy range is required"),
+  // Dynamic fields based on action
+  buyRange: z.string().optional(),
   addMoreAt: z.string().optional(),
+  exitPrice: z.string().optional(),
   weightage: z.string().optional(),
   description: z.string().min(1, "Description is required"),
   pdfLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
@@ -92,11 +94,11 @@ interface PortfolioTipDialogProps {
   description: string;
 }
 
-// Simple debounce function
+// Debounce utility function
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number) {
-  let timeout: NodeJS.Timeout | null = null;
+  let timeout: NodeJS.Timeout;
   return (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout);
+    clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
 }
@@ -117,6 +119,7 @@ export function PortfolioTipDialog({
   const [isSearching, setIsSearching] = React.useState(false);
   const [showResults, setShowResults] = React.useState(false);
   const [focusedIndex, setFocusedIndex] = React.useState(-1);
+  const [weightageValue, setWeightageValue] = React.useState("");
   
   const inputRef = React.useRef<HTMLInputElement>(null);
   const resultsRef = React.useRef<HTMLDivElement>(null);
@@ -129,6 +132,7 @@ export function PortfolioTipDialog({
       action: "",
       buyRange: "",
       addMoreAt: "",
+      exitPrice: "",
       weightage: "",
       description: "",
       pdfLink: "",
@@ -138,8 +142,38 @@ export function PortfolioTipDialog({
   const {
     handleSubmit,
     reset,
+    watch,
     formState: { isSubmitting },
   } = form;
+
+  // Watch the action field to show/hide dynamic fields
+  const watchedAction = watch("action");
+
+  // Define which fields to show based on action
+  const getFieldsForAction = (action: string) => {
+    const common = ["stockSymbol", "action", "description", "pdfLink"];
+    
+    switch (action?.toUpperCase()) {
+      case "BUY":
+      case "FRESH BUY":
+        return [...common, "buyRange", "addMoreAt", "weightage"];
+      case "SELL":
+      case "COMPLETE SELL":
+        return [...common, "exitPrice"];
+      case "PARTIAL SELL":
+        return [...common, "buyRange", "exitPrice", "weightage"];
+      case "PARTIAL PROFIT":
+        return [...common, "exitPrice", "weightage"];
+      case "HOLD":
+        return [...common, "weightage"];
+      case "ADD MORE":
+        return [...common, "addMoreAt", "weightage"];
+      default:
+        return [...common, "buyRange", "addMoreAt", "exitPrice", "weightage"];
+    }
+  };
+
+  const activeFields = getFieldsForAction(watchedAction);
 
   // Reset form when dialog opens/closes or initial data changes
   React.useEffect(() => {
@@ -151,10 +185,12 @@ export function PortfolioTipDialog({
           action: initialData.action || "",
           buyRange: initialData.buyRange || "",
           addMoreAt: initialData.addMoreAt || "",
+          exitPrice: "",
           weightage: initialData.weightage || "",
           description: initialData.description || "",
           pdfLink: initialData.pdfLink || "",
         });
+        setWeightageValue(initialData.weightage || "");
       } else {
         reset({
           stockSymbol: "",
@@ -162,20 +198,20 @@ export function PortfolioTipDialog({
           action: "",
           buyRange: "",
           addMoreAt: "",
+          exitPrice: "",
           weightage: "",
           description: "",
           pdfLink: "",
         });
         setSelectedStockDetails(null);
+        setWeightageValue("");
       }
     }
   }, [open, initialData, reset]);
 
   const onValidSubmit = async (data: TipFormValues) => {
     try {
-      // Ensure we have the stock ID from the selected stock
-      const stockId = data.stockId || selectedStockDetails?._id;
-      if (!stockId) {
+      if (!selectedStockDetails && !data.stockId) {
         toast({
           title: "Error",
           description: "Please select a valid stock symbol",
@@ -184,39 +220,26 @@ export function PortfolioTipDialog({
         return;
       }
 
-      // Transform the simplified form data into the backend-expected format
+      // Create content array from form data
       const content: Array<{ key: string; value: string }> = [];
       
-      // Add all the form fields as content items
-      if (data.action) {
-        content.push({ key: "Action", value: data.action });
-      }
-      if (data.buyRange) {
-        content.push({ key: "Buy Range (₹)", value: data.buyRange });
-      }
-      if (data.addMoreAt) {
-        content.push({ key: "Add More At (₹)", value: data.addMoreAt });
-      }
-      if (data.weightage) {
-        content.push({ key: "Weightage", value: data.weightage });
-      }
-      
-      // Add stock symbol to content for reference
-      const stockSymbolForContent = selectedStockDetails?.symbol || data.stockSymbol;
-      if (stockSymbolForContent) {
-        content.push({ key: "Stock Symbol", value: stockSymbolForContent });
-      }
+      if (data.action) content.push({ key: "action", value: data.action });
+      if (data.buyRange) content.push({ key: "buyRange", value: data.buyRange });
+      if (data.addMoreAt) content.push({ key: "addMoreAt", value: data.addMoreAt });
+      if (data.exitPrice) content.push({ key: "exitPrice", value: data.exitPrice });
+      if (data.weightage) content.push({ key: "weightage", value: data.weightage });
 
-      // Transform download links
+      // Create downloadLinks array
       const downloadLinks: Array<{ name: string; url: string }> = [];
-      if (data.pdfLink && data.pdfLink.trim()) {
-        downloadLinks.push({
-          name: "PDF Document",
-          url: data.pdfLink,
-        });
+      if (data.pdfLink) {
+        downloadLinks.push({ name: "Analysis Report", url: data.pdfLink });
       }
 
-      // Create the backend-expected format
+      const stockId = selectedStockDetails?._id || data.stockId;
+      if (!stockId) {
+        throw new Error("Stock ID is required");
+      }
+
       const stockSymbol = selectedStockDetails?.symbol || data.stockSymbol || "Unknown";
       const tipData: CreateTipRequest = {
         title: `${stockSymbol} - ${data.action}`,
@@ -312,6 +335,7 @@ export function PortfolioTipDialog({
     setSelectedStockDetails(null);
     setSearchTerm("");
     setShowResults(false);
+    setWeightageValue("");
   };
 
   const handleStockSelect = (stock: StockSymbol) => {
@@ -363,7 +387,7 @@ export function PortfolioTipDialog({
     return <Minus className="h-3 w-3" />;
   };
 
-  // Keyboard navigation
+  // Keyboard navigation for search results
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!showResults || searchResults.length === 0) return;
 
@@ -390,264 +414,305 @@ export function PortfolioTipDialog({
     }
   };
 
+  // Weightage adjustment functions
+  const incrementWeightage = () => {
+    const current = parseFloat(weightageValue) || 0;
+    const newValue = Math.min(current + 1, 100).toString();
+    setWeightageValue(newValue);
+    form.setValue("weightage", newValue);
+  };
+
+  const decrementWeightage = () => {
+    const current = parseFloat(weightageValue) || 0;
+    const newValue = Math.max(current - 1, 0).toString();
+    setWeightageValue(newValue);
+    form.setValue("weightage", newValue);
+  };
+
+  const handleWeightageChange = (value: string) => {
+    setWeightageValue(value);
+    form.setValue("weightage", value);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            {description}
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700 text-white">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="text-white text-xl font-semibold">Edit Model Portfolio Tips</DialogTitle>
+          <DialogDescription className="text-gray-300 text-sm">
+            Edit Tip Details
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={handleSubmit(onValidSubmit)} className="space-y-6">
-            {/* Symbol with Custom Stock Search */}
-            <FormField
-              control={form.control}
-              name="stockSymbol"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Symbol</FormLabel>
-                  <FormControl>
-                    <div className="space-y-2">
-                      {selectedStockDetails ? (
-                        // Display selected stock with live price
-                        <div className="p-4 border rounded-md bg-background space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div>
-                                <p className="font-bold text-lg text-blue-600">{selectedStockDetails.symbol}</p>
-                                <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                                  {selectedStockDetails.name}
-                                </p>
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                {selectedStockDetails.exchange}
-                              </Badge>
-                            </div>
+            {/* Stock Symbol Display */}
+            {selectedStockDetails && (
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-600">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-bold text-lg">{selectedStockDetails.symbol}</span>
+                    <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-300">
+                      {selectedStockDetails.exchange}
+                    </Badge>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleStockClear}
+                    disabled={isSubmitting}
+                    className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="text-gray-300 text-sm mb-3">
+                  Weight: 10.4% Price: ₹{parseFloat(selectedStockDetails.currentPrice).toLocaleString()} Status: Hold
+                </div>
+              </div>
+            )}
+
+            {/* Stock Symbol Search - Only show if no stock selected */}
+            {!selectedStockDetails && (
+              <FormField
+                control={form.control}
+                name="stockSymbol"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Stock Symbol</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            ref={inputRef}
+                            placeholder="Search for stock symbol..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            onFocus={() => {
+                              if (searchResults.length > 0 && searchTerm.length >= 2) {
+                                setShowResults(true);
+                              }
+                            }}
+                            disabled={isSubmitting}
+                            className="pl-10 pr-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                            autoComplete="off"
+                          />
+                          {searchTerm && (
                             <button
                               type="button"
-                              onClick={handleStockClear}
-                              disabled={isSubmitting}
-                              className="p-1 hover:bg-muted rounded"
-                              title="Change Stock"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                          
-                          {/* Live Price Display */}
-                          <div className="grid grid-cols-3 gap-4 text-sm bg-muted/30 p-3 rounded">
-                            <div>
-                              <p className="text-muted-foreground text-xs">Current Price</p>
-                              <p className="font-bold text-lg">₹{parseFloat(selectedStockDetails.currentPrice).toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground text-xs">Previous Price</p>
-                              <p className="font-medium">₹{parseFloat(selectedStockDetails.previousPrice).toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground text-xs">Change</p>
-                              <div className={`flex items-center gap-1 font-medium ${getPriceChangeColor(selectedStockDetails.currentPrice, selectedStockDetails.previousPrice)}`}>
-                                {getPriceChangeIcon(selectedStockDetails.currentPrice, selectedStockDetails.previousPrice)}
-                                <span>₹{calculatePriceChange(selectedStockDetails.currentPrice, selectedStockDetails.previousPrice).absolute}</span>
-                                <span>({calculatePriceChange(selectedStockDetails.currentPrice, selectedStockDetails.previousPrice).percent}%)</span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <p className="text-xs text-muted-foreground">
-                            Last updated: {new Date(selectedStockDetails.updatedAt).toLocaleString()}
-                          </p>
-                        </div>
-                      ) : (
-                        // Search input
-                        <div className="relative">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              ref={inputRef}
-                              placeholder="Search and select stock symbol..."
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                              onKeyDown={handleKeyDown}
-                              onFocus={() => {
-                                if (searchResults.length > 0 && searchTerm.length >= 2) {
-                                  setShowResults(true);
-                                }
+                              onClick={() => {
+                                setSearchTerm("");
+                                setShowResults(false);
+                                inputRef.current?.focus();
                               }}
-                              disabled={isSubmitting}
-                              className="pl-10 pr-10 bg-background"
-                              autoComplete="off"
-                            />
-                            {searchTerm && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSearchTerm("");
-                                  setShowResults(false);
-                                  inputRef.current?.focus();
-                                }}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-muted rounded"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
-                          
-                          {/* Search Results */}
-                          {showResults && (
-                            <div
-                              ref={resultsRef}
-                              className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-[300px] overflow-auto"
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-700 rounded"
                             >
-                              {isSearching ? (
-                                <div className="p-4 text-center text-sm text-muted-foreground">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Searching...
-                                  </div>
-                                </div>
-                              ) : searchResults.length > 0 ? (
-                                                                 <div className="p-1">
-                                   {searchResults.map((stock, index) => (
-                                     <div
-                                       key={stock._id}
-                                       className={`flex items-center justify-between p-3 cursor-pointer rounded-md transition-colors ${
-                                         index === focusedIndex ? 'bg-accent' : 'hover:bg-accent'
-                                       }`}
-                                       onClick={() => handleStockSelect(stock)}
-                                       onMouseEnter={() => setFocusedIndex(index)}
-                                     >
-                                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                                         <div className="min-w-0 flex-1">
-                                           <p className="font-medium">{stock.symbol}</p>
-                                           <p className="text-sm text-muted-foreground truncate">
-                                             {stock.name}
-                                           </p>
-                                         </div>
-                                         <Badge variant="outline" className="text-xs shrink-0">
-                                           {stock.exchange}
-                                         </Badge>
-                                       </div>
-                                       <div className="text-right ml-3 shrink-0">
-                                         <p className="font-bold text-lg">₹{parseFloat(stock.currentPrice).toLocaleString()}</p>
-                                         <div className={`flex items-center gap-1 text-xs justify-end ${getPriceChangeColor(stock.currentPrice, stock.previousPrice)}`}>
-                                           {getPriceChangeIcon(stock.currentPrice, stock.previousPrice)}
-                                           <span>₹{calculatePriceChange(stock.currentPrice, stock.previousPrice).absolute}</span>
-                                           <span>({calculatePriceChange(stock.currentPrice, stock.previousPrice).percent}%)</span>
-                                         </div>
-                                       </div>
-                                     </div>
-                                   ))}
-                                 </div>
-                              ) : searchTerm.length >= 2 ? (
-                                <div className="p-4 text-center text-sm text-muted-foreground">
-                                  No stocks found for "{searchTerm}"
-                                </div>
-                              ) : (
-                                <div className="p-4 text-center text-sm text-muted-foreground">
-                                  Type at least 2 characters to search
-                                </div>
-                              )}
-                            </div>
+                              <X className="h-3 w-3 text-gray-400" />
+                            </button>
                           )}
                         </div>
-                      )}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        
+                        {/* Search Results */}
+                        {showResults && (
+                          <div
+                            ref={resultsRef}
+                            className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-md shadow-lg max-h-[300px] overflow-auto"
+                          >
+                            {isSearching ? (
+                              <div className="p-4 text-center text-sm text-gray-400">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Searching...
+                                </div>
+                              </div>
+                            ) : searchResults.length > 0 ? (
+                              <div className="p-1">
+                                {searchResults.map((stock, index) => (
+                                  <div
+                                    key={stock._id}
+                                    className={`flex items-center justify-between p-3 cursor-pointer rounded-md transition-colors ${
+                                      index === focusedIndex ? 'bg-gray-700' : 'hover:bg-gray-700'
+                                    }`}
+                                    onClick={() => handleStockSelect(stock)}
+                                    onMouseEnter={() => setFocusedIndex(index)}
+                                  >
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-medium text-white">{stock.symbol}</p>
+                                        <p className="text-sm text-gray-400 truncate">
+                                          {stock.name}
+                                        </p>
+                                      </div>
+                                      <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-300 shrink-0">
+                                        {stock.exchange}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-right ml-3 shrink-0">
+                                      <p className="font-bold text-lg text-white">₹{parseFloat(stock.currentPrice).toLocaleString()}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : searchTerm.length >= 2 ? (
+                              <div className="p-4 text-center text-sm text-gray-400">
+                                No stocks found for "{searchTerm}"
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-sm text-gray-400">
+                                Type at least 2 characters to search
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Action */}
+            {/* Edit Action */}
             <FormField
               control={form.control}
               name="action"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Action</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                    <FormControl>
-                      <SelectTrigger className="bg-background">
-                        <SelectValue placeholder="Actions like BUY / SELL / PARTIAL PROFIT" />
+                  <FormLabel className="text-white">Edit Action</FormLabel>
+                  <div className="text-gray-400 text-sm mb-2">
+                    Drop down of the action will decide the expression of weightage & buy range or exit price
+                  </div>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
+                        <SelectValue placeholder="Select action" />
                       </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="PARTIAL SELL" className="text-white hover:bg-gray-700">PARTIAL SELL</SelectItem>
+                        <SelectItem value="BUY" className="text-white hover:bg-gray-700">BUY</SelectItem>
+                        <SelectItem value="SELL" className="text-white hover:bg-gray-700">SELL</SelectItem>
+                        <SelectItem value="HOLD" className="text-white hover:bg-gray-700">HOLD</SelectItem>
+                        <SelectItem value="ADD MORE" className="text-white hover:bg-gray-700">ADD MORE</SelectItem>
+                        <SelectItem value="PARTIAL PROFIT" className="text-white hover:bg-gray-700">PARTIAL PROFIT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Dynamic Fields Based on Action */}
+            {activeFields.includes("buyRange") && (
+              <FormField
+                control={form.control}
+                name="buyRange"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">
+                      {watchedAction === "PARTIAL SELL" ? "Buy Range (₹)" : "Buy Range (₹)"}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={watchedAction === "PARTIAL SELL" ? "7400" : "Enter buy range"}
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="BUY">BUY</SelectItem>
-                      <SelectItem value="SELL">SELL</SelectItem>
-                      <SelectItem value="PARTIAL PROFIT">PARTIAL PROFIT</SelectItem>
-                      <SelectItem value="PARTIAL SELL">PARTIAL SELL</SelectItem>
-                      <SelectItem value="HOLD">HOLD</SelectItem>
-                      <SelectItem value="ADD MORE">ADD MORE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Buy Range */}
-            <FormField
-              control={form.control}
-              name="buyRange"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Buy Range (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="1000 - 2000"
-                      {...field}
-                      disabled={isSubmitting}
-                      className="bg-background"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {activeFields.includes("addMoreAt") && (
+              <FormField
+                control={form.control}
+                name="addMoreAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Add More At (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter additional buy price"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Add More At */}
-            <FormField
-              control={form.control}
-              name="addMoreAt"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Add More At (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter additional buy price"
-                      {...field}
-                      disabled={isSubmitting}
-                      className="bg-background"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {activeFields.includes("exitPrice") && (
+              <FormField
+                control={form.control}
+                name="exitPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Exit Price</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="This will appear when selected sell option"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Weightage */}
-            <FormField
-              control={form.control}
-              name="weightage"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Weightage</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Add Weightage"
-                      {...field}
-                      disabled={isSubmitting}
-                      className="bg-background"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Weightage with + and - buttons */}
+            {activeFields.includes("weightage") && (
+              <FormField
+                control={form.control}
+                name="weightage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Weightage</FormLabel>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={decrementWeightage}
+                        disabled={isSubmitting}
+                        className="bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <FormControl>
+                        <Input
+                          placeholder="Add Weightage"
+                          value={weightageValue}
+                          onChange={(e) => handleWeightageChange(e.target.value)}
+                          disabled={isSubmitting}
+                          className="bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-center"
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={incrementWeightage}
+                        disabled={isSubmitting}
+                        className="bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Description */}
             <FormField
@@ -655,11 +720,11 @@ export function PortfolioTipDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel className="text-white">Description</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="WHY BUY THIS / Summary"
-                      className="min-h-[100px] bg-background"
+                      className="min-h-[100px] bg-gray-800 border-gray-600 text-white placeholder-gray-400"
                       {...field}
                       disabled={isSubmitting}
                     />
@@ -675,13 +740,13 @@ export function PortfolioTipDialog({
               name="pdfLink"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>PDF Link</FormLabel>
+                  <FormLabel className="text-white">PDF Link</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Paste Link here"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-background"
+                      className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
                     />
                   </FormControl>
                   <FormMessage />
@@ -690,20 +755,20 @@ export function PortfolioTipDialog({
             />
 
             {/* Footer Buttons */}
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 space-x-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="min-w-[100px]"
+                className="min-w-[100px] bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
-                className="min-w-[100px]"
+                className="min-w-[100px] bg-white text-black hover:bg-gray-100"
               >
                 {isSubmitting ? "Saving..." : "Save"}
               </Button>

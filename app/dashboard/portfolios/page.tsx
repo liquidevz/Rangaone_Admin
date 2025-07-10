@@ -60,6 +60,18 @@ export default function PortfoliosPage() {
       console.log("Fetching portfolios...")
       const data = await fetchPortfolios()
       console.log(`Loaded ${data.length} portfolios:`, data)
+      
+      // Debug: Check if all portfolios have the same holdings
+      data.forEach((portfolio, index) => {
+        console.log(`Portfolio ${index + 1}: ${portfolio.name}`);
+        console.log(`  - ID: ${portfolio.id || portfolio._id}`);
+        console.log(`  - Holdings count: ${portfolio.holdings?.length || 0}`);
+        if (portfolio.holdings && portfolio.holdings.length > 0) {
+          console.log(`  - First holding symbol: ${portfolio.holdings[0].symbol}`);
+          console.log(`  - Holdings:`, portfolio.holdings.map(h => h.symbol).join(', '));
+        }
+      });
+      
       setPortfolios(data)
     } catch (error) {
       console.error("Error loading portfolios:", error)
@@ -237,8 +249,19 @@ export default function PortfoliosPage() {
         <button 
           className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
           onClick={() => {
-            setSelectedPortfolioForDetails(row.original)
-            setIsDetailsDialogOpen(true)
+            console.log(`Opening details for portfolio: ${row.original.name} (ID: ${row.original.id || row.original._id})`);
+            console.log("Portfolio data:", row.original);
+            console.log("Portfolio holdings:", row.original.holdings);
+            
+            // Clear previous selection first to ensure fresh data
+            setSelectedPortfolioForDetails(null);
+            setIsDetailsDialogOpen(false);
+            
+            // Set new selection after a brief delay to ensure state is cleared
+            setTimeout(() => {
+              setSelectedPortfolioForDetails(row.original);
+              setIsDetailsDialogOpen(true);
+            }, 10);
           }}
         >
           {row.original.name}
@@ -446,20 +469,20 @@ export default function PortfoliosPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Portfolios</h1>
-          <p className="text-muted-foreground">Manage investment portfolios</p>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Portfolios</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage investment portfolios</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:gap-2">
           {!isUserAuthenticated && (
-            <Button size="sm" onClick={handleLogin}>
+            <Button size="sm" onClick={handleLogin} className="w-full sm:w-auto">
               <LogIn className="mr-2 h-4 w-4" />
               Log In
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={loadPortfolios} disabled={isLoading}>
+          <Button variant="outline" size="sm" onClick={loadPortfolios} disabled={isLoading} className="w-full sm:w-auto">
             {isLoading ? (
               <>
                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -472,7 +495,7 @@ export default function PortfoliosPage() {
               </>
             )}
           </Button>
-          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} disabled={!isUserAuthenticated}>
+          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} disabled={!isUserAuthenticated} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Add Portfolio
           </Button>
@@ -483,7 +506,7 @@ export default function PortfoliosPage() {
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="text-sm">{error}</AlertDescription>
         </Alert>
       )}
 
@@ -491,9 +514,9 @@ export default function PortfoliosPage() {
         <Alert variant="warning" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription>
+          <AlertDescription className="text-sm">
             You need to be logged in to view and manage portfolios.
-            <Button variant="link" className="p-0 h-auto font-normal" onClick={handleLogin}>
+            <Button variant="link" className="p-0 h-auto font-normal text-sm" onClick={handleLogin}>
               Click here to log in
             </Button>
           </AlertDescription>
@@ -501,12 +524,17 @@ export default function PortfoliosPage() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Portfolios</CardTitle>
-          <CardDescription>View and manage all investment portfolios</CardDescription>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg sm:text-xl">All Portfolios</CardTitle>
+          <CardDescription className="text-sm">View and manage all investment portfolios</CardDescription>
         </CardHeader>
-        <CardContent>
-          <DataTable columns={columns} data={portfolios} searchColumn="name" isLoading={isLoading} />
+        <CardContent className="px-3 sm:px-6">
+          {/* Mobile: Add horizontal scroll wrapper for table */}
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[600px]">
+              <DataTable columns={columns} data={portfolios} searchColumn="name" isLoading={isLoading} />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -543,7 +571,13 @@ export default function PortfoliosPage() {
       {/* Portfolio Details Dialog */}
       <PortfolioDetailsDialog
         open={isDetailsDialogOpen}
-        onOpenChange={setIsDetailsDialogOpen}
+        onOpenChange={(open) => {
+          setIsDetailsDialogOpen(open);
+          if (!open) {
+            // Clear selected portfolio when dialog closes to prevent stale data
+            setSelectedPortfolioForDetails(null);
+          }
+        }}
         portfolio={selectedPortfolioForDetails}
       />
     </div>

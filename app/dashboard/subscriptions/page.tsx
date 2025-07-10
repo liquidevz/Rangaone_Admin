@@ -197,7 +197,7 @@ export default function SubscriptionsPage() {
       header: "ID",
       cell: ({ row }) => (
         <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original._id}
+          {row.original.id || (row.original as any)._id}
         </div>
       ),
     },
@@ -269,7 +269,7 @@ export default function SubscriptionsPage() {
       header: "ID",
       cell: ({ row }) => (
         <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original._id}
+          {row.original.id || (row.original as any)._id}
         </div>
       ),
     },
@@ -332,20 +332,20 @@ export default function SubscriptionsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Subscription Management</h1>
-          <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold">Subscription Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage user subscriptions and payments
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button onClick={() => loadData()} variant="outline">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:space-x-2">
+          <Button onClick={() => loadData()} variant="outline" className="w-full sm:w-auto">
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Order
           </Button>
@@ -353,9 +353,9 @@ export default function SubscriptionsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-          <TabsTrigger value="payments">Payment History</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-none sm:inline-flex">
+          <TabsTrigger value="subscriptions" className="text-xs sm:text-sm">Subscriptions</TabsTrigger>
+          <TabsTrigger value="payments" className="text-xs sm:text-sm">Payment History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="subscriptions">

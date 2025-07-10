@@ -446,26 +446,26 @@ export default function BundlesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Portfolio Bundles</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Portfolio Bundles</h1>
+          <p className="text-sm text-muted-foreground">
             Create and manage portfolio bundles with custom pricing
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={loadBundles}
             disabled={isLoading}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground w-full sm:w-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="bg-primary">
+          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="bg-primary w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Bundle
           </Button>
@@ -476,23 +476,28 @@ export default function BundlesPage() {
         <Alert variant="destructive" className="border-destructive/50 text-destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="text-sm">{error}</AlertDescription>
         </Alert>
       )}
 
       <Card className="border-border/40 shadow-md">
-        <CardHeader className="border-b border-border/40">
+        <CardHeader className="border-b border-border/40 pb-4">
           <CardTitle className="text-lg font-medium">Bundles</CardTitle>
           <CardDescription className="text-sm text-muted-foreground">
             Manage your portfolio bundles. Bundles allow you to group portfolios together with a discount.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <DataTable
-            columns={columns}
-            data={bundles}
-            isLoading={isLoading}
-          />
+        <CardContent className="px-3 sm:px-6 py-0">
+          {/* Mobile: Add horizontal scroll wrapper for table */}
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[700px]">
+              <DataTable
+                columns={columns}
+                data={bundles}
+                isLoading={isLoading}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 

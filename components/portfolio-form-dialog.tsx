@@ -34,6 +34,13 @@ import type {
   DownloadLink,
   YouTubeLink,
 } from "@/lib/api";
+
+// Extended subscription fee interface for the form with discount fields
+interface ExtendedSubscriptionFee extends SubscriptionFee {
+  actualPrice: number;
+  discountPrice: number;
+  discountPercentage: number;
+}
 import { StockSearch } from "@/components/stock-search";
 import { 
   fetchStockSymbolBySymbol, 
@@ -128,12 +135,15 @@ export function PortfolioFormDialog({
 
   // Financial Details State
   const [minInvestment, setMinInvestment] = useState("");
-  const [subscriptionFees, setSubscriptionFees] = useState<SubscriptionFee[]>([]);
+  const [monthlyContribution, setMonthlyContribution] = useState("");
+  const [subscriptionFees, setSubscriptionFees] = useState<ExtendedSubscriptionFee[]>([]);
 
   // Portfolio Characteristics State
   const [portfolioCategory, setPortfolioCategory] = useState("Basic");
   const [timeHorizon, setTimeHorizon] = useState("");
   const [rebalancing, setRebalancing] = useState("");
+  const [lastRebalancingDate, setLastRebalancingDate] = useState("");
+  const [nextRebalancingDate, setNextRebalancingDate] = useState("");
   const [index, setIndex] = useState("");
   const [details, setDetails] = useState("");
   const [monthlyGains, setMonthlyGains] = useState("");
@@ -356,16 +366,25 @@ export function PortfolioFormDialog({
 
         // Financial Details
         setMinInvestment(initialData.minInvestment?.toString() || "");
+        setMonthlyContribution(initialData.monthlyContribution?.toString() || "");
 
         // Handle subscription fees
         if (Array.isArray(initialData.subscriptionFee)) {
-          setSubscriptionFees(initialData.subscriptionFee);
+          const extendedFees: ExtendedSubscriptionFee[] = initialData.subscriptionFee.map(fee => ({
+            ...fee,
+            actualPrice: fee.price,
+            discountPrice: fee.price,
+            discountPercentage: 0,
+          }));
+          setSubscriptionFees(extendedFees);
         }
 
         // Portfolio Characteristics
         setPortfolioCategory(initialData.PortfolioCategory || "Basic");
         setTimeHorizon(initialData.timeHorizon || "");
         setRebalancing(initialData.rebalancing || "");
+        setLastRebalancingDate(initialData.lastRebalancingDate || "");
+        setNextRebalancingDate(initialData.nextRebalancingDate || "");
         setIndex(initialData.index || "");
         setDetails(initialData.details || "");
         setMonthlyGains(initialData.monthlyGains || "");
@@ -420,10 +439,13 @@ export function PortfolioFormDialog({
         setMethodologyPdfLink("");
         setYouTubeLinks([]);
         setMinInvestment("");
+        setMonthlyContribution("");
         setSubscriptionFees([]);
         setPortfolioCategory("Basic");
         setTimeHorizon("");
         setRebalancing("");
+        setLastRebalancingDate("");
+        setNextRebalancingDate("");
         setIndex("");
         setDetails("");
         setMonthlyGains("");
@@ -519,13 +541,16 @@ export function PortfolioFormDialog({
         description: allDescriptions.filter(d => d.value.trim() !== ""),
         subscriptionFee: subscriptionFees,
         minInvestment: Number(minInvestment),
+        monthlyContribution: monthlyContribution ? Number(monthlyContribution) : undefined,
         durationMonths: 12,
-        holdings: portfolioHoldings.length > 0 ? portfolioHoldings : undefined,
+        holdings: portfolioHoldings.length > 0 ? portfolioHoldings : [],
         PortfolioCategory: portfolioCategory,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
         youTubeLinks: youTubeLinks.length > 0 ? youTubeLinks : undefined,
         timeHorizon,
         rebalancing,
+        lastRebalancingDate,
+        nextRebalancingDate,
         index,
         details,
         monthlyGains,
@@ -536,7 +561,13 @@ export function PortfolioFormDialog({
         currentValue: currentValue,
       };
 
-      console.log("Submitting portfolio data:", JSON.stringify(portfolioData, null, 2));
+      console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
+      console.log("Portfolio Name:", portfolioData.name);
+      console.log("Holdings Count:", portfolioData.holdings?.length || 0);
+      console.log("Holdings Data:", portfolioData.holdings);
+      console.log("Full Portfolio Data:", JSON.stringify(portfolioData, null, 2));
+      console.log("=== END DEBUG ===");
+      
       await onSubmit(portfolioData);
       onOpenChange(false);
     } catch (error) {
@@ -883,13 +914,32 @@ export function PortfolioFormDialog({
   };
 
   const addSubscriptionFee = () => {
-    setSubscriptionFees([...subscriptionFees, { type: "monthly", price: 0 }]);
+    setSubscriptionFees([...subscriptionFees, { 
+      type: "monthly", 
+      price: 0,
+      actualPrice: 0,
+      discountPrice: 0,
+      discountPercentage: 0,
+    }]);
   };
 
-  const updateSubscriptionFee = (index: number, field: keyof SubscriptionFee, value: string | number) => {
+  const updateSubscriptionFee = (index: number, field: keyof ExtendedSubscriptionFee, value: string | number) => {
     const updated = [...subscriptionFees];
-    if (field === "price") {
+    if (field === "price" || field === "actualPrice" || field === "discountPrice" || field === "discountPercentage") {
       updated[index] = { ...updated[index], [field]: Number(value) };
+      
+      // Auto-calculate discount percentage when actual or discount price changes
+      if (field === "actualPrice" || field === "discountPrice") {
+        const actual = field === "actualPrice" ? Number(value) : updated[index].actualPrice;
+        const discount = field === "discountPrice" ? Number(value) : updated[index].discountPrice;
+        
+        if (actual > 0) {
+          updated[index].discountPercentage = Math.round(((actual - discount) / actual) * 100);
+        }
+        
+        // Update the main price field to be the discount price
+        updated[index].price = discount;
+      }
     } else {
       const typeValue = value as "monthly" | "quarterly" | "yearly";
       updated[index] = { ...updated[index], [field]: typeValue };
@@ -1047,7 +1097,7 @@ export function PortfolioFormDialog({
                         <Label htmlFor={`desc-${index}`} className="text-sm font-medium capitalize">
                           {desc.key}
                         </Label>
-                        {desc.key === "portfolio card" ? (
+                        {desc.key === "portfolio card" || desc.key === "checkout card" ? (
                           <div className="space-y-2">
                             <QuillEditor
                               id={`desc-${index}`}
@@ -1127,62 +1177,99 @@ export function PortfolioFormDialog({
               </TabsContent>
               <TabsContent value="financial" className="space-y-4 py-4">
                 <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="min-investment">Minimum Investment (₹) *</Label>
-                    <Input
-                      id="min-investment"
-                      type="number"
-                      min="100"
-                      value={minInvestment}
-                      onChange={(e) => setMinInvestment(e.target.value)}
-                      placeholder="Enter minimum investment amount"
-                      disabled={isSubmitting}
-                      required
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="min-investment">Minimum Investment (₹) *</Label>
+                      <Input
+                        id="min-investment"
+                        type="number"
+                        min="100"
+                        value={minInvestment}
+                        onChange={(e) => setMinInvestment(e.target.value)}
+                        placeholder="Enter minimum investment amount"
+                        disabled={isSubmitting}
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="monthly-contribution">Monthly Contribution</Label>
+                      <Input
+                        id="monthly-contribution"
+                        type="number"
+                        min="0"
+                        value={monthlyContribution}
+                        onChange={(e) => setMonthlyContribution(e.target.value)}
+                        placeholder="Enter Monthly Contribution"
+                        disabled={isSubmitting}
+                      />
+                    </div>
                   </div>
 
                   {/* Subscription Fees section */}
                   <div className="space-y-3 border p-4 rounded-md bg-muted">
-                    <Label>Subscription Fees *</Label>&nbsp;&nbsp;
+                    <Label>Subscription Fees *</Label>
                     {subscriptionFees.map((fee, index) => (
-                      <div key={index} className="grid grid-cols-3 gap-2 items-end">
-                        <div>
-                          <Label className="text-sm">Type</Label>
-                          <Select
-                            value={fee.type}
-                            onValueChange={(value) => updateSubscriptionFee(index, "type", value)}
+                      <div key={index} className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+                          <div>
+                            <Label className="text-sm">Type</Label>
+                            <Select
+                              value={fee.type}
+                              onValueChange={(value) => updateSubscriptionFee(index, "type", value)}
+                              disabled={isSubmitting}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="quarterly">Quarterly</SelectItem>
+                                <SelectItem value="yearly">Yearly</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Actual Price (₹)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={fee.actualPrice}
+                              onChange={(e) => updateSubscriptionFee(index, "actualPrice", e.target.value)}
+                              placeholder="Enter Price"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm">Discount Price (₹)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={fee.discountPrice}
+                              onChange={(e) => updateSubscriptionFee(index, "discountPrice", e.target.value)}
+                              placeholder="Enter Discount Price"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm">Discount Percentage (%)</Label>
+                            <Input
+                              type="text"
+                              value={fee.discountPercentage + "%"}
+                              placeholder="Automatic Reflecting"
+                              disabled={true}
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeSubscriptionFee(index)}
                             disabled={isSubmitting}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="monthly">Monthly</SelectItem>
-                              <SelectItem value="quarterly">Quarterly</SelectItem>
-                              <SelectItem value="yearly">Yearly</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <div>
-                          <Label className="text-sm">Price (₹)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={fee.price}
-                            onChange={(e) => updateSubscriptionFee(index, "price", e.target.value)}
-                            placeholder="Enter price"
-                            disabled={isSubmitting}
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeSubscriptionFee(index)}
-                          disabled={isSubmitting}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     ))}
                     <Button
@@ -1218,28 +1305,51 @@ export function PortfolioFormDialog({
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="time-horizon">Time Horizon</Label>
-                        <Input
-                          id="time-horizon"
-                          value={timeHorizon}
-                          onChange={(e) => setTimeHorizon(e.target.value)}
-                          placeholder="e.g., Long-term"
-                          disabled={isSubmitting}
-                        />
-                      </div>
+
                       <div className="grid gap-2">
                         <Label htmlFor="rebalancing">Rebalancing</Label>
                         <Input
                           id="rebalancing"
                           value={rebalancing}
                           onChange={(e) => setRebalancing(e.target.value)}
-                          placeholder="e.g., Quarterly"
+                          placeholder="Enter Rebalancing Type"
                           disabled={isSubmitting}
                         />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="index">Index</Label>
+                        <Label htmlFor="time-horizon">Time Horizon</Label>
+                        <Input
+                          id="time-horizon"
+                          value={timeHorizon}
+                          onChange={(e) => setTimeHorizon(e.target.value)}
+                          placeholder="Enter Time Horizon"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="last-rebalancing-date">Last Rebalancing Date</Label>
+                        <Input
+                          id="last-rebalancing-date"
+                          type="date"
+                          value={lastRebalancingDate}
+                          onChange={(e) => setLastRebalancingDate(e.target.value)}
+                          placeholder="Enter Date"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="next-rebalancing-date">Next Rebalancing Date</Label>
+                        <Input
+                          id="next-rebalancing-date"
+                          type="date"
+                          value={nextRebalancingDate}
+                          onChange={(e) => setNextRebalancingDate(e.target.value)}
+                          placeholder="Enter Date"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="index">Compared to Benchmark Index</Label>
                         <Input
                           id="index"
                           value={index}

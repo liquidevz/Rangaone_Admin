@@ -47,6 +47,7 @@
     "draft-js": "^0.11.7",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
+    "isomorphic-dompurify": "^2.26.0",
     "kiteconnect": "latest",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",

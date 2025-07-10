@@ -2,17 +2,25 @@
 import type { ReactNode } from "react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Toaster } from "@/components/ui/toaster"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-zinc-950">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar component */}
       <DashboardSidebar />
 
       {/* Main content area - responsive to sidebar state */}
-      <main className="flex-1 min-w-0 overflow-x-hidden">
-        <div className="container mx-auto px-6 py-6 max-w-[1600px]">
-          {children}
+      <main className="flex-1 min-w-0 overflow-x-hidden bg-background">
+        {/* Mobile: Top padding for fixed header, responsive container with better mobile spacing */}
+        <div className="pt-16 md:pt-0">
+          {/* Theme toggle in top right */}
+          <div className="fixed top-4 right-4 z-50">
+            <ThemeToggle />
+          </div>
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-[1600px]">
+            {children}
+          </div>
         </div>
       </main>
 

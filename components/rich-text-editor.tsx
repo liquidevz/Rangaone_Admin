@@ -117,16 +117,16 @@ export function RichTextEditor({
             body { 
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; 
               font-size: 14px;
-              color: #ffffff;
-              background-color: #09090b;
+              color: var(--foreground);
+              background-color: var(--background);
               line-height: 1.6;
             }
             p { 
               margin: 0.5em 0; 
-              color: #ffffff;
+              color: var(--foreground);
             }
             h1, h2, h3, h4, h5, h6 { 
-              color: #ffffff !important; 
+              color: var(--foreground) !important; 
               font-weight: bold;
               margin-top: 1em;
               margin-bottom: 0.5em;
@@ -137,13 +137,13 @@ export function RichTextEditor({
             h4 { font-size: 1em; }
             h5 { font-size: 0.83em; }
             h6 { font-size: 0.67em; }
-            a { color: #3b82f6; }
-            strong, b { color: #ffffff; font-weight: bold; }
-            em, i { color: #ffffff; font-style: italic; }
-            ul, ol { color: #ffffff; padding-left: 1.5em; }
-            li { color: #ffffff; margin: 0.25em 0; }
-            pre { background-color: #18181b; padding: 1em; border-radius: 4px; color: #ffffff; }
-            code { background-color: #18181b; padding: 0.2em 0.4em; border-radius: 3px; color: #ffffff; }
+            a { color: var(--primary); }
+            strong, b { color: var(--foreground); font-weight: bold; }
+            em, i { color: var(--foreground); font-style: italic; }
+            ul, ol { color: var(--foreground); padding-left: 1.5em; }
+            li { color: var(--foreground); margin: 0.25em 0; }
+            pre { background-color: var(--muted); padding: 1em; border-radius: 4px; color: var(--foreground); }
+            code { background-color: var(--muted); padding: 0.2em 0.4em; border-radius: 3px; color: var(--foreground); }
           `,
           skin: 'oxide-dark',
           content_css: 'dark',

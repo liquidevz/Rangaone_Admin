@@ -13,8 +13,8 @@ const Editor = dynamic(
   { 
     ssr: false,
     loading: () => (
-      <div className="w-full border border-zinc-700 rounded-md bg-zinc-950 flex items-center justify-center" style={{ height: 200 }}>
-        <div className="text-zinc-500">Loading TinyMCE editor...</div>
+      <div className="w-full border border-border rounded-md bg-background flex items-center justify-center" style={{ height: 200 }}>
+        <div className="text-muted-foreground">Loading TinyMCE editor...</div>
       </div>
     )
   }
@@ -48,10 +48,10 @@ function FallbackTextarea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="min-h-[150px] bg-zinc-950 border-zinc-700 text-zinc-100"
+        className="min-h-[150px] bg-background border-border text-foreground"
         style={{ minHeight: height ? `${height}px` : '150px' }}
       />
-      <p className="text-xs text-zinc-500 mt-1">
+      <p className="text-xs text-muted-foreground mt-1">
         TinyMCE editor not available - using fallback mode
       </p>
     </div>

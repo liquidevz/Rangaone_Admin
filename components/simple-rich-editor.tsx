@@ -52,14 +52,14 @@ export function SimpleRichEditor({
             body { 
               font-family: Arial, sans-serif; 
               font-size: 14px;
-              color: #ffffff;
-              background-color: #18181b;
+              color: var(--foreground);
+              background-color: var(--background);
               margin: 10px;
             }
-            h1 { color: #ffffff; font-size: 2em; }
-            h2 { color: #ffffff; font-size: 1.5em; }
-            h3 { color: #ffffff; font-size: 1.2em; }
-            p { color: #ffffff; }
+            h1 { color: var(--foreground); font-size: 2em; }
+            h2 { color: var(--foreground); font-size: 1.5em; }
+            h3 { color: var(--foreground); font-size: 1.2em; }
+            p { color: var(--foreground); }
           `,
         }}
       />

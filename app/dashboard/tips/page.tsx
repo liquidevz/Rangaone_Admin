@@ -139,12 +139,12 @@ export default function TipsManagementPage() {
 
     // Filter by status
     if (statusFilter !== "all") {
-      filtered = filtered.filter((tip) => tip.status === statusFilter);
+      filtered = filtered.filter((tip) => tip.status.toLowerCase() === statusFilter.toLowerCase());
     }
 
     // Filter by action
     if (actionFilter !== "all") {
-      filtered = filtered.filter((tip) => tip.action === actionFilter);
+      filtered = filtered.filter((tip) => tip.action?.toLowerCase() === actionFilter.toLowerCase());
     }
 
     // Filter by search query
@@ -347,6 +347,11 @@ export default function TipsManagementPage() {
   // Check if tip can be edited (only general tips can be edited from this page)
   const canEditTip = (tip: Tip) => !tip.portfolio;
 
+  // Helper function to get portfolio ID
+  const getPortfolioId = (portfolio: Portfolio): string => {
+    return portfolio.id || portfolio._id || "no-id";
+  };
+
   // Mobile-optimized columns configuration
   const columns: ColumnDef<Tip>[] = [
     {
@@ -526,249 +531,105 @@ export default function TipsManagementPage() {
 
   return (
     <div className="min-h-screen w-full">
-      <div className="container mx-auto space-y-4 md:space-y-6 p-4 md:p-6">
-        <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-start lg:space-y-0">
-          <div className="space-y-1">
+      <div className="container mx-auto p-0">
+        {/* Header Section */}
+        <div className="flex flex-col space-y-4 px-4 py-4">
+          <div className="space-y-1.5">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-              Investment Tips Management
+              Investment Tips
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Unified view of all investment tips - portfolio-specific and general
+              {filteredTips.length} tips found
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto lg:w-auto">
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              onClick={() => setCreateDialogOpen(true)}
+              size="sm"
+              className="w-full sm:w-auto order-1 sm:order-2"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create General Tip
+            </Button>
             <Button
               onClick={() => loadAllTips()}
               variant="outline"
               size="sm"
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Refresh
             </Button>
-            <Button
-              onClick={() => setCreateDialogOpen(true)}
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add General Tip
-            </Button>
           </div>
         </div>
 
-        {/* Information Alert - Better mobile spacing */}
-        <Alert className="mx-1 sm:mx-0">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="text-sm sm:text-base">Tip Management Info</AlertTitle>
-          <AlertDescription className="text-sm">
-            <div className="space-y-1 mt-2">
-              <p>• <strong>General Tips:</strong> Can be created/edited here - visible to all users</p>
-              <p>• <strong>Portfolio Tips:</strong> Must be managed from individual portfolio pages</p>
-              <p>• <strong>Click title:</strong> View details (general) or go to portfolio page (portfolio tips)</p>
-              <p className="hidden sm:block">• Use the portfolio filter below to view tips by category</p>
-            </div>
-          </AlertDescription>
-        </Alert>
-
-        {/* Error alert */}
+        {/* Error Alert */}
         {error && (
-          <Alert variant="destructive" className="mx-1 sm:mx-0">
+          <Alert variant="destructive" className="mx-4 mb-4">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="text-sm sm:text-base">Error</AlertTitle>
-            <AlertDescription className="text-sm">{error}</AlertDescription>
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <Card className="mx-1 sm:mx-0 shadow-sm">
-          <CardHeader className="space-y-4">
-            <div>
-              <CardTitle className="text-lg sm:text-xl">All Investment Tips</CardTitle>
-              <CardDescription className="text-sm">
-                View and manage all investment tips across portfolios and general tips
-              </CardDescription>
-            </div>
+        {/* Search Input */}
+        <div className="px-4 mb-4">
+          <Input
+            placeholder="Search tips..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
 
-            {/* Mobile-first responsive filters */}
-            <div className="space-y-3 sm:space-y-4">
-              {/* Search bar - full width on mobile */}
-              <div className="w-full">
-                <Input
-                  placeholder="Search tips..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              
-              {/* Filter dropdowns - responsive grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                <div className="w-full">
-                  <Select value={portfolioFilter} onValueChange={setPortfolioFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Tips" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Tips</SelectItem>
-                      <SelectItem value="general">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-purple-600" />
-                          <span className="text-sm">General Tips</span>
-                        </div>
-                      </SelectItem>
-                      {portfolios.map((portfolio) => (
-                        <SelectItem key={portfolio.id ?? ""} value={portfolio.id ?? ""}>
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm truncate">{portfolio.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+        {/* Tips Table */}
+        <div className="rounded-md border">
+          <DataTable
+            columns={columns}
+            data={filteredTips}
+            isLoading={isLoading}
+            searchColumn="title"
+          />
+        </div>
+      </div>
 
-                <div className="w-full">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+      {/* Dialogs */}
+      <TipFormDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSubmit={handleCreateTip}
+        title="Create General Tip"
+        description="Add a new general investment tip visible to all users"
+      />
 
-                <div className="w-full sm:col-span-2 xl:col-span-1">
-                  <Select value={actionFilter} onValueChange={setActionFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Actions" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Actions</SelectItem>
-                      <SelectItem value="buy">Buy</SelectItem>
-                      <SelectItem value="sell">Sell</SelectItem>
-                      <SelectItem value="partial sell">Partial Sell</SelectItem>
-                      <SelectItem value="partial profit">Partial Profit</SelectItem>
-                      <SelectItem value="hold">Hold</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-              </div>
-            ) : filteredTips.length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <div className="max-w-md mx-auto space-y-4">
-                  <div className="text-4xl">📈</div>
-                  <div>
-                    <p className="text-lg font-medium text-muted-foreground mb-2">
-                      No tips found matching your criteria
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {portfolioFilter === "general" 
-                        ? "Create your first general investment tip for all users."
-                        : "Try adjusting your filters or create a new tip."
-                      }
-                    </p>
-                  </div>
-                  {(portfolioFilter === "all" || portfolioFilter === "general") && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setCreateDialogOpen(true)}
-                      className="mt-4"
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Add General Tip
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Stats row - responsive */}
-                <div className="px-4 sm:px-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-muted-foreground">
-                    <span className="font-medium">
-                      Showing {filteredTips.length} tip{filteredTips.length !== 1 ? 's' : ''}
-                    </span>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs">
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3 text-purple-600" />
-                        <span>General: {filteredTips.filter(t => !t.portfolio).length}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Building2 className="h-3 w-3 text-blue-600" />
-                        <span>Portfolio: {filteredTips.filter(t => t.portfolio).length}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Table container with horizontal scroll */}
-                <div className="w-full">
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[900px]">
-                      <DataTable 
-                        columns={columns} 
-                        data={filteredTips} 
-                        searchColumn="title"
-                        isLoading={isLoading}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Create General Tip Dialog - Only for general tips */}
-        <TipFormDialog
-          open={createDialogOpen}
-          onOpenChange={setCreateDialogOpen}
-          onSubmit={handleCreateTip}
-          title="Create General Investment Tip"
-          description="Add a new general investment tip visible to all users (not tied to any portfolio)"
-        />
-
-        {/* Edit Tip Dialog - Only for general tips */}
-        {selectedTip && !selectedTip.portfolio && (
+      {selectedTip && (
+        <>
           <TipFormDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
             onSubmit={handleEditTip}
             initialData={selectedTip}
-            title="Edit General Investment Tip"
-            description="Modify an existing general investment tip"
+            title="Edit Investment Tip"
+            description="Modify an existing investment tip"
           />
-        )}
 
-        {/* Delete Confirmation Dialog */}
-        <ConfirmDialog
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-          onConfirm={handleDeleteTip}
-          title="Delete Investment Tip"
-          description={`Are you sure you want to delete this tip? This action cannot be undone.`}
-          confirmText="Delete"
-        />
+          <ConfirmDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            title="Delete Tip"
+            description="Are you sure you want to delete this tip? This action cannot be undone."
+            onConfirm={handleDeleteTip}
+          />
 
-        {/* Tip Details Modal - For viewing general tips */}
-        <TipDetailsModal
-          open={viewModalOpen}
-          onOpenChange={setViewModalOpen}
-          tip={selectedTip}
-          portfolio={selectedTip?.portfolio ? portfolios.find(p => p.id === selectedTip.portfolio) : undefined}
-        />
-      </div>
+          <TipDetailsModal
+            open={viewModalOpen}
+            onOpenChange={setViewModalOpen}
+            tip={selectedTip}
+          />
+        </>
+      )}
     </div>
   );
 }

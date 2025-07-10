@@ -290,6 +290,8 @@ export interface Portfolio {
   currentValue: number;
   timeHorizon?: string;
   rebalancing?: string;
+  lastRebalancingDate?: string;
+  nextRebalancingDate?: string;
   index?: string;
   details?: string;
   monthlyGains?: string;
@@ -297,6 +299,7 @@ export interface Portfolio {
   oneYearGains?: string;
   subscriptionFee: SubscriptionFee[];
   minInvestment: number;
+  monthlyContribution?: number;
   durationMonths: number;
   PortfolioCategory: string;
   compareWith?: string;
@@ -319,6 +322,7 @@ export interface CreatePortfolioRequest {
   description: DescriptionItem[];
   subscriptionFee: SubscriptionFee[];
   minInvestment: number;
+  monthlyContribution?: number;
   durationMonths: number;
   expiryDate?: string;
   holdings?: PortfolioHolding[];
@@ -327,6 +331,8 @@ export interface CreatePortfolioRequest {
   youTubeLinks?: YouTubeLink[];
   timeHorizon?: string;
   rebalancing?: string;
+  lastRebalancingDate?: string;
+  nextRebalancingDate?: string;
   index?: string;
   details?: string;
   monthlyGains?: string;
@@ -484,7 +490,12 @@ export const createPortfolio = async (
   portfolioData: CreatePortfolioRequest
 ): Promise<Portfolio> => {
   try {
-    console.log("Creating portfolio with data:", JSON.stringify(portfolioData, null, 2));
+    console.log("=== API CREATE PORTFOLIO DEBUG ===");
+    console.log("Portfolio Name:", portfolioData.name);
+    console.log("Holdings in API request:", portfolioData.holdings);
+    console.log("Holdings count:", portfolioData.holdings?.length || 0);
+    console.log("API Request Body:", JSON.stringify(portfolioData, null, 2));
+    console.log("=== END API DEBUG ===");
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios`, {
       method: "POST",

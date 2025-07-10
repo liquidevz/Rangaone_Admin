@@ -542,21 +542,21 @@ export default function StockSymbolsPage() {
   const displayData = searchQuery && searchResults.length > 0 ? searchResults : stockSymbols;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Stock Symbols</h1>
-          <p className="text-sm text-zinc-400 mt-1">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">Stock Symbols</h1>
+          <p className="text-sm text-zinc-400">
             Manage stock symbols database with real-time price tracking
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={handleUpdateAllPrices}
             disabled={isUpdatingPrices}
-            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800"
+            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800 w-full sm:w-auto"
           >
             <Activity className={`h-4 w-4 mr-2 ${isUpdatingPrices ? "animate-pulse" : ""}`} />
             {isUpdatingPrices ? "Updating..." : "Update Prices"}
@@ -566,7 +566,7 @@ export default function StockSymbolsPage() {
             size="sm"
             onClick={() => loadStockSymbols(pagination.page, pagination.limit)}
             disabled={isLoading}
-            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800"
+            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800 w-full sm:w-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
@@ -575,12 +575,12 @@ export default function StockSymbolsPage() {
             variant="outline"
             size="sm"
             onClick={() => setShowLiveSearch(!showLiveSearch)}
-            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800"
+            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800 w-full sm:w-auto"
           >
             <Search className="h-4 w-4 mr-2" />
             {showLiveSearch ? "Hide" : "Search Live"}
           </Button>
-          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="bg-primary">
+          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="bg-primary w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Manually
           </Button>
@@ -981,7 +981,7 @@ export default function StockSymbolsPage() {
 
       {/* Data Table */}
       <Card className="border-zinc-800 bg-zinc-900/50 shadow-md">
-        <CardHeader className="border-b border-zinc-800">
+        <CardHeader className="border-b border-zinc-800 pb-4">
           <CardTitle className="text-lg font-medium text-white">
             {searchQuery ? 'Search Results' : 'Stock Symbols'}
           </CardTitle>
@@ -992,12 +992,17 @@ export default function StockSymbolsPage() {
             }
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <DataTable
-            columns={columns}
-            data={displayData}
-            isLoading={isLoading}
-          />
+        <CardContent className="px-3 sm:px-6 py-0">
+          {/* Mobile: Add horizontal scroll wrapper for table */}
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[800px]">
+              <DataTable
+                columns={columns}
+                data={displayData}
+                isLoading={isLoading}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 

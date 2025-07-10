@@ -309,27 +309,28 @@ export default function UsersPage() {
   ];
 
   return (
-    <div className="py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-muted-foreground">
+    <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Users</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage user accounts and permissions.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={loadUsers}
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             <RefreshCw
               className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
-          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)} className="w-full sm:w-auto">
             <UserPlus className="h-4 w-4 mr-2" />
             Add User
           </Button>
@@ -339,17 +340,22 @@ export default function UsersPage() {
       {error && (
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="text-sm">{error}</AlertDescription>
         </Alert>
       )}
 
-      <div className="border rounded-lg">
-        <DataTable
-          columns={columns}
-          data={users}
-          searchColumn="email"
-          isLoading={loading}
-        />
+      <div className="border rounded-lg overflow-hidden">
+        {/* Mobile: Add horizontal scroll wrapper for table */}
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[600px]">
+            <DataTable
+              columns={columns}
+              data={users}
+              searchColumn="email"
+              isLoading={loading}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Create User Dialog */}
