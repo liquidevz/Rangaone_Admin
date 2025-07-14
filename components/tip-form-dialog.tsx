@@ -40,14 +40,8 @@ import type { CreateTipRequest, Tip } from "@/lib/api-tips";
 const tipSchema = z.object({
   title: z.string().min(1, "Title is required"),
   stockId: z.string().min(1, "Stock symbol is required"),
-  content: z
-    .array(
-      z.object({
-        key: z.string().min(1, "Key is required"),
-        value: z.string().min(1, "Value is required"),
-      })
-    )
-    .min(1, "At least one content item is required"),
+  category: z.enum(["basic", "premium", "social_media"]),
+  content: z.string().min(1, "Content is required"),
   description: z.string().min(1, "Description is required"),
   status: z.enum(["Active", "Closed"]),
   action: z.string().optional(),
@@ -94,7 +88,8 @@ export function TipFormDialog({
     defaultValues: {
       title: "",
       stockId: "",
-      content: [{ key: "", value: "" }],
+      category: "basic",
+      content: "",
       description: "",
       status: "Active",
       action: undefined,
@@ -119,11 +114,6 @@ export function TipFormDialog({
     formState: { isSubmitting },
   } = form;
 
-  const { fields: contentFields, append: appendContent, remove: removeContent } = useFieldArray({
-    control,
-    name: "content",
-  });
-
   const { fields: downloadFields, append: appendDownload, remove: removeDownload } = useFieldArray({
     control,
     name: "downloadLinks",
@@ -139,9 +129,8 @@ export function TipFormDialog({
       const defaultValues: TipFormValues = {
         title: initialData?.title || "",
         stockId: initialData?.stockId || "",
-        content: initialData?.content && initialData.content.length > 0 
-          ? initialData.content 
-          : [{ key: "", value: "" }],
+        category: initialData?.category || "basic",
+        content: initialData?.content?.[0]?.value || "", // Extract content value from array
         description: initialData?.description || "",
         status: initialData?.status || "Active",
         action: initialData?.action || undefined,
@@ -166,7 +155,8 @@ export function TipFormDialog({
       const tipData: CreateTipRequest = {
         title: data.title,
         stockId: data.stockId,
-        content: data.content.filter(item => item.key.trim() && item.value.trim()),
+        category: data.category,
+        content: [{ key: "Content", value: data.content }], // Convert string content to TipContent array
         description: data.description,
         status: data.status,
         action: data.action,
@@ -201,10 +191,6 @@ export function TipFormDialog({
     }
   };
 
-  const addContentField = () => {
-    appendContent({ key: "", value: "" });
-  };
-
   const addDownloadLink = () => {
     appendDownload({ name: "", url: "" });
   };
@@ -220,22 +206,42 @@ export function TipFormDialog({
             </DialogHeader>
 
             <div className="px-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {/* Subscription Type */}
+              {/* Title */}
               <FormField
                 control={control}
-                name="action"
+                name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">Subscription Type</FormLabel>
+                    <FormLabel className="text-white text-sm">Title</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter tip title"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Category */}
+              <FormField
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Category</FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
-                          <SelectValue placeholder="Drop down of BASIC / PREMIUM / SOCIAL MEDIA" />
+                          <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent className="bg-zinc-800 border-zinc-700">
-                          <SelectItem value="basic" className="text-white hover:bg-zinc-700">BASIC</SelectItem>
-                          <SelectItem value="premium" className="text-white hover:bg-zinc-700">PREMIUM</SelectItem>
-                          <SelectItem value="social_media" className="text-white hover:bg-zinc-700">SOCIAL MEDIA</SelectItem>
+                          <SelectItem value="basic" className="text-white hover:bg-zinc-700">Basic</SelectItem>
+                          <SelectItem value="premium" className="text-white hover:bg-zinc-700">Premium</SelectItem>
+                          <SelectItem value="social_media" className="text-white hover:bg-zinc-700">Social Media</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormControl>
@@ -253,10 +259,50 @@ export function TipFormDialog({
                     <FormLabel className="text-white text-sm">Symbol</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="STOCK ID"
+                        placeholder="Enter stock symbol"
                         {...field}
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Content */}
+              <FormField
+                control={control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Content</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter tip content"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[120px]"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Description */}
+              <FormField
+                control={control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white text-sm">Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter tip description"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[80px]"
                       />
                     </FormControl>
                     <FormMessage />
@@ -272,12 +318,17 @@ export function TipFormDialog({
                   <FormItem>
                     <FormLabel className="text-white text-sm">Action</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Actions like BUY / SELL / PARTIAL PROFIT"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
-                      />
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                          <SelectValue placeholder="Select action" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-800 border-zinc-700">
+                          <SelectItem value="buy" className="text-white hover:bg-zinc-700">Buy</SelectItem>
+                          <SelectItem value="sell" className="text-white hover:bg-zinc-700">Sell</SelectItem>
+                          <SelectItem value="partial sell" className="text-white hover:bg-zinc-700">Partial Sell</SelectItem>
+                          <SelectItem value="partial profit" className="text-white hover:bg-zinc-700">Partial Profit</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -325,6 +376,7 @@ export function TipFormDialog({
               />
 
               {/* Target Price and Target Percentage */}
+              {showTargetFields && (
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={control}
@@ -364,6 +416,50 @@ export function TipFormDialog({
                   )}
                 />
               </div>
+              )}
+
+              {/* Exit Fields */}
+              {showExitFields && (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="exitPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Price</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Exit Price"
+                            {...field}
+                            disabled={isSubmitting}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="exitStatusPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Percentage</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter Exit Percentage"
+                            {...field}
+                            disabled={isSubmitting}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               {/* Horizon and Status */}
               <div className="grid grid-cols-2 gap-4">
@@ -376,7 +472,7 @@ export function TipFormDialog({
                       <FormControl>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
-                            <SelectValue placeholder="Drop down of horizons" />
+                            <SelectValue placeholder="Select horizon" />
                           </SelectTrigger>
                           <SelectContent className="bg-zinc-800 border-zinc-700">
                             <SelectItem value="Short Term" className="text-white hover:bg-zinc-700">Short Term</SelectItem>
@@ -390,6 +486,7 @@ export function TipFormDialog({
                   )}
                 />
 
+                {/* Status */}
                 <FormField
                   control={control}
                   name="status"
@@ -399,12 +496,11 @@ export function TipFormDialog({
                       <FormControl>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
-                            <SelectValue placeholder="Drop down of Status" />
+                            <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent className="bg-zinc-800 border-zinc-700">
                             <SelectItem value="Active" className="text-white hover:bg-zinc-700">Active</SelectItem>
                             <SelectItem value="Closed" className="text-white hover:bg-zinc-700">Closed</SelectItem>
-                            <SelectItem value="Pending" className="text-white hover:bg-zinc-700">Pending</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>
@@ -413,26 +509,6 @@ export function TipFormDialog({
                   )}
                 />
               </div>
-
-              {/* Description */}
-              <FormField
-                control={control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white text-sm">Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="WHY BUY THIS / Summary"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[80px]"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               {/* PDF Link */}
               <FormField

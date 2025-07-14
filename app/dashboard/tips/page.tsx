@@ -154,11 +154,8 @@ export default function TipsManagementPage() {
         (tip) =>
           tip.title.toLowerCase().includes(query) ||
           tip.stockId.toLowerCase().includes(query) ||
-          tip.description.toLowerCase().includes(query) ||
-          tip.content.some(item => 
-            item.key.toLowerCase().includes(query) || 
-            item.value.toLowerCase().includes(query)
-          )
+          tip.content.some(item => item.value.toLowerCase().includes(query)) ||
+          tip.description.toLowerCase().includes(query)
       );
     }
 
@@ -361,7 +358,7 @@ export default function TipsManagementPage() {
       cell: ({ row }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
-        const stockSymbol = row.getValue("stockId") as string;
+        const stockSymbol = tip.stockId; // Change this line to use tip.stockId directly
         
         return (
           <div className="min-w-[200px] space-y-2">
@@ -400,6 +397,11 @@ export default function TipsManagementPage() {
           </div>
         );
       },
+    },
+    {
+      accessorKey: "stockId",
+      header: "Stock ID",
+      size: 100,
     },
     {
       accessorKey: "action",
@@ -576,33 +578,33 @@ export default function TipsManagementPage() {
 
         {/* Search Input */}
         <div className="px-4 mb-4">
-          <Input
-            placeholder="Search tips..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+                <Input
+                  placeholder="Search tips..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
             className="max-w-sm"
-          />
-        </div>
-
+                />
+              </div>
+              
         {/* Tips Table */}
         <div className="rounded-md border">
-          <DataTable
-            columns={columns}
-            data={filteredTips}
+                      <DataTable 
+                        columns={columns} 
+                        data={filteredTips} 
             isLoading={isLoading}
-            searchColumn="title"
-          />
-        </div>
-      </div>
+                        searchColumn="title"
+                      />
+                    </div>
+                  </div>
 
       {/* Dialogs */}
-      <TipFormDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onSubmit={handleCreateTip}
+        <TipFormDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          onSubmit={handleCreateTip}
         title="Create General Tip"
         description="Add a new general investment tip visible to all users"
-      />
+        />
 
       {selectedTip && (
         <>
@@ -615,19 +617,19 @@ export default function TipsManagementPage() {
             description="Modify an existing investment tip"
           />
 
-          <ConfirmDialog
-            open={deleteDialogOpen}
-            onOpenChange={setDeleteDialogOpen}
+        <ConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
             title="Delete Tip"
             description="Are you sure you want to delete this tip? This action cannot be undone."
-            onConfirm={handleDeleteTip}
-          />
+          onConfirm={handleDeleteTip}
+        />
 
-          <TipDetailsModal
-            open={viewModalOpen}
-            onOpenChange={setViewModalOpen}
-            tip={selectedTip}
-          />
+        <TipDetailsModal
+          open={viewModalOpen}
+          onOpenChange={setViewModalOpen}
+          tip={selectedTip}
+        />
         </>
       )}
     </div>

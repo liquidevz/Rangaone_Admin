@@ -14,6 +14,7 @@ export interface Tip {
   portfolio?: string;
   title: string;
   stockId: string;
+  category: "basic" | "premium" | "social_media";
   content: TipContent[];
   description: string;
   status: "Active" | "Closed";
@@ -39,6 +40,7 @@ export interface Tip {
 export interface CreateTipRequest {
   title: string;
   stockId: string;
+  category: "basic" | "premium" | "social_media";
   content: TipContent[];
   description: string;
   status?: "Active" | "Closed";
@@ -298,7 +300,7 @@ export const createGeneralTip = async (
   tipData: CreateTipRequest
 ): Promise<Tip> => {
   try {
-    console.log('Creating general tip with data:', tipData);
+    console.log('Creating general tip with data:', JSON.stringify(tipData, null, 2));
 
     // Validate required fields for general tips
     if (!tipData.title?.trim()) {
@@ -309,8 +311,12 @@ export const createGeneralTip = async (
       throw new Error("Stock symbol is required");
     }
     
-    if (!tipData.content || tipData.content.length === 0) {
-      throw new Error("At least one content item is required");
+    if (!tipData.category) {
+      throw new Error("Category is required");
+    }
+
+    if (!tipData.content?.length) { // Changed from tipData.content?.trim() to tipData.content?.length
+      throw new Error("Content is required");
     }
     
     if (!tipData.description?.trim()) {
@@ -322,7 +328,6 @@ export const createGeneralTip = async (
       ...tipData,
       status: tipData.status || "Active",
       horizon: tipData.horizon || "Long Term",
-      content: tipData.content.filter(item => item.key?.trim() && item.value?.trim()),
       downloadLinks: tipData.downloadLinks?.filter(link => link.name?.trim() && link.url?.trim()) || [],
     };
 
@@ -340,6 +345,7 @@ export const createGeneralTip = async (
       }
 
       const error = await response.json();
+      console.error('API Error Response:', error);
       throw new Error(error.message || "Failed to create general tip");
     }
 
@@ -349,8 +355,7 @@ export const createGeneralTip = async (
     return {
       ...tip,
       id: tip._id || tip.id,
-      content: Array.isArray(tip.content) ? tip.content : 
-               typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
+      content: tip.content,
       downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
     };
   } catch (error) {
@@ -368,64 +373,23 @@ export const validateTipData = (data: CreateTipRequest): string[] => {
   }
 
   if (!data.stockId?.trim()) {
-    errors.push("Stock symbol is required");
+    errors.push("Stock ID is required");
   }
 
-  if (!data.content || data.content.length === 0) {
-    errors.push("At least one content item is required");
-  } else {
-    data.content.forEach((item, index) => {
-      if (!item.key?.trim()) {
-        errors.push(`Content item ${index + 1}: Key is required`);
-      }
-      if (!item.value?.trim()) {
-        errors.push(`Content item ${index + 1}: Value is required`);
-      }
-    });
+  if (!data.content?.length || !data.content[0]?.value?.trim()) {
+    errors.push("Content is required");
   }
 
   if (!data.description?.trim()) {
     errors.push("Description is required");
   }
 
-  // Validate URLs if provided
-  if (data.tipUrl && data.tipUrl.trim()) {
-    try {
-      new URL(data.tipUrl);
-    } catch {
-      errors.push("Tip URL must be a valid URL");
-    }
+  if (data.status && !["Active", "Closed"].includes(data.status)) {
+    errors.push("Invalid status value");
   }
 
-  // Validate download links if provided
-  if (data.downloadLinks && data.downloadLinks.length > 0) {
-    data.downloadLinks.forEach((link, index) => {
-      if (!link.name?.trim()) {
-        errors.push(`Download link ${index + 1}: Name is required`);
-      }
-      if (!link.url?.trim()) {
-        errors.push(`Download link ${index + 1}: URL is required`);
-      } else {
-        try {
-          new URL(link.url);
-        } catch {
-          errors.push(`Download link ${index + 1}: URL must be valid`);
-        }
-      }
-    });
-  }
-
-  // Validate action-specific fields
-  if (data.action === "buy" || data.action === "sell") {
-    if (!data.targetPrice && !data.targetPercentage) {
-      errors.push("Target price or target percentage is recommended for buy/sell actions");
-    }
-  }
-
-  if (data.action === "sell" || data.action === "partial sell" || data.action === "partial profit") {
-    if (!data.exitPrice && !data.exitStatus) {
-      errors.push("Exit price or exit status is recommended for sell actions");
-    }
+  if (data.category && !["basic", "premium", "social_media"].includes(data.category)) {
+    errors.push("Invalid category value");
   }
 
   return errors;
@@ -466,7 +430,7 @@ export const filterTips = (
         tip.title,
         tip.stockId,
         tip.description,
-        ...tip.content.map(c => `${c.key} ${c.value}`)
+        tip.content // Assuming content is now a string
       ].join(" ").toLowerCase();
       
       if (!searchFields.includes(searchTerm)) {

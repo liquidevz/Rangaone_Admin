@@ -491,11 +491,11 @@ export default function BundlesPage() {
           {/* Mobile: Add horizontal scroll wrapper for table */}
           <div className="w-full overflow-x-auto">
             <div className="min-w-[700px]">
-              <DataTable
-                columns={columns}
-                data={bundles}
-                isLoading={isLoading}
-              />
+          <DataTable
+            columns={columns}
+            data={bundles}
+            isLoading={isLoading}
+          />
             </div>
           </div>
         </CardContent>

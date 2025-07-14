@@ -348,12 +348,12 @@ export default function UsersPage() {
         {/* Mobile: Add horizontal scroll wrapper for table */}
         <div className="w-full overflow-x-auto">
           <div className="min-w-[600px]">
-            <DataTable
-              columns={columns}
-              data={users}
-              searchColumn="email"
-              isLoading={loading}
-            />
+        <DataTable
+          columns={columns}
+          data={users}
+          searchColumn="email"
+          isLoading={loading}
+        />
           </div>
         </div>
       </div>

@@ -996,11 +996,11 @@ export default function StockSymbolsPage() {
           {/* Mobile: Add horizontal scroll wrapper for table */}
           <div className="w-full overflow-x-auto">
             <div className="min-w-[800px]">
-              <DataTable
-                columns={columns}
-                data={displayData}
-                isLoading={isLoading}
-              />
+          <DataTable
+            columns={columns}
+            data={displayData}
+            isLoading={isLoading}
+          />
             </div>
           </div>
         </CardContent>

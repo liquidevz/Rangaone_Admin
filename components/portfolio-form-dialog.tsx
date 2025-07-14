@@ -1114,18 +1114,18 @@ export function PortfolioFormDialog({
                             />
                           </div>
                         ) : (
-                          <Textarea
-                            id={`desc-${index}`}
-                            value={desc.value}
-                            onChange={(e) => {
-                              const updated = [...descriptions];
-                              updated[index].value = e.target.value;
-                              setDescriptions(updated);
-                            }}
-                            placeholder={`Enter ${desc.key} description`}
-                            className="min-h-[80px]"
-                            disabled={isSubmitting}
-                          />
+                        <Textarea
+                          id={`desc-${index}`}
+                          value={desc.value}
+                          onChange={(e) => {
+                            const updated = [...descriptions];
+                            updated[index].value = e.target.value;
+                            setDescriptions(updated);
+                          }}
+                          placeholder={`Enter ${desc.key} description`}
+                          className="min-h-[80px]"
+                          disabled={isSubmitting}
+                        />
                         )}
                       </div>
                     ))}
@@ -1178,18 +1178,18 @@ export function PortfolioFormDialog({
               <TabsContent value="financial" className="space-y-4 py-4">
                 <div className="grid gap-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="min-investment">Minimum Investment (₹) *</Label>
-                      <Input
-                        id="min-investment"
-                        type="number"
-                        min="100"
-                        value={minInvestment}
-                        onChange={(e) => setMinInvestment(e.target.value)}
-                        placeholder="Enter minimum investment amount"
-                        disabled={isSubmitting}
-                        required
-                      />
+                  <div className="grid gap-2">
+                    <Label htmlFor="min-investment">Minimum Investment (₹) *</Label>
+                    <Input
+                      id="min-investment"
+                      type="number"
+                      min="100"
+                      value={minInvestment}
+                      onChange={(e) => setMinInvestment(e.target.value)}
+                      placeholder="Enter minimum investment amount"
+                      disabled={isSubmitting}
+                      required
+                    />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="monthly-contribution">Monthly Contribution</Label>
@@ -1211,34 +1211,34 @@ export function PortfolioFormDialog({
                     {subscriptionFees.map((fee, index) => (
                       <div key={index} className="grid grid-cols-1 gap-4">
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
-                          <div>
-                            <Label className="text-sm">Type</Label>
-                            <Select
-                              value={fee.type}
-                              onValueChange={(value) => updateSubscriptionFee(index, "type", value)}
-                              disabled={isSubmitting}
-                            >
-                              <SelectTrigger>
+                        <div>
+                          <Label className="text-sm">Type</Label>
+                          <Select
+                            value={fee.type}
+                            onValueChange={(value) => updateSubscriptionFee(index, "type", value)}
+                            disabled={isSubmitting}
+                          >
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select Type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="monthly">Monthly</SelectItem>
-                                <SelectItem value="quarterly">Quarterly</SelectItem>
-                                <SelectItem value="yearly">Yearly</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                              <SelectItem value="quarterly">Quarterly</SelectItem>
+                              <SelectItem value="yearly">Yearly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
                             <Label className="text-sm">Actual Price (₹)</Label>
-                            <Input
-                              type="number"
-                              min="0"
+                          <Input
+                            type="number"
+                            min="0"
                               value={fee.actualPrice}
                               onChange={(e) => updateSubscriptionFee(index, "actualPrice", e.target.value)}
                               placeholder="Enter Price"
-                              disabled={isSubmitting}
-                            />
-                          </div>
+                            disabled={isSubmitting}
+                          />
+                        </div>
                           <div>
                             <Label className="text-sm">Discount Price (₹)</Label>
                             <Input
@@ -1260,15 +1260,15 @@ export function PortfolioFormDialog({
                               className="bg-gray-100"
                             />
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeSubscriptionFee(index)}
-                            disabled={isSubmitting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeSubscriptionFee(index)}
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                         </div>
                       </div>
                     ))}

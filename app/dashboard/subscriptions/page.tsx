@@ -202,20 +202,20 @@ export default function SubscriptionsPage() {
       ),
     },
     {
-      accessorKey: "userId",
-      header: "User ID",
+      accessorKey: "userName",
+      header: "User Name",
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original.user?._id}
+        <div className="font-medium truncate max-w-[150px]">
+          {row.original.user?.username || row.original.user?.email || "Unknown User"}
         </div>
       ),
     },
     {
-      accessorKey: "portfolioId",
-      header: "Portfolio ID",
+      accessorKey: "portfolioName",
+      header: "Portfolio Name",
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original.portfolio?._id}
+        <div className="font-medium truncate max-w-[200px]" title={row.original.portfolio?.name}>
+          {row.original.portfolio?.name || "Unknown Portfolio"}
         </div>
       ),
     },
@@ -265,11 +265,11 @@ export default function SubscriptionsPage() {
 
   const paymentHistoryColumns: ColumnDef<PaymentHistory>[] = [
     {
-      accessorKey: "id",
+      accessorKey: "_id",
       header: "ID",
       cell: ({ row }) => (
         <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original.id || (row.original as any)._id}
+          {row.original._id}
         </div>
       ),
     },
