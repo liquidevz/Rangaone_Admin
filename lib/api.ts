@@ -895,8 +895,8 @@ export interface Subscription {
 
 export interface PaymentHistory {
   _id: string;
-  user: string;
-  portfolio: string;
+  user: User | string;
+  portfolio: Portfolio | string;
   subscription: string;
   amount: number;
   currency: string;
@@ -1092,6 +1092,72 @@ export const updateSubscriptionStatus = async (
     return await response.json();
   } catch (error) {
     console.error(`Error updating subscription status with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const cancelSubscription = async (subscriptionId: string): Promise<{ message: string }> => {
+  try {
+    if (!subscriptionId || subscriptionId === "undefined") {
+      throw new Error("Invalid subscription ID");
+    }
+
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/api/subscriptions/${subscriptionId}/cancel`,
+      {
+        method: "POST",
+      }
+    );
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error("Server returned an HTML response instead of JSON");
+      }
+
+      const error = await response.json();
+      
+      // Handle specific error cases from API documentation
+      if (response.status === 400) {
+        throw new Error(error.message || "Cannot cancel during commitment period");
+      }
+      if (response.status === 404) {
+        throw new Error(error.message || "Subscription not found");
+      }
+      
+      throw new Error(error.message || "Failed to cancel subscription");
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error(`Error canceling subscription with id ${subscriptionId}:`, error);
+    throw error;
+  }
+};
+
+export const fetchActiveSubscriptions = async (): Promise<Subscription[]> => {
+  try {
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/api/admin/subscriptions/active`
+    );
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error(
+          "Server returned HTML instead of JSON for active subscriptions"
+        );
+      }
+
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch active subscriptions");
+    }
+
+    const data = await response.json();
+    return data?.subscriptions || [];
+  } catch (error) {
+    console.error("Error fetching active subscriptions:", error);
     throw error;
   }
 };

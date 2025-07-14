@@ -3,6 +3,7 @@
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PaymentVerificationDialog } from "@/components/payment-verification-dialog";
+import { PaymentDetailsDialog } from "@/components/payment-details-dialog";
 import { SubscriptionFormDialog } from "@/components/subscription-form-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import {
   fetchPaymentHistory,
   fetchSubscriptions,
   updateSubscriptionStatus,
+  cancelSubscription,
   type PaymentHistory,
   type Subscription,
 } from "@/lib/api";
@@ -31,7 +33,9 @@ import {
   PlusCircle,
   RefreshCw,
   XCircle,
+  Users,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 export default function SubscriptionsPage() {
@@ -44,6 +48,8 @@ export default function SubscriptionsPage() {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] =
     useState<Subscription | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentHistory | null>(null);
+  const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false);
   const [orderData, setOrderData] = useState<{
     orderId: string;
     amount: number;
@@ -139,11 +145,19 @@ export default function SubscriptionsPage() {
     if (!selectedSubscription || !newStatus) return;
 
     try {
+      if (newStatus === "cancelled") {
+        const result = await cancelSubscription(selectedSubscription.id);
+        toast({
+          title: "Subscription Cancelled",
+          description: result.message || "The subscription has been successfully cancelled",
+        });
+      } else {
       await updateSubscriptionStatus(selectedSubscription.id, newStatus);
       toast({
         title: "Status Updated",
         description: `Subscription status has been updated to ${newStatus}`,
       });
+      }
       setStatusDialogOpen(false);
       loadData();
     } catch (error) {
@@ -155,6 +169,11 @@ export default function SubscriptionsPage() {
         variant: "destructive",
       });
     }
+  };
+
+  const handlePaymentClick = (payment: PaymentHistory) => {
+    setSelectedPayment(payment);
+    setPaymentDetailsOpen(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -274,29 +293,50 @@ export default function SubscriptionsPage() {
       ),
     },
     {
-      accessorKey: "userId",
-      header: "User ID",
-      cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original.user}
+      accessorKey: "userName",
+      header: "User Name",
+      cell: ({ row }) => {
+        const user = row.original.user;
+        const displayName = typeof user === 'object' && user 
+          ? (user.username || user.email || "Unknown User")
+          : "Unknown User";
+        return (
+          <div className="font-medium truncate max-w-[150px]" title={displayName}>
+            {displayName}
         </div>
-      ),
+        );
+      },
     },
     {
-      accessorKey: "portfolioId",
-      header: "Portfolio ID",
-      cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original.portfolio}
+      accessorKey: "portfolioName",
+      header: "Portfolio Name",
+      cell: ({ row }) => {
+        const portfolio = row.original.portfolio;
+        const displayName = typeof portfolio === 'object' && portfolio 
+          ? portfolio.name 
+          : "Unknown Portfolio";
+        return (
+          <div className="font-medium truncate max-w-[200px]" title={displayName}>
+            {displayName}
         </div>
-      ),
+        );
+      },
     },
     {
       accessorKey: "amount",
       header: "Amount",
       cell: ({ row }) => {
         const amount = row.getValue("amount") as number;
-        return <div>{amount}</div>;
+        const currency = row.original.currency;
+        const formattedAmount = new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: currency || 'INR',
+        }).format(amount);
+        return (
+          <div className="font-medium text-green-600">
+            {formattedAmount}
+          </div>
+        );
       },
     },
     {
@@ -324,9 +364,13 @@ export default function SubscriptionsPage() {
       accessorKey: "orderId",
       header: "Order ID",
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[100px]">
+        <button
+          onClick={() => handlePaymentClick(row.original)}
+          className="font-mono text-xs truncate max-w-[100px] text-blue-600 hover:text-blue-800 hover:underline text-left"
+          title="Click to view payment details"
+        >
           {row.getValue("orderId")}
-        </div>
+        </button>
       ),
     },
   ];
@@ -345,6 +389,12 @@ export default function SubscriptionsPage() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
+          <Link href="/dashboard/subscriptions/active">
+            <Button variant="outline" className="w-full sm:w-auto">
+              <Users className="mr-2 h-4 w-4" />
+              Active Subscriptions
+            </Button>
+          </Link>
           <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Order
@@ -489,10 +539,19 @@ export default function SubscriptionsPage() {
           newStatus === "active" ? "activate" : "cancel"
         } this subscription? This will ${
           newStatus === "active" ? "enable" : "disable"
-        } access to the portfolio.`}
+        } access to the portfolio.${
+          newStatus === "cancelled" ? " Note: Yearly subscriptions may have a commitment period during which cancellation is not allowed." : ""
+        }`}
         confirmText={
           newStatus === "active" ? "Activate" : "Cancel Subscription"
         }
+      />
+
+      {/* Payment Details Dialog */}
+      <PaymentDetailsDialog
+        open={paymentDetailsOpen}
+        onOpenChange={setPaymentDetailsOpen}
+        payment={selectedPayment}
       />
     </div>
   );
