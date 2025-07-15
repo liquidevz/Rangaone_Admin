@@ -362,15 +362,15 @@ export function TipFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-zinc-900 border-zinc-800 max-h-[90vh] overflow-hidden" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-[600px] bg-zinc-900 border-zinc-800 max-h-[90vh] flex flex-col" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         <Form {...form}>
-          <form onSubmit={handleSubmit(onValidSubmit)} className="space-y-0 flex flex-col h-full">
+          <form onSubmit={handleSubmit(onValidSubmit)} className="flex flex-col h-full max-h-[calc(90vh-2rem)]">
             <DialogHeader className="p-6 pb-4 flex-shrink-0">
               <DialogTitle className="text-xl font-semibold text-white">Create Rangaone Wealth Tips</DialogTitle>
               <DialogDescription className="text-zinc-400 text-sm">Add Tip Details</DialogDescription>
             </DialogHeader>
 
-            <div className="px-6 space-y-4 overflow-y-auto flex-1">
+            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Stock Selection */}
               {selectedStockDetails && (
                 <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">

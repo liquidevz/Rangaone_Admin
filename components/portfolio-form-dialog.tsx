@@ -493,6 +493,22 @@ export function PortfolioFormDialog({
       return;
     }
 
+    // Validate subscription fees have required fields
+    const invalidFees = subscriptionFees.filter(fee => 
+      !fee.type || !fee.type.trim() || 
+      typeof fee.price !== 'number' || 
+      fee.price <= 0
+    );
+    
+    if (invalidFees.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: "All subscription fees must have a valid type and price greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate total weight doesn't exceed 100%
     if (totalWeightUsed > 100) {
       toast({
@@ -524,6 +540,14 @@ export function PortfolioFormDialog({
         allDescriptions.push({ key: "methodology PDF link", value: methodologyPdfLink });
       }
 
+      // Filter out empty descriptions
+      const filteredDescriptions = allDescriptions.filter(d => d.value.trim() !== "");
+      
+      // Ensure at least one description exists for portfolio creation
+      if (filteredDescriptions.length === 0) {
+        filteredDescriptions.push({ key: "description", value: `Investment portfolio: ${name}` });
+      }
+
       // Convert ExtendedHolding back to PortfolioHolding for submission
       const portfolioHoldings: PortfolioHolding[] = holdings.map(holding => ({
         symbol: holding.symbol,
@@ -538,7 +562,7 @@ export function PortfolioFormDialog({
 
       const portfolioData: CreatePortfolioRequest = {
         name,
-        description: allDescriptions.filter(d => d.value.trim() !== ""),
+        description: filteredDescriptions,
         subscriptionFee: subscriptionFees,
         minInvestment: Number(minInvestment),
         monthlyContribution: monthlyContribution ? Number(monthlyContribution) : undefined,
@@ -563,6 +587,9 @@ export function PortfolioFormDialog({
 
       console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
       console.log("Portfolio Name:", portfolioData.name);
+      console.log("Description:", portfolioData.description);
+      console.log("Subscription Fees:", portfolioData.subscriptionFee);
+      console.log("Min Investment:", portfolioData.minInvestment);
       console.log("Holdings Count:", portfolioData.holdings?.length || 0);
       console.log("Holdings Data:", portfolioData.holdings);
       console.log("Full Portfolio Data:", JSON.stringify(portfolioData, null, 2));

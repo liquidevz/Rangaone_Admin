@@ -509,14 +509,33 @@ export const createPortfolio = async (
       }
 
       try {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || errorData.error || "Failed to create portfolio"
-        );
-      } catch (jsonError) {
-        throw new Error(
-          `Failed to create portfolio: Server returned ${response.status}`
-        );
+        const errorText = await response.text();
+        console.error("Raw error response:", errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error("Parsed error data:", errorData);
+          
+          // Extract more detailed error information
+          let errorMessage = "Failed to create portfolio";
+          
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.errors && Array.isArray(errorData.errors)) {
+            errorMessage = errorData.errors.map((e: any) => e.message || e).join(", ");
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+          
+          throw new Error(errorMessage);
+        } catch (parseError) {
+          // If JSON parsing fails, use the raw text
+          throw new Error(errorText || `Failed to create portfolio: Server returned ${response.status}`);
+        }
+      } catch (readError) {
+        throw new Error(`Failed to create portfolio: Server returned ${response.status}`);
       }
     }
 
