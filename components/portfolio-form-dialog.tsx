@@ -1285,8 +1285,8 @@ export function PortfolioFormDialog({
                               placeholder="Automatic Reflecting"
                               disabled={true}
                               className="bg-gray-100"
-                            />
-                          </div>
+                          />
+                        </div>
                         <Button
                           type="button"
                           variant="ghost"

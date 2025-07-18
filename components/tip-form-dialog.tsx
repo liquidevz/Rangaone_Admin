@@ -41,23 +41,99 @@ import { RichTextEditor } from "@/components/rich-text-editor";
 
 // Validation schema for the general tip form
 const tipSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  title: z.string()
+    .min(1, "Title is required")
+    .min(5, "Title must be at least 5 characters")
+    .max(200, "Title must be less than 200 characters"),
   stockId: z.string().min(1, "Stock symbol is required"),
   stockSymbol: z.string().optional(),
-  category: z.enum(["basic", "premium", "social_media"]),
-  content: z.string().min(1, "Content is required"),
-  description: z.string().min(1, "Description is required"),
-  status: z.enum(["Active", "Closed"]),
-  action: z.string().optional(),
-  buyRange: z.string().optional(),
-  targetPrice: z.string().optional(),
+  category: z.enum(["basic", "premium", "social_media"], {
+    required_error: "Category is required",
+  }),
+  content: z.string()
+    .min(1, "Content is required")
+    .min(20, "Content must be at least 20 characters")
+    .max(5000, "Content must be less than 5000 characters"),
+  description: z.string()
+    .min(1, "Description is required")
+    .min(10, "Description must be at least 10 characters")
+    .max(1000, "Description must be less than 1000 characters"),
+  status: z.enum(["Active", "Closed"], {
+    required_error: "Status is required",
+  }),
+  action: z.string()
+    .min(1, "Action is required")
+    .refine((val) => ["buy", "sell", "hold", "partial sell", "partial profit", "add more"].includes(val), {
+      message: "Please select a valid action",
+    }),
+  buyRange: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      const rangePattern = /^\d+(\.\d+)?\s*-\s*\d+(\.\d+)?$/;
+      return rangePattern.test(val);
+    }, {
+      message: "Buy range must be in format: 100-200 or 100.50-200.75",
+    }),
+  targetPrice: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      const price = parseFloat(val);
+      return !isNaN(price) && price > 0;
+    }, {
+      message: "Target price must be a positive number",
+    }),
   targetPercentage: z.string().optional(),
-  addMoreAt: z.string().optional(),
-  exitPrice: z.string().optional(),
-  exitStatus: z.string().optional(),
+  addMoreAt: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      const price = parseFloat(val);
+      return !isNaN(price) && price > 0;
+    }, {
+      message: "Add more at price must be a positive number",
+    }),
+  exitPrice: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      const price = parseFloat(val);
+      return !isNaN(price) && price > 0;
+    }, {
+      message: "Exit price must be a positive number",
+    }),
+  exitStatus: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      return val.length >= 3 && val.length <= 100;
+    }, {
+      message: "Exit status must be between 3-100 characters",
+    }),
   exitStatusPercentage: z.string().optional(),
-  horizon: z.string().optional(),
-  tipUrl: z.string().optional(),
+  horizon: z.string()
+    .min(1, "Horizon is required")
+    .refine((val) => ["Short Term", "Medium Term", "Long Term"].includes(val), {
+      message: "Please select a valid time horizon",
+    }),
+  tipUrl: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      try {
+        new URL(val);
+        return true;
+      } catch {
+        return false;
+      }
+    }, {
+      message: "Please enter a valid URL",
+    }),
+  analystConfidence: z.number()
+    .min(1, "Confidence score is required")
+    .max(10, "Confidence score must be between 1-10")
+    .int("Confidence score must be a whole number"),
 });
 
 type TipFormValues = z.infer<typeof tipSchema>;
@@ -124,8 +200,9 @@ export function TipFormDialog({
       exitPrice: "",
       exitStatus: "",
       exitStatusPercentage: "",
-      horizon: "",
+      horizon: "Long Term",
       tipUrl: "",
+      analystConfidence: 5,
     },
   });
 
@@ -190,8 +267,9 @@ export function TipFormDialog({
           exitPrice: initialData.exitPrice || "",
           exitStatus: initialData.exitStatus || "",
           exitStatusPercentage: initialData.exitStatusPercentage || "",
-          horizon: initialData.horizon || "",
+          horizon: initialData.horizon || "Long Term",
           tipUrl: initialData.tipUrl || "",
+          analystConfidence: (initialData as any).analystConfidence || 5,
         });
       } else {
         reset({
@@ -210,8 +288,9 @@ export function TipFormDialog({
           exitPrice: "",
           exitStatus: "",
           exitStatusPercentage: "",
-          horizon: "",
+          horizon: "Long Term",
           tipUrl: "",
+          analystConfidence: 5,
         });
         setSelectedStockDetails(null);
         setSearchTerm("");
@@ -265,6 +344,7 @@ export function TipFormDialog({
         exitStatus: data.exitStatus,
         exitStatusPercentage: data.exitStatusPercentage,
         horizon: data.horizon || "Long Term",
+        analystConfidence: data.analystConfidence,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
       };
 
@@ -407,7 +487,9 @@ export function TipFormDialog({
           <form onSubmit={handleSubmit(onValidSubmit)} className="flex flex-col h-full">
             <DialogHeader className="p-6 pb-4 flex-shrink-0">
               <DialogTitle className="text-xl font-semibold text-white">Create Rangaone Wealth Tips</DialogTitle>
-              <DialogDescription className="text-zinc-400 text-sm">Add Tip Details</DialogDescription>
+              <DialogDescription className="text-zinc-400 text-sm">
+                Add comprehensive tip details with validation. Fields marked with * are required.
+              </DialogDescription>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto px-6 space-y-6">
@@ -505,10 +587,10 @@ export function TipFormDialog({
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">Title</FormLabel>
+                    <FormLabel className="text-white text-sm">Title *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Enter tip title"
+                        placeholder="Enter tip title (min 5 chars)"
                         {...field}
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
@@ -525,7 +607,7 @@ export function TipFormDialog({
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">Category</FormLabel>
+                    <FormLabel className="text-white text-sm">Category *</FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
@@ -549,12 +631,12 @@ export function TipFormDialog({
                 name="content"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">Content</FormLabel>
+                    <FormLabel className="text-white text-sm">Content *</FormLabel>
                     <FormControl>
                       <RichTextEditor
                         value={field.value}
                         onChange={field.onChange}
-                        placeholder="Enter detailed tip content with formatting..."
+                        placeholder="Enter detailed tip content with formatting (min 20 chars)..."
                         height={200}
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700"
@@ -571,10 +653,10 @@ export function TipFormDialog({
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">Description</FormLabel>
+                    <FormLabel className="text-white text-sm">Description *</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Brief summary/description"
+                        placeholder="Brief summary/description (min 10 chars)"
                         {...field}
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[80px]"
@@ -591,7 +673,7 @@ export function TipFormDialog({
                 name="action"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">Action</FormLabel>
+                    <FormLabel className="text-white text-sm">Action *</FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} value={field.value || ""}>
                         <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
@@ -621,12 +703,15 @@ export function TipFormDialog({
                     <FormLabel className="text-white text-sm">Buy Range (₹)</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="1000 - 2000"
+                        placeholder="Format: 1000-2000 or 1000.50-2000.75"
                         {...field}
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                       />
                     </FormControl>
+                    <FormDescription className="text-zinc-500 text-xs">
+                      Use format: min-max (e.g., 100-150)
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -641,15 +726,21 @@ export function TipFormDialog({
                       name="targetPrice"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-white text-sm">Target Price</FormLabel>
+                          <FormLabel className="text-white text-sm">Target Price (₹)</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Target Price"
+                              placeholder="e.g., 150.75"
+                              type="number"
+                              step="0.01"
+                              min="0"
                               {...field}
                               disabled={isSubmitting}
                               className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                             />
                           </FormControl>
+                          <FormDescription className="text-zinc-500 text-xs">
+                            Enter positive number (auto-calculates percentage)
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -675,12 +766,15 @@ export function TipFormDialog({
                           </FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Enter Target Percentage"
+                              placeholder="e.g., 25% or 25"
                               {...field}
                               disabled={isSubmitting || isAutoCalcTarget}
                               className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                             />
                           </FormControl>
+                          <FormDescription className="text-zinc-500 text-xs">
+                            {isAutoCalcTarget ? "Auto-calculated from target price" : "Enter percentage manually"}
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -693,15 +787,21 @@ export function TipFormDialog({
                       name="addMoreAt"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-white text-sm">Add More At</FormLabel>
+                          <FormLabel className="text-white text-sm">Add More At (₹)</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Enter Add More At Price"
+                              placeholder="e.g., 95.50"
+                              type="number"
+                              step="0.01"
+                              min="0"
                               {...field}
                               disabled={isSubmitting}
                               className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                             />
                           </FormControl>
+                          <FormDescription className="text-zinc-500 text-xs">
+                            Price level to add more shares
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -718,15 +818,21 @@ export function TipFormDialog({
                     name="exitPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-white text-sm">Exit Price</FormLabel>
+                        <FormLabel className="text-white text-sm">Exit Price (₹)</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Exit Price"
+                            placeholder="e.g., 200.00"
+                            type="number"
+                            step="0.01"
+                            min="0"
                             {...field}
                             disabled={isSubmitting}
                             className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                           />
                         </FormControl>
+                        <FormDescription className="text-zinc-500 text-xs">
+                          Target exit price (auto-calculates percentage)
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -752,12 +858,15 @@ export function TipFormDialog({
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Enter Exit Percentage"
+                            placeholder="e.g., 100% or 100"
                             {...field}
                             disabled={isSubmitting || isAutoCalcExit}
                             className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                           />
                         </FormControl>
+                        <FormDescription className="text-zinc-500 text-xs">
+                          {isAutoCalcExit ? "Auto-calculated from exit price" : "Enter percentage manually"}
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -784,14 +893,14 @@ export function TipFormDialog({
                 </div>
               )}
 
-              {/* Horizon and Status */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Horizon, Status and Analyst Confidence */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={control}
                   name="horizon"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white text-sm">Horizon</FormLabel>
+                      <FormLabel className="text-white text-sm">Time Horizon *</FormLabel>
                       <FormControl>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
@@ -815,7 +924,7 @@ export function TipFormDialog({
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white text-sm">Status</FormLabel>
+                      <FormLabel className="text-white text-sm">Status *</FormLabel>
                       <FormControl>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
@@ -831,6 +940,39 @@ export function TipFormDialog({
                     </FormItem>
                   )}
                 />
+
+                {/* Analyst Confidence Score */}
+                <FormField
+                  control={control}
+                  name="analystConfidence"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm">Confidence Score *</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                          <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                            <SelectValue placeholder="Rate 1-10" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+                              <SelectItem 
+                                key={score} 
+                                value={score.toString()} 
+                                className="text-white hover:bg-zinc-700"
+                              >
+                                {score} {score <= 3 ? "⭐ Low" : score <= 6 ? "⭐⭐ Medium" : score <= 8 ? "⭐⭐⭐ High" : "⭐⭐⭐⭐ Very High"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormDescription className="text-zinc-500 text-xs">
+                        Rate your confidence in this tip (1=Low, 10=Very High)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               {/* PDF Link */}
@@ -839,15 +981,18 @@ export function TipFormDialog({
                 name="tipUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">PDF Link</FormLabel>
+                    <FormLabel className="text-white text-sm">PDF Link (Optional)</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Paste Link here"
+                        placeholder="https://example.com/analysis.pdf"
                         {...field}
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                       />
                     </FormControl>
+                    <FormDescription className="text-zinc-500 text-xs">
+                      Enter a valid URL for additional analysis or report
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -28,6 +28,7 @@ export interface Tip {
   exitStatus?: string;
   exitStatusPercentage?: string;
   horizon?: string;
+  analystConfidence?: number;
   downloadLinks?: Array<{
     _id?: string;
     name: string;
@@ -54,6 +55,7 @@ export interface CreateTipRequest {
   exitStatus?: string;
   exitStatusPercentage?: string;
   horizon?: string;
+  analystConfidence?: number;
   downloadLinks?: Array<{
     name: string;
     url: string;
