@@ -31,12 +31,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2, Search, X, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, X, Loader2, Calculator } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import type { CreateTipRequest, Tip } from "@/lib/api-tips";
 import { searchStockSymbols, type StockSymbol } from "@/lib/api-stock-symbols";
 import { Badge } from "@/components/ui/badge";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 // Validation schema for the general tip form
 const tipSchema = z.object({
@@ -51,7 +52,9 @@ const tipSchema = z.object({
   buyRange: z.string().optional(),
   targetPrice: z.string().optional(),
   targetPercentage: z.string().optional(),
+  addMoreAt: z.string().optional(),
   exitPrice: z.string().optional(),
+  exitStatus: z.string().optional(),
   exitStatusPercentage: z.string().optional(),
   horizon: z.string().optional(),
   tipUrl: z.string().optional(),
@@ -95,6 +98,10 @@ export function TipFormDialog({
   const [selectedStockDetails, setSelectedStockDetails] = React.useState<StockSymbol | null>(null);
   const [focusedIndex, setFocusedIndex] = React.useState(-1);
   
+  // Auto-calculation states
+  const [isAutoCalcTarget, setIsAutoCalcTarget] = React.useState(true);
+  const [isAutoCalcExit, setIsAutoCalcExit] = React.useState(true);
+  
   // Refs for search functionality
   const inputRef = React.useRef<HTMLInputElement>(null);
   const resultsRef = React.useRef<HTMLDivElement>(null);
@@ -113,7 +120,9 @@ export function TipFormDialog({
       buyRange: "",
       targetPrice: "",
       targetPercentage: "",
+      addMoreAt: "",
       exitPrice: "",
+      exitStatus: "",
       exitStatusPercentage: "",
       horizon: "",
       tipUrl: "",
@@ -122,10 +131,39 @@ export function TipFormDialog({
 
   const { handleSubmit, control, reset, watch, setValue, formState: { isSubmitting } } = form;
   const watchedAction = watch("action");
+  const watchedTargetPrice = watch("targetPrice");
+  const watchedExitPrice = watch("exitPrice");
 
   // Conditional field display logic
   const showTargetFields = watchedAction === "buy" || watchedAction === "sell";
   const showExitFields = watchedAction === "partial sell" || watchedAction === "partial profit";
+  const showAddMoreField = watchedAction === "buy" || watchedAction === "hold" || watchedAction === "add more";
+
+  // Auto-calculate target percentage
+  React.useEffect(() => {
+    if (isAutoCalcTarget && selectedStockDetails && watchedTargetPrice) {
+      const currentPrice = parseFloat(selectedStockDetails.currentPrice);
+      const targetPrice = parseFloat(watchedTargetPrice);
+      
+      if (currentPrice > 0 && targetPrice > 0) {
+        const percentage = ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
+        setValue("targetPercentage", `${percentage}%`);
+      }
+    }
+  }, [watchedTargetPrice, selectedStockDetails, isAutoCalcTarget, setValue]);
+
+  // Auto-calculate exit percentage
+  React.useEffect(() => {
+    if (isAutoCalcExit && selectedStockDetails && watchedExitPrice) {
+      const currentPrice = parseFloat(selectedStockDetails.currentPrice);
+      const exitPrice = parseFloat(watchedExitPrice);
+      
+      if (currentPrice > 0 && exitPrice > 0) {
+        const percentage = ((exitPrice - currentPrice) / currentPrice * 100).toFixed(2);
+        setValue("exitStatusPercentage", `${percentage}%`);
+      }
+    }
+  }, [watchedExitPrice, selectedStockDetails, isAutoCalcExit, setValue]);
 
   // Reset form when dialog opens/closes or initial data changes
   React.useEffect(() => {
@@ -148,7 +186,9 @@ export function TipFormDialog({
           buyRange: initialData.buyRange || "",
           targetPrice: initialData.targetPrice || "",
           targetPercentage: initialData.targetPercentage || "",
+          addMoreAt: initialData.addMoreAt || "",
           exitPrice: initialData.exitPrice || "",
+          exitStatus: initialData.exitStatus || "",
           exitStatusPercentage: initialData.exitStatusPercentage || "",
           horizon: initialData.horizon || "",
           tipUrl: initialData.tipUrl || "",
@@ -166,7 +206,9 @@ export function TipFormDialog({
           buyRange: "",
           targetPrice: "",
           targetPercentage: "",
+          addMoreAt: "",
           exitPrice: "",
+          exitStatus: "",
           exitStatusPercentage: "",
           horizon: "",
           tipUrl: "",
@@ -194,15 +236,7 @@ export function TipFormDialog({
         { key: "main", value: data.content }
       ];
 
-      // Add optional fields to content array
-      if (data.action) contentArray.push({ key: "action", value: data.action });
-      if (data.buyRange) contentArray.push({ key: "buyRange", value: data.buyRange });
-      if (data.targetPrice) contentArray.push({ key: "targetPrice", value: data.targetPrice });
-      if (data.targetPercentage) contentArray.push({ key: "targetPercentage", value: data.targetPercentage });
-      if (data.exitPrice) contentArray.push({ key: "exitPrice", value: data.exitPrice });
-      if (data.exitStatusPercentage) contentArray.push({ key: "exitStatusPercentage", value: data.exitStatusPercentage });
-
-      // Create downloadLinks array
+      // Create downloadLinks array (no duplicates)
       const downloadLinks: Array<{ name: string; url: string }> = [];
       if (data.tipUrl) {
         downloadLinks.push({ name: "Analysis Report", url: data.tipUrl });
@@ -213,6 +247,7 @@ export function TipFormDialog({
         throw new Error("Stock ID is required");
       }
 
+      // Create tip data matching API structure exactly (no duplicate fields)
       const tipData: CreateTipRequest = {
         title: data.title,
         stockId: stockId as string,
@@ -224,7 +259,10 @@ export function TipFormDialog({
         buyRange: data.buyRange,
         targetPrice: data.targetPrice,
         targetPercentage: data.targetPercentage,
+        addMoreAt: data.addMoreAt,
+        tipUrl: data.tipUrl,
         exitPrice: data.exitPrice,
+        exitStatus: data.exitStatus,
         exitStatusPercentage: data.exitStatusPercentage,
         horizon: data.horizon || "Long Term",
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
@@ -312,24 +350,22 @@ export function TipFormDialog({
     setSelectedStockDetails(stock);
     setSearchTerm("");
     setShowResults(false);
-    setFocusedIndex(-1);
-    
-    // Set form values
+    setValue("stockId", stock._id || stock.id || "");
     setValue("stockSymbol", stock.symbol);
-    setValue("stockId", stock._id || "");
     
-    // Auto-fill title with stock name (not symbol)
-    setValue("title", `${stock.name} Analysis`);
+    // Auto-generate title if empty
+    const currentTitle = form.getValues("title");
+    if (!currentTitle) {
+      setValue("title", `${stock.symbol} Investment Tip`);
+    }
   };
 
   const handleStockClear = () => {
     setSelectedStockDetails(null);
     setSearchTerm("");
     setShowResults(false);
-    setFocusedIndex(-1);
-    setValue("stockSymbol", "");
     setValue("stockId", "");
-    setValue("title", "");
+    setValue("stockSymbol", "");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -338,17 +374,17 @@ export function TipFormDialog({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setFocusedIndex((prev) => 
+        setFocusedIndex(prev => 
           prev < searchResults.length - 1 ? prev + 1 : prev
         );
         break;
       case "ArrowUp":
         e.preventDefault();
-        setFocusedIndex((prev) => prev > 0 ? prev - 1 : prev);
+        setFocusedIndex(prev => prev > 0 ? prev - 1 : prev);
         break;
       case "Enter":
         e.preventDefault();
-        if (focusedIndex >= 0 && focusedIndex < searchResults.length) {
+        if (focusedIndex >= 0) {
           handleStockSelect(searchResults[focusedIndex]);
         }
         break;
@@ -362,15 +398,19 @@ export function TipFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-zinc-900 border-zinc-800 max-h-[90vh] flex flex-col" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent 
+        className="sm:max-w-[700px] bg-zinc-900 border-zinc-800 max-h-[95vh] flex flex-col p-0" 
+        onEscapeKeyDown={(e) => e.preventDefault()} 
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <Form {...form}>
-          <form onSubmit={handleSubmit(onValidSubmit)} className="flex flex-col h-full max-h-[calc(90vh-2rem)]">
+          <form onSubmit={handleSubmit(onValidSubmit)} className="flex flex-col h-full">
             <DialogHeader className="p-6 pb-4 flex-shrink-0">
               <DialogTitle className="text-xl font-semibold text-white">Create Rangaone Wealth Tips</DialogTitle>
               <DialogDescription className="text-zinc-400 text-sm">Add Tip Details</DialogDescription>
             </DialogHeader>
 
-            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+            <div className="flex-1 overflow-y-auto px-6 space-y-6">
               {/* Stock Selection */}
               {selectedStockDetails && (
                 <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
@@ -390,112 +430,73 @@ export function TipFormDialog({
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="text-zinc-300 text-sm mb-3">
-                    {selectedStockDetails.name}
+                  <div className="text-zinc-300 text-sm">
+                    Current Price: ₹{parseFloat(selectedStockDetails.currentPrice).toLocaleString()}
                   </div>
                 </div>
               )}
 
               {/* Stock Symbol Search - Only show if no stock selected */}
               {!selectedStockDetails && (
-                <FormField
-                  control={control}
-                  name="stockSymbol"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Stock Symbol</FormLabel>
-                      <FormControl>
-                        <div className="relative">
+                <div className="relative">
+                  <FormField
+                    control={control}
+                    name="stockSymbol"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Stock Symbol</FormLabel>
+                        <FormControl>
                           <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
                             <Input
                               ref={inputRef}
-                              placeholder="Search for stock symbol..."
+                              placeholder="Search for stocks..."
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
                               onKeyDown={handleKeyDown}
-                              onFocus={() => {
-                                if (searchResults.length > 0 && searchTerm.length >= 2) {
-                                  setShowResults(true);
-                                }
-                              }}
                               disabled={isSubmitting}
-                              className="pl-10 pr-10 bg-zinc-800 border-zinc-700 text-white placeholder-zinc-400"
-                              autoComplete="off"
+                              className="pl-10 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                             />
-                            {searchTerm && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSearchTerm("");
-                                  setShowResults(false);
-                                  inputRef.current?.focus();
-                                }}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-zinc-700 rounded"
-                              >
-                                <X className="h-3 w-3 text-zinc-400" />
-                              </button>
+                            {isSearching && (
+                              <Loader2 className="absolute right-3 top-3 h-4 w-4 text-zinc-500 animate-spin" />
                             )}
                           </div>
-                          
-                          {/* Search Results */}
-                          {showResults && (
-                            <div
-                              ref={resultsRef}
-                              className="absolute z-50 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg max-h-[200px] overflow-auto"
-                            >
-                              {isSearching ? (
-                                <div className="p-4 text-center text-sm text-zinc-400">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Searching...
+                        </FormControl>
+                        <FormMessage />
+                        
+                        {/* Search Results */}
+                        {showResults && searchResults.length > 0 && (
+                          <div
+                            ref={resultsRef}
+                            className="absolute z-50 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                          >
+                            {searchResults.map((stock, index) => (
+                              <button
+                                key={stock._id}
+                                type="button"
+                                onClick={() => handleStockSelect(stock)}
+                                className={`w-full text-left p-3 hover:bg-zinc-700 border-b border-zinc-700 last:border-b-0 transition-colors ${
+                                  index === focusedIndex ? "bg-zinc-700" : ""
+                                }`}
+                              >
+                                                                 <div className="flex items-center justify-between">
+                                   <div>
+                                     <div className="font-medium text-white">{stock.symbol}</div>
+                                     <div className="text-sm text-zinc-400">{stock.name}</div>
+                                   </div>
+                                  <div className="text-right">
+                                    <div className="text-white font-medium">₹{parseFloat(stock.currentPrice).toLocaleString()}</div>
+                                    <div className="text-xs text-zinc-500">{stock.exchange}</div>
                                   </div>
                                 </div>
-                              ) : searchResults.length > 0 ? (
-                                <div className="p-1">
-                                  {searchResults.map((stock, index) => (
-                                    <div
-                                      key={stock._id}
-                                      className={`flex items-center justify-between p-3 cursor-pointer rounded-md transition-colors ${
-                                        index === focusedIndex ? 'bg-zinc-700' : 'hover:bg-zinc-700'
-                                      }`}
-                                      onClick={() => handleStockSelect(stock)}
-                                      onMouseEnter={() => setFocusedIndex(index)}
-                                    >
-                                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className="min-w-0 flex-1">
-                                          <p className="font-medium text-white">{stock.symbol}</p>
-                                          <p className="text-sm text-zinc-400 truncate">
-                                            {stock.name}
-                                          </p>
-                                        </div>
-                                        <Badge variant="secondary" className="text-xs bg-zinc-700 text-zinc-300 shrink-0">
-                                          {stock.exchange}
-                                        </Badge>
-                                      </div>
-                                      <div className="text-right ml-3 shrink-0">
-                                        <p className="font-bold text-lg text-white">₹{parseFloat(stock.currentPrice).toLocaleString()}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : searchTerm.length >= 2 ? (
-                                <div className="p-4 text-center text-sm text-zinc-400">
-                                  No stocks found for "{searchTerm}"
-                                </div>
-                              ) : (
-                                <div className="p-4 text-center text-sm text-zinc-400">
-                                  Type at least 2 characters to search
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+                </div>
               )}
 
               {/* Title */}
@@ -542,7 +543,7 @@ export function TipFormDialog({
                 )}
               />
 
-              {/* Content */}
+              {/* Content with TinyMCE */}
               <FormField
                 control={control}
                 name="content"
@@ -550,11 +551,13 @@ export function TipFormDialog({
                   <FormItem>
                     <FormLabel className="text-white text-sm">Content</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Enter tip content"
-                        {...field}
+                      <RichTextEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Enter detailed tip content with formatting..."
+                        height={200}
                         disabled={isSubmitting}
-                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[120px]"
+                        className="bg-zinc-800 border-zinc-700"
                       />
                     </FormControl>
                     <FormMessage />
@@ -571,7 +574,7 @@ export function TipFormDialog({
                     <FormLabel className="text-white text-sm">Description</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Enter tip description"
+                        placeholder="Brief summary/description"
                         {...field}
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[80px]"
@@ -597,8 +600,10 @@ export function TipFormDialog({
                         <SelectContent className="bg-zinc-800 border-zinc-700">
                           <SelectItem value="buy" className="text-white hover:bg-zinc-700">Buy</SelectItem>
                           <SelectItem value="sell" className="text-white hover:bg-zinc-700">Sell</SelectItem>
+                          <SelectItem value="hold" className="text-white hover:bg-zinc-700">Hold</SelectItem>
                           <SelectItem value="partial sell" className="text-white hover:bg-zinc-700">Partial Sell</SelectItem>
                           <SelectItem value="partial profit" className="text-white hover:bg-zinc-700">Partial Profit</SelectItem>
+                          <SelectItem value="add more" className="text-white hover:bg-zinc-700">Add More</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormControl>
@@ -629,50 +634,85 @@ export function TipFormDialog({
 
               {/* Target Price and Target Percentage */}
               {showTargetFields && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={control}
-                  name="targetPrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white text-sm">Target Price</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Target Price"
-                          {...field}
-                          disabled={isSubmitting}
-                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={control}
+                      name="targetPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white text-sm">Target Price</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Target Price"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <FormField
-                  control={control}
-                  name="targetPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white text-sm">Target Percentage</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter Target Percentage"
-                          {...field}
-                          disabled={isSubmitting}
-                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                    <FormField
+                      control={control}
+                      name="targetPercentage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white text-sm flex items-center gap-2">
+                            Target Percentage
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsAutoCalcTarget(!isAutoCalcTarget)}
+                              className="h-6 px-2 text-xs text-zinc-400 hover:text-zinc-300"
+                            >
+                              <Calculator className="h-3 w-3 mr-1" />
+                              {isAutoCalcTarget ? "Auto" : "Manual"}
+                            </Button>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter Target Percentage"
+                              {...field}
+                              disabled={isSubmitting || isAutoCalcTarget}
+                              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {showAddMoreField && (
+                    <FormField
+                      control={control}
+                      name="addMoreAt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white text-sm">Add More At</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter Add More At Price"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
-              </div>
+                </div>
               )}
 
               {/* Exit Fields */}
               {showExitFields && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={control}
                     name="exitPrice"
@@ -697,10 +737,41 @@ export function TipFormDialog({
                     name="exitStatusPercentage"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-white text-sm">Exit Percentage</FormLabel>
+                        <FormLabel className="text-white text-sm flex items-center gap-2">
+                          Exit Percentage
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsAutoCalcExit(!isAutoCalcExit)}
+                            className="h-6 px-2 text-xs text-zinc-400 hover:text-zinc-300"
+                          >
+                            <Calculator className="h-3 w-3 mr-1" />
+                            {isAutoCalcExit ? "Auto" : "Manual"}
+                          </Button>
+                        </FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Enter Exit Percentage"
+                            {...field}
+                            disabled={isSubmitting || isAutoCalcExit}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="exitStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Status</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter Exit Status"
                             {...field}
                             disabled={isSubmitting}
                             className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
