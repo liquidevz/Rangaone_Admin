@@ -70,6 +70,10 @@ export interface CreateTipRequest {
 
 // Enhanced validation schema for the new dynamic form
 const tipSchema = z.object({
+  title: z.string()
+    .min(1, "Title is required")
+    .min(5, "Title must be at least 5 characters")
+    .max(200, "Title must be less than 200 characters"),
   stockSymbol: z.string().min(1, "Stock symbol is required"),
   stockId: z.string().optional(),
   action: z.string().min(1, "Action is required"),
@@ -127,6 +131,7 @@ export function PortfolioTipDialog({
   const form = useForm<TipFormValues>({
     resolver: zodResolver(tipSchema),
     defaultValues: {
+      title: "",
       stockSymbol: "",
       stockId: "",
       action: "",
@@ -148,6 +153,19 @@ export function PortfolioTipDialog({
 
   // Watch the action field to show/hide dynamic fields
   const watchedAction = watch("action");
+  const watchedStockSymbol = watch("stockSymbol");
+  
+  // Auto-update title when action changes
+  React.useEffect(() => {
+    if (watchedAction && watchedStockSymbol) {
+      const currentTitle = form.getValues("title");
+      // Only auto-update if title is empty or follows the auto-generated pattern
+      if (!currentTitle || currentTitle === `${watchedStockSymbol} Investment Tip` || 
+          currentTitle.startsWith(`${watchedStockSymbol} -`)) {
+        form.setValue("title", `${watchedStockSymbol} - ${watchedAction}`);
+      }
+    }
+  }, [watchedAction, watchedStockSymbol, form]);
 
   // Define which fields to show based on action
   const getFieldsForAction = (action: string) => {
@@ -180,6 +198,7 @@ export function PortfolioTipDialog({
     if (open) {
       if (initialData) {
         reset({
+          title: initialData.title || "",
           stockSymbol: initialData.stockSymbol || "",
           stockId: initialData.stockId || "",
           action: initialData.action || "",
@@ -193,6 +212,7 @@ export function PortfolioTipDialog({
         setWeightageValue(initialData.weightage || "");
       } else {
         reset({
+          title: "",
           stockSymbol: "",
           stockId: "",
           action: "",
@@ -242,7 +262,7 @@ export function PortfolioTipDialog({
 
       const stockSymbol = selectedStockDetails?.symbol || data.stockSymbol || "Unknown";
       const tipData: CreateTipRequest = {
-        title: `${stockSymbol} - ${data.action}`,
+        title: data.title,
         stockId: stockId as string,
         content: content,
         description: data.description,
@@ -345,6 +365,16 @@ export function PortfolioTipDialog({
     setFocusedIndex(-1);
     form.setValue("stockSymbol", stock.symbol);
     form.setValue("stockId", stock._id);
+    
+    // Auto-generate title if empty
+    const currentTitle = form.getValues("title");
+    const currentAction = form.getValues("action");
+    if (!currentTitle) {
+      const titleSuggestion = currentAction 
+        ? `${stock.symbol} - ${currentAction}` 
+        : `${stock.symbol} Investment Tip`;
+      form.setValue("title", titleSuggestion);
+    }
   };
 
   const handleStockClear = () => {
@@ -470,6 +500,26 @@ export function PortfolioTipDialog({
                 </div>
               </div>
             )}
+
+            {/* Title Field */}
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Title *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter tip title (min 5 chars)"
+                      {...field}
+                      disabled={isSubmitting}
+                      className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Stock Symbol Search - Only show if no stock selected */}
             {!selectedStockDetails && (
