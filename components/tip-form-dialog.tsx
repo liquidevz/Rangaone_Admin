@@ -1,4 +1,4 @@
-// components\tip-form-dialog.tsx
+// components\tip-form-dialog.tsx  
 "use client";
 
 import * as React from "react";
@@ -74,36 +74,12 @@ const tipSchema = z.object({
     }, {
       message: "Buy range must be in format: 100-200 or 100.50-200.75",
     }),
-  targetPrice: z.string()
-    .min(1, "Target price is required")
-    .refine((val) => {
-      const price = parseFloat(val);
-      return !isNaN(price) && price > 0;
-    }, {
-      message: "Target price must be a positive number",
-    }),
-  targetPercentage: z.string().min(1, "Target percentage is required"),
-  addMoreAt: z.string()
-    .min(1, "Add more price is required")
-    .refine((val) => {
-      const price = parseFloat(val);
-      return !isNaN(price) && price > 0;
-    }, {
-      message: "Add more at price must be a positive number",
-    }),
-  exitPrice: z.string()
-    .min(1, "Exit price is required")
-    .refine((val) => {
-      const price = parseFloat(val);
-      return !isNaN(price) && price > 0;
-    }, {
-      message: "Exit price must be a positive number",
-    }),
-  exitStatus: z.string()
-    .min(1, "Exit status is required")
-    .min(3, "Exit status must be at least 3 characters")
-    .max(100, "Exit status must be less than 100 characters"),
-  exitStatusPercentage: z.string().min(1, "Exit percentage is required"),
+  targetPrice: z.string().optional(),
+  targetPercentage: z.string().optional(),
+  addMoreAt: z.string().optional(),
+  exitPrice: z.string().optional(),
+  exitStatus: z.string().optional(),
+  exitStatusPercentage: z.string().optional(),
   horizon: z.string()
     .min(1, "Horizon is required")
     .refine((val) => ["Short Term", "Medium Term", "Long Term"].includes(val), {
@@ -121,7 +97,7 @@ const tipSchema = z.object({
     }, {
       message: "Please enter a valid URL",
     }),
-  analystConfidence: z.number()
+  analysistConfidence: z.number()
     .min(1, "Confidence score is required")
     .max(10, "Confidence score must be between 1-10")
     .int("Confidence score must be a whole number"),
@@ -187,13 +163,13 @@ export function TipFormDialog({
       buyRange: "",
       targetPrice: "",
       targetPercentage: "",
-      addMoreAt: "",
-      exitPrice: "",
-      exitStatus: "",
+      addMoreAt: "", 
+      exitPrice: "", 
+      exitStatus: "", 
       exitStatusPercentage: "",
       horizon: "Long Term",
       tipUrl: "",
-      analystConfidence: 5,
+      analysistConfidence: 5,
     },
   });
 
@@ -260,7 +236,7 @@ export function TipFormDialog({
           exitStatusPercentage: initialData.exitStatusPercentage || "",
           horizon: initialData.horizon || "Long Term",
           tipUrl: initialData.tipUrl || "",
-          analystConfidence: (initialData as any).analystConfidence || 5,
+          analysistConfidence: (initialData as any).analysistConfidence || 5,
         });
       } else {
         reset({
@@ -281,7 +257,7 @@ export function TipFormDialog({
           exitStatusPercentage: "",
           horizon: "Long Term",
           tipUrl: "",
-          analystConfidence: 5,
+          analysistConfidence: 5,
         });
         setSelectedStockDetails(null);
         setSearchTerm("");
@@ -291,16 +267,12 @@ export function TipFormDialog({
   }, [open, initialData, reset]);
 
   const onValidSubmit = async (data: TipFormValues) => {
+    console.log('onValidSubmit started with data:', data);
     try {
       if (!selectedStockDetails && !data.stockId) {
-        toast({
-          title: "Error",
-          description: "Please select a valid stock symbol",
-          variant: "destructive",
-        });
-        return;
+        throw new Error('Stock ID is missing');
       }
-
+      console.log('Preparing tipData object');
       // Convert content string to array format expected by API
       const contentArray = [
         { key: "main", value: data.content }
@@ -335,12 +307,20 @@ export function TipFormDialog({
         exitStatus: data.exitStatus,
         exitStatusPercentage: data.exitStatusPercentage,
         horizon: data.horizon || "Long Term",
-        analystConfidence: data.analystConfidence,
+        analysistConfidence: data.analysistConfidence,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
       };
+      console.log('tipData prepared:', tipData);
+      console.log('Calling onSubmit prop with tipData');
+      
+      // Ensure content is properly formatted
+      if (!Array.isArray(tipData.content) || !tipData.content.length) {
+        throw new Error("Content must be provided as an array of objects");
+      }
 
       console.log("Transformed tip data for backend:", tipData);
       await onSubmit(tipData);
+      console.log('onSubmit prop completed successfully');
       
       toast({
         title: "Success",
@@ -353,13 +333,14 @@ export function TipFormDialog({
       setSearchTerm("");
       setShowResults(false);
     } catch (error) {
-      console.error("Error submitting tip:", error);
+      console.error('Error in onValidSubmit:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save tip",
         variant: "destructive",
       });
     }
+    console.log('onValidSubmit ended');
   };
 
   // Debounced search function
@@ -475,7 +456,24 @@ export function TipFormDialog({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <Form {...form}>
-          <form onSubmit={handleSubmit(onValidSubmit)} className="flex flex-col h-full">
+          <form 
+            onSubmit={async (e) => {
+              console.log('Form submission triggered');
+              console.log('Form errors:', form.formState.errors);
+              console.log('Form values:', form.getValues());
+              try {
+                await handleSubmit(onValidSubmit)(e);
+                console.log('handleSubmit completed');
+              } catch (error) {
+                console.error('Form submission error:', error);
+                // If handleSubmit fails, try calling onValidSubmit directly
+                console.log('Trying direct onValidSubmit call');
+                const formData = form.getValues();
+                await onValidSubmit(formData);
+              }
+            }}
+            className="flex flex-col h-full"
+          >
             <DialogHeader className="p-6 pb-4 flex-shrink-0">
               <DialogTitle className="text-xl font-semibold text-white">Create Rangaone Wealth Tips</DialogTitle>
               <DialogDescription className="text-zinc-400 text-sm">
@@ -630,8 +628,7 @@ export function TipFormDialog({
                         placeholder="Enter detailed tip content with formatting (min 20 chars)..."
                         height={200}
                         disabled={isSubmitting}
-                        className="bg-zinc-800 border-zinc-700"
-                      />
+                        className="bg-zinc-800 border-zinc-700" id={undefined}                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -712,36 +709,36 @@ export function TipFormDialog({
               {showTargetFields && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={control}
-                      name="targetPrice"
-                      render={({ field }) => (
-                        <FormItem>
+                <FormField
+                  control={control}
+                  name="targetPrice"
+                  render={({ field }) => (
+                    <FormItem>
                           <FormLabel className="text-white text-sm">Target Price (₹) *</FormLabel>
-                          <FormControl>
-                            <Input
+                      <FormControl>
+                        <Input
                               placeholder="e.g., 150.75"
                               type="number"
                               step="0.01"
                               min="0"
-                              {...field}
-                              disabled={isSubmitting}
-                              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
-                            />
-                          </FormControl>
+                          {...field}
+                          disabled={isSubmitting}
+                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                        />
+                      </FormControl>
                           <FormDescription className="text-zinc-500 text-xs">
                             Enter positive number (auto-calculates percentage)
                           </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                    <FormField
-                      control={control}
-                      name="targetPercentage"
-                      render={({ field }) => (
-                        <FormItem>
+                <FormField
+                  control={control}
+                  name="targetPercentage"
+                  render={({ field }) => (
+                    <FormItem>
                           <FormLabel className="text-white text-sm flex items-center gap-2">
                             Target Percentage *
                             <Button
@@ -869,19 +866,19 @@ export function TipFormDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white text-sm">Exit Status *</FormLabel>
-                        <FormControl>
-                          <Input
+                      <FormControl>
+                        <Input
                             placeholder="Enter Exit Status"
-                            {...field}
-                            disabled={isSubmitting}
-                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                          {...field}
+                          disabled={isSubmitting}
+                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               )}
 
               {/* Horizon, Status and Analyst Confidence */}
@@ -933,13 +930,13 @@ export function TipFormDialog({
                 />
 
                 {/* Analyst Confidence Score */}
-                <FormField
-                  control={control}
-                  name="analystConfidence"
-                  render={({ field }) => (
-                    <FormItem>
+              <FormField
+                control={control}
+                  name="analysistConfidence"
+                render={({ field }) => (
+                  <FormItem>
                       <FormLabel className="text-white text-sm">Confidence Score *</FormLabel>
-                      <FormControl>
+                    <FormControl>
                         <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
                           <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
                             <SelectValue placeholder="Rate 1-10" />
@@ -956,14 +953,14 @@ export function TipFormDialog({
                             ))}
                           </SelectContent>
                         </Select>
-                      </FormControl>
+                    </FormControl>
                       <FormDescription className="text-zinc-500 text-xs">
                         Rate your confidence in this tip (1=Low, 10=Very High)
                       </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               </div>
 
               {/* PDF Link */}

@@ -28,7 +28,7 @@ export interface Tip {
   exitStatus?: string;
   exitStatusPercentage?: string;
   horizon?: string;
-  analystConfidence?: number;
+  analysistConfidence?: number;
   downloadLinks?: Array<{
     _id?: string;
     name: string;
@@ -55,7 +55,7 @@ export interface CreateTipRequest {
   exitStatus?: string;
   exitStatusPercentage?: string;
   horizon?: string;
-  analystConfidence?: number;
+  analysistConfidence?: number;
   downloadLinks?: Array<{
     name: string;
     url: string;
@@ -184,13 +184,25 @@ export const createTip = async (
       throw new Error("Invalid portfolio ID");
     }
 
-    console.log('Creating tip for portfolio:', portfolioId, 'with data:', tipData);
+    console.log('Creating tip for portfolio:', portfolioId, 'with data:', JSON.stringify(tipData, null, 2));
+
+    // Ensure content is properly formatted as an array
+    if (!Array.isArray(tipData.content) || tipData.content.length === 0) {
+      tipData.content = [{ key: "main", value: tipData.description || "No content provided" }];
+    }
+
+    // Ensure required fields are present
+    const processedTipData = {
+      ...tipData,
+      status: tipData.status || "Active",
+      horizon: tipData.horizon || "Long Term",
+    };
 
     const response = await fetchWithAuth(
       `${API_BASE_URL}/api/tips/portfolios/${portfolioId}/tips`,
       {
         method: "POST",
-        body: JSON.stringify(tipData),
+        body: JSON.stringify(processedTipData),
       }
     );
 
@@ -203,10 +215,12 @@ export const createTip = async (
       }
 
       const error = await response.json();
+      console.error("API error response:", error);
       throw new Error(error.message || "Failed to create tip");
     }
 
     const tip = await response.json();
+    console.log("Successfully created tip:", tip);
     return {
       ...tip,
       id: tip._id || tip.id,
@@ -317,8 +331,19 @@ export const createGeneralTip = async (
       throw new Error("Category is required");
     }
 
-    if (!tipData.content?.length) { // Changed from tipData.content?.trim() to tipData.content?.length
-      throw new Error("Content is required");
+    // Handle both string and array content formats
+    if (typeof tipData.content === 'string') {
+      if (!tipData.content.trim()) {
+        throw new Error("Content is required");
+      }
+      // Convert string content to array format
+      tipData.content = [{ key: "main", value: tipData.content }];
+    } else if (Array.isArray(tipData.content)) {
+      if (!tipData.content.length || !tipData.content[0]?.value?.trim()) {
+        throw new Error("Content is required");
+      }
+    } else {
+      throw new Error("Content must be a string or an array of objects");
     }
     
     if (!tipData.description?.trim()) {
@@ -367,7 +392,7 @@ export const createGeneralTip = async (
 };
 
 // Helper function for validation - ENHANCED
-export const validateTipData = (data: CreateTipRequest): string[] => {
+export const validateTipData = (data: any): string[] => {
   const errors: string[] = [];
 
   if (!data.title?.trim()) {
@@ -378,8 +403,17 @@ export const validateTipData = (data: CreateTipRequest): string[] => {
     errors.push("Stock ID is required");
   }
 
-  if (!data.content?.length || !data.content[0]?.value?.trim()) {
-    errors.push("Content is required");
+  // Handle both string and array content formats
+  if (typeof data.content === 'string') {
+    if (!data.content.trim()) {
+      errors.push("Content is required");
+    }
+  } else if (Array.isArray(data.content)) {
+    if (!data.content.length || !data.content[0]?.value?.trim()) {
+      errors.push("Content is required");
+    }
+  } else {
+    errors.push("Content must be a string or an array of objects");
   }
 
   if (!data.description?.trim()) {

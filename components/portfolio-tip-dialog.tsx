@@ -1,6 +1,9 @@
-// components\portfolio-tip-dialog.tsx  
 "use client";
 
+import React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -26,18 +30,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as React from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import type { Portfolio } from "@/lib/api";
-import { searchStockSymbols, type StockSymbol } from "@/lib/api-stock-symbols";
-import { Search, X, Loader2, TrendingUp, TrendingDown, Minus, Plus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Search, X, Plus, Minus } from "lucide-react";
+import { searchStockSymbols } from "@/lib/api-stock-symbols";
 
-// Simplified Tip interface
+// Stock symbol interface
+interface StockSymbol {
+  _id?: string;
+  symbol: string;
+  name: string;
+  sector?: string;
+  currentPrice?: string;
+  previousPrice?: string;
+}
+
+// Portfolio interface
+interface Portfolio {
+  _id: string;
+  name: string;
+  holdings?: Array<{
+    symbol: string;
+    sector?: string;
+  }>;
+}
+
+// Tip interfaces
 export interface Tip {
   _id: string;
   id: string;
@@ -58,6 +75,7 @@ export interface Tip {
 export interface CreateTipRequest {
   title: string;
   stockId: string;
+  category: "basic" | "premium" | "social_media";
   content: Array<{ key: string; value: string }>;
   description: string;
   status?: "Active" | "Closed";
@@ -68,7 +86,7 @@ export interface CreateTipRequest {
   downloadLinks?: Array<{ name: string; url: string }>;
 }
 
-// Enhanced validation schema for the new dynamic form
+// Validation schema
 const tipSchema = z.object({
   title: z.string()
     .min(1, "Title is required")
@@ -76,8 +94,8 @@ const tipSchema = z.object({
     .max(200, "Title must be less than 200 characters"),
   stockSymbol: z.string().min(1, "Stock symbol is required"),
   stockId: z.string().optional(),
+  category: z.enum(["basic", "premium", "social_media"]),
   action: z.string().min(1, "Action is required"),
-  // Dynamic fields based on action
   buyRange: z.string().optional(),
   addMoreAt: z.string().optional(),
   exitPrice: z.string().optional(),
@@ -98,7 +116,7 @@ interface PortfolioTipDialogProps {
   description: string;
 }
 
-// Debounce utility function
+// Debounce function
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number) {
   let timeout: NodeJS.Timeout;
   return (...args: Parameters<T>) => {
@@ -134,6 +152,7 @@ export function PortfolioTipDialog({
       title: "",
       stockSymbol: "",
       stockId: "",
+      category: "basic",
       action: "",
       buyRange: "",
       addMoreAt: "",
@@ -145,10 +164,13 @@ export function PortfolioTipDialog({
   });
 
   const {
+    control,
     handleSubmit,
     reset,
     watch,
-    formState: { isSubmitting },
+    setValue,
+    getValues,
+    formState: { errors, isSubmitting },
   } = form;
 
   // Watch the action field to show/hide dynamic fields
@@ -201,6 +223,7 @@ export function PortfolioTipDialog({
           title: initialData.title || "",
           stockSymbol: initialData.stockSymbol || "",
           stockId: initialData.stockId || "",
+          category: "basic",
           action: initialData.action || "",
           buyRange: initialData.buyRange || "",
           addMoreAt: initialData.addMoreAt || "",
@@ -215,6 +238,7 @@ export function PortfolioTipDialog({
           title: "",
           stockSymbol: "",
           stockId: "",
+          category: "basic",
           action: "",
           buyRange: "",
           addMoreAt: "",
@@ -228,71 +252,6 @@ export function PortfolioTipDialog({
       }
     }
   }, [open, initialData, reset]);
-
-  const onValidSubmit = async (data: TipFormValues) => {
-    try {
-      if (!selectedStockDetails && !data.stockId) {
-        toast({
-          title: "Error",
-          description: "Please select a valid stock symbol",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Create content array from form data
-      const content: Array<{ key: string; value: string }> = [];
-      
-      if (data.action) content.push({ key: "action", value: data.action });
-      if (data.buyRange) content.push({ key: "buyRange", value: data.buyRange });
-      if (data.addMoreAt) content.push({ key: "addMoreAt", value: data.addMoreAt });
-      if (data.exitPrice) content.push({ key: "exitPrice", value: data.exitPrice });
-      if (data.weightage) content.push({ key: "weightage", value: data.weightage });
-
-      // Create downloadLinks array
-      const downloadLinks: Array<{ name: string; url: string }> = [];
-      if (data.pdfLink) {
-        downloadLinks.push({ name: "Analysis Report", url: data.pdfLink });
-      }
-
-      const stockId = selectedStockDetails?._id || data.stockId;
-      if (!stockId) {
-        throw new Error("Stock ID is required");
-      }
-
-      const stockSymbol = selectedStockDetails?.symbol || data.stockSymbol || "Unknown";
-      const tipData: CreateTipRequest = {
-        title: data.title,
-        stockId: stockId as string,
-        content: content,
-        description: data.description,
-        status: "Active" as const,
-        action: data.action,
-        buyRange: data.buyRange,
-        addMoreAt: data.addMoreAt,
-        horizon: "Long Term" as const,
-        downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
-      };
-
-      console.log("Transformed tip data for backend:", tipData);
-      await onSubmit(tipData);
-      
-      toast({
-        title: "Success",
-        description: "Portfolio tip saved successfully",
-      });
-      
-      onOpenChange(false);
-      reset();
-    } catch (error) {
-      console.error("Error submitting tip:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save tip",
-        variant: "destructive",
-      });
-    }
-  };
 
   // Debounced search function
   const debouncedSearch = React.useCallback(
@@ -401,125 +360,120 @@ export function PortfolioTipDialog({
     };
   };
 
-  // Get price change color
   const getPriceChangeColor = (current: string, previous: string) => {
     const change = calculatePriceChange(current, previous);
-    if (change.isPositive) return "text-green-600";
-    if (change.isNegative) return "text-red-600";
-    return "text-muted-foreground";
+    return change.isPositive ? "text-green-500" : change.isNegative ? "text-red-500" : "text-gray-500";
   };
 
-  // Get price change icon
   const getPriceChangeIcon = (current: string, previous: string) => {
     const change = calculatePriceChange(current, previous);
-    if (change.isPositive) return <TrendingUp className="h-3 w-3" />;
-    if (change.isNegative) return <TrendingDown className="h-3 w-3" />;
-    return <Minus className="h-3 w-3" />;
+    return change.isPositive ? "↗" : change.isNegative ? "↘" : "→";
   };
 
-  // Keyboard navigation for search results
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showResults || searchResults.length === 0) return;
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setFocusedIndex(prev => (prev < searchResults.length - 1 ? prev + 1 : 0));
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setFocusedIndex(prev => (prev > 0 ? prev - 1 : searchResults.length - 1));
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (focusedIndex >= 0 && focusedIndex < searchResults.length) {
-          handleStockSelect(searchResults[focusedIndex]);
-        }
-        break;
-      case "Escape":
-        e.preventDefault();
-        setShowResults(false);
-        setFocusedIndex(-1);
-        break;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedIndex(prev => 
+        prev < searchResults.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedIndex(prev => prev > 0 ? prev - 1 : prev);
+    } else if (e.key === "Enter" && focusedIndex >= 0) {
+      e.preventDefault();
+      handleStockSelect(searchResults[focusedIndex]);
     }
   };
 
-  // Weightage adjustment functions
   const incrementWeightage = () => {
-    const current = parseFloat(weightageValue) || 0;
-    const newValue = Math.min(current + 1, 100).toString();
-    setWeightageValue(newValue);
-    form.setValue("weightage", newValue);
+    const currentValue = parseFloat(weightageValue) || 0;
+    const newValue = Math.min(currentValue + 1, 100);
+    setWeightageValue(newValue.toString());
+    form.setValue("weightage", newValue.toString());
   };
 
   const decrementWeightage = () => {
-    const current = parseFloat(weightageValue) || 0;
-    const newValue = Math.max(current - 1, 0).toString();
-    setWeightageValue(newValue);
-    form.setValue("weightage", newValue);
+    const currentValue = parseFloat(weightageValue) || 0;
+    const newValue = Math.max(currentValue - 1, 0);
+    setWeightageValue(newValue.toString());
+    form.setValue("weightage", newValue.toString());
   };
 
   const handleWeightageChange = (value: string) => {
-    setWeightageValue(value);
-    form.setValue("weightage", value);
+    const numValue = parseFloat(value) || 0;
+    const clampedValue = Math.max(0, Math.min(100, numValue));
+    setWeightageValue(clampedValue.toString());
+    form.setValue("weightage", clampedValue.toString());
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700 text-white">
-        <DialogHeader className="space-y-3">
-          <DialogTitle className="text-white text-xl font-semibold">Edit Model Portfolio Tips</DialogTitle>
-          <DialogDescription className="text-gray-300 text-sm">
-            Edit Tip Details
-          </DialogDescription>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900 text-white border-gray-700">
+        <DialogHeader>
+          <DialogTitle className="text-white">{title}</DialogTitle>
+          <DialogDescription className="text-gray-300">{description}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={handleSubmit(onValidSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(async (data) => {
+            console.log('Form submit attempted with data:', data);  // Debug log
+            try {
+              const tipData: CreateTipRequest = {
+                title: data.title,
+                stockId: data.stockId as string,
+                category: data.category,
+                content: content,
+                description: data.description,
+                status: "Active" as const,
+                action: data.action,
+                buyRange: data.buyRange,
+                addMoreAt: data.addMoreAt,
+                horizon: "Long Term" as const,
+                downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
+              };
+              
+              const response = await fetchWithAuth('/api/tips', {
+                method: 'POST',
+                body: JSON.stringify(tipData),
+              });
+              
+              if (!response.ok) {
+                throw new Error('Submission failed: ' + await response.text());
+              }
+              
+              toast({ title: 'Tip created successfully' });
+              onClose();
+            } catch (error) {
+              console.error('Error submitting tip:', error);
+              toast({ title: 'Error', description: error.message, variant: 'destructive' });
+            }
+          })} className="space-y-6">
             {/* Stock Symbol Display */}
             {selectedStockDetails && (
-              <div className="bg-gray-800 rounded-lg p-4 border border-gray-600">
+              <div className="p-4 bg-gray-800 rounded-lg border border-gray-600">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
-                    <span className="text-white font-bold text-lg">{selectedStockDetails.symbol}</span>
-                    <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-300">
-                      {selectedStockDetails.exchange}
-                    </Badge>
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                      {selectedStockDetails.symbol.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white">{selectedStockDetails.symbol}</div>
+                      <div className="text-sm text-gray-300">{selectedStockDetails.name}</div>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleStockClear}
-                    disabled={isSubmitting}
                     className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="text-gray-300 text-sm mb-3">
-                  Weight: 10.4% Price: ₹{parseFloat(selectedStockDetails.currentPrice).toLocaleString()} Status: Hold
+                  Weight: 10.4% Price: ₹{parseFloat(selectedStockDetails.currentPrice || "0").toLocaleString()} Status: Hold
                 </div>
               </div>
             )}
-
-            {/* Title Field */}
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Title *</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter tip title (min 5 chars)"
-                      {...field}
-                      disabled={isSubmitting}
-                      className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             {/* Stock Symbol Search - Only show if no stock selected */}
             {!selectedStockDetails && (
@@ -562,57 +516,45 @@ export function PortfolioTipDialog({
                             </button>
                           )}
                         </div>
-                        
+
                         {/* Search Results */}
-                        {showResults && (
+                        {showResults && searchResults.length > 0 && (
                           <div
                             ref={resultsRef}
-                            className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-md shadow-lg max-h-[300px] overflow-auto"
+                            className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
                           >
-                            {isSearching ? (
-                              <div className="p-4 text-center text-sm text-gray-400">
-                                <div className="flex items-center justify-center gap-2">
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  Searching...
+                            {searchResults.map((stock, index) => (
+                              <div
+                                key={stock._id}
+                                className={`p-3 cursor-pointer hover:bg-gray-700 ${
+                                  index === focusedIndex ? "bg-gray-700" : ""
+                                }`}
+                                onClick={() => handleStockSelect(stock)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium text-white">{stock.symbol}</div>
+                                    <div className="text-sm text-gray-300">{stock.name}</div>
+                                  </div>
+                                  {stock.currentPrice && stock.previousPrice && (
+                                    <div className="text-right">
+                                      <div className="font-medium text-white">
+                                        ₹{parseFloat(stock.currentPrice).toLocaleString()}
+                                      </div>
+                                      <div className={`text-sm ${getPriceChangeColor(stock.currentPrice, stock.previousPrice)}`}>
+                                        {getPriceChangeIcon(stock.currentPrice, stock.previousPrice)} {calculatePriceChange(stock.currentPrice, stock.previousPrice).absolute} ({calculatePriceChange(stock.currentPrice, stock.previousPrice).percent}%)
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            ) : searchResults.length > 0 ? (
-                              <div className="p-1">
-                                {searchResults.map((stock, index) => (
-                                  <div
-                                    key={stock._id}
-                                    className={`flex items-center justify-between p-3 cursor-pointer rounded-md transition-colors ${
-                                      index === focusedIndex ? 'bg-gray-700' : 'hover:bg-gray-700'
-                                    }`}
-                                    onClick={() => handleStockSelect(stock)}
-                                    onMouseEnter={() => setFocusedIndex(index)}
-                                  >
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                      <div className="min-w-0 flex-1">
-                                        <p className="font-medium text-white">{stock.symbol}</p>
-                                        <p className="text-sm text-gray-400 truncate">
-                                          {stock.name}
-                                        </p>
-                                      </div>
-                                      <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-300 shrink-0">
-                                        {stock.exchange}
-                                      </Badge>
-                                    </div>
-                                    <div className="text-right ml-3 shrink-0">
-                                      <p className="font-bold text-lg text-white">₹{parseFloat(stock.currentPrice).toLocaleString()}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : searchTerm.length >= 2 ? (
-                              <div className="p-4 text-center text-sm text-gray-400">
-                                No stocks found for "{searchTerm}"
-                              </div>
-                            ) : (
-                              <div className="p-4 text-center text-sm text-gray-400">
-                                Type at least 2 characters to search
-                              </div>
-                            )}
+                            ))}
+                          </div>
+                        )}
+
+                        {isSearching && (
+                          <div className="absolute top-full left-0 right-0 mt-1 p-3 bg-gray-800 border border-gray-600 rounded-lg">
+                            <div className="text-gray-400 text-center">Searching...</div>
                           </div>
                         )}
                       </div>
@@ -623,7 +565,51 @@ export function PortfolioTipDialog({
               />
             )}
 
-            {/* Edit Action */}
+            {/* Title Field */}
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Title *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter tip title (min 5 chars)"
+                      {...field}
+                      disabled={isSubmitting}
+                      className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Category Field */}
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Category *</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="basic" className="text-white hover:bg-gray-700">Basic</SelectItem>
+                        <SelectItem value="premium" className="text-white hover:bg-gray-700">Premium</SelectItem>
+                        <SelectItem value="social_media" className="text-white hover:bg-gray-700">Social Media</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Action Field */}
             <FormField
               control={form.control}
               name="action"

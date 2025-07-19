@@ -8,9 +8,14 @@ const createTipSchema = z.object({
   title: z.string().min(1, "Title is required"),
   stockId: z.string().min(1, "Stock symbol is required"),
   category: z.enum(["basic", "premium", "social_media"]),
-  content: z.string().min(1, "Content is required"),
+  content: z.array(
+    z.object({
+      key: z.string(),
+      value: z.string().min(1, "Content value is required")
+    })
+  ).min(1, "At least one content item is required"),
   description: z.string().min(1, "Description is required"),
-  status: z.enum(["active", "closed"]).optional(),
+  status: z.enum(["Active", "Closed"]).optional(),
   action: z.string().optional(),
   buyRange: z.string().optional(),
   targetPrice: z.string().optional(),
@@ -21,6 +26,8 @@ const createTipSchema = z.object({
   exitStatus: z.string().optional(),
   exitStatusPercentage: z.string().optional(),
   horizon: z.string().optional(),
+  analysistConfidence: z.number().optional(),
+  analysistConfidence: z.number().optional(),
   downloadLinks: z.array(
     z.object({
       name: z.string().min(1, "Name is required"),
@@ -40,7 +47,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log('Received request body:', JSON.stringify(body, null, 2));
     
-    const validationResult = createTipSchema.safeParse(body);
+    // Pre-process the body to handle content field
+    let processedBody = { ...body };
+    
+    // Handle content field - ensure it's an array of objects
+    if (typeof processedBody.content === 'string') {
+      processedBody.content = [{ key: "main", value: processedBody.content }];
+      console.log('Converted string content to array format');
+    }
+    
+    const validationResult = createTipSchema.safeParse(processedBody);
 
     if (!validationResult.success) {
       console.error('Validation errors:', validationResult.error.errors);
@@ -50,7 +66,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const tipData = validationResult.data;
+    let tipData = validationResult.data;
+
+    // Convert string content to array format if needed
+    if (typeof tipData.content === 'string') {
+      tipData = {
+        ...tipData,
+        content: [{ key: "main", value: tipData.content }]
+      };
+      console.log('Converted string content to array format:', tipData.content);
+    }
 
     // Additional validation using the helper function
     const errors = validateTipData(tipData);
@@ -65,8 +90,11 @@ export async function POST(req: NextRequest) {
     // Set default values
     const processedTipData = {
       ...tipData,
-      status: tipData.status || "active",
+      status: tipData.status || "Active",
       horizon: tipData.horizon || "Long Term",
+      // Handle both spellings of the confidence field
+      analysistConfidence: tipData.analysistConfidence || tipData.analysistConfidence || 5,
+      analysistConfidence: tipData.analysistConfidence || tipData.analysistConfidence || 5,
       downloadLinks: tipData.downloadLinks?.filter(link => link.name?.trim() && link.url?.trim()) || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
