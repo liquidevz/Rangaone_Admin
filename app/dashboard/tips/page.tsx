@@ -40,6 +40,7 @@ import {
   type CreateTipRequest,
   type Tip,
 } from "@/lib/api-tips";
+import { fetchStockSymbolById, type StockSymbol } from "@/lib/api-stock-symbols";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertCircle,
@@ -55,6 +56,61 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+// Stock Details Cell Component
+function StockDetailsCell({ tip }: { tip: Tip }) {
+  const [stockDetails, setStockDetails] = useState<StockSymbol | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    const getStockDetails = async () => {
+      try {
+        setIsLoading(true);
+        if (tip.stockId) {
+          console.log(`Fetching stock details for tip ${tip.id}, stockId: ${tip.stockId}`);
+          
+          // Check cache first
+          if (stockDetailsCache.has(tip.stockId)) {
+            setStockDetails(stockDetailsCache.get(tip.stockId) || null);
+          } else {
+            const stock = await fetchStockSymbolById(tip.stockId);
+            stockDetailsCache.set(tip.stockId, stock);
+            setStockDetails(stock);
+          }
+        } else {
+          console.log(`No stockId found for tip ${tip.id}`);
+        }
+      } catch (error) {
+        console.error(`Error fetching stock details for tip ${tip.id}:`, error);
+        // Don't set stock details on error, just show the fallback
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    getStockDetails();
+  }, [tip.stockId, tip.id]);
+  
+  if (isLoading) {
+    return <div className="text-muted-foreground text-sm">Loading...</div>;
+  }
+  
+  return (
+    <div className="text-sm space-y-1">
+      {stockDetails ? (
+        <>
+          <div className="font-medium line-clamp-1">{stockDetails.name}</div>
+          <div className="text-green-600 font-mono">₹{parseFloat(stockDetails.currentPrice).toLocaleString()}</div>
+        </>
+      ) : (
+        <div className="text-muted-foreground">{tip.stockSymbol || tip.stockId}</div>
+      )}
+    </div>
+  );
+}
+
+// Cache for stock details to avoid redundant API calls
+const stockDetailsCache = new Map<string, StockSymbol>();
 
 export default function TipsManagementPage() {
   const router = useRouter();
@@ -194,6 +250,15 @@ export default function TipsManagementPage() {
     if (!selectedTip) return;
 
     try {
+      // Ensure we have stockSymbol and stockName
+      if (!tipData.stockSymbol && selectedTip.stockSymbol) {
+        tipData.stockSymbol = selectedTip.stockSymbol;
+      }
+      
+      if (!tipData.stockName && selectedTip.stockName) {
+        tipData.stockName = selectedTip.stockName;
+      }
+      
       console.log(`Updating tip ${selectedTip.id}:`, tipData);
       const updatedTip = await updateTip(selectedTip.id, tipData);
 
@@ -249,6 +314,12 @@ export default function TipsManagementPage() {
       const existingTip = allTips.find((tip) => tip._id === id || tip.id === id);
 
       if (existingTip) {
+        // Make sure we have stockSymbol and stockName
+        if (!existingTip.stockSymbol) {
+          existingTip.stockSymbol = existingTip.stockId;
+        }
+        
+        console.log('Opening edit dialog with tip data:', existingTip);
         setSelectedTip(existingTip);
         setEditDialogOpen(true);
         return;
@@ -256,6 +327,12 @@ export default function TipsManagementPage() {
 
       // If not found, try to fetch it
       const tip = await fetchTipById(id);
+      // Make sure we have stockSymbol and stockName
+      if (!tip.stockSymbol) {
+        tip.stockSymbol = tip.stockId;
+      }
+      
+      console.log('Opening edit dialog with fetched tip data:', tip);
       setSelectedTip(tip);
       setEditDialogOpen(true);
     } catch (error) {
@@ -353,12 +430,11 @@ export default function TipsManagementPage() {
   const columns: ColumnDef<Tip>[] = [
     {
       accessorKey: "title",
-      header: "Title & Stock",
+      header: "Title",
       size: 250,
       cell: ({ row }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
-        const stockSymbol = tip.stockId; // Change this line to use tip.stockId directly
         
         return (
           <div className="min-w-[200px] space-y-2">
@@ -376,23 +452,18 @@ export default function TipsManagementPage() {
               </div>
             </button>
             
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                {isGeneral ? (
-                  <>
-                    <TrendingUp className="h-3 w-3 text-purple-600 shrink-0" />
-                    <span className="text-xs text-purple-600">General</span>
-                  </>
-                ) : (
-                  <>
-                    <Building2 className="h-3 w-3 text-blue-600 shrink-0" />
-                    <span className="text-xs text-blue-600">Portfolio</span>
-                  </>
-                )}
-              </div>
-              <div className="font-mono text-sm font-medium text-blue-600 bg-blue-50 dark:bg-blue-950 px-2 py-1 rounded">
-                {stockSymbol}
-              </div>
+            <div className="flex items-center gap-1">
+              {isGeneral ? (
+                <>
+                  <TrendingUp className="h-3 w-3 text-purple-600 shrink-0" />
+                  <span className="text-xs text-purple-600">General</span>
+                </>
+              ) : (
+                <>
+                  <Building2 className="h-3 w-3 text-blue-600 shrink-0" />
+                  <span className="text-xs text-blue-600">Portfolio</span>
+                </>
+              )}
             </div>
           </div>
         );
@@ -400,8 +471,11 @@ export default function TipsManagementPage() {
     },
     {
       accessorKey: "stockId",
-      header: "Stock ID",
-      size: 100,
+      header: "Stock Details",
+      size: 180,
+      cell: ({ row }) => {
+        return <StockDetailsCell tip={row.original} />;
+      },
     },
     {
       accessorKey: "action",

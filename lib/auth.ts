@@ -184,9 +184,19 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
   let accessToken = getAdminAccessToken()
 
   // Set up headers with or without the access token
-  const headers = {
-    ...options.headers,
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
+  }
+
+  // Add any existing headers from options
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      options.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else {
+      Object.assign(headers, options.headers);
+    }
   }
 
   if (accessToken) {

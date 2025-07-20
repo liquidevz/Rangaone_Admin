@@ -2,7 +2,12 @@
 "use client";
 
 import * as React from "react";
+
+// Cache for stock details to avoid redundant API calls
+const stockDetailsCache = new Map<string, any>();
 import { Button } from "@/components/ui/button";
+import { API_BASE_URL } from "@/lib/auth";
+import { fetchStockSymbolById } from "@/lib/api-stock-symbols";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +52,7 @@ const tipSchema = z.object({
     .max(200, "Title must be less than 200 characters"),
   stockId: z.string().min(1, "Stock symbol is required"),
   stockSymbol: z.string().min(1, "Stock symbol is required"),
+  stockName: z.string().optional(),
   category: z.enum(["basic", "premium", "social_media"], {
     required_error: "Category is required",
   }),
@@ -155,6 +161,7 @@ export function TipFormDialog({
       title: "",
       stockId: "",
       stockSymbol: "",
+      stockName: "",
       category: "basic",
       content: "",
       description: "",
@@ -218,10 +225,46 @@ export function TipFormDialog({
           ? initialData.content.find(c => c.key === "main")?.value || initialData.content[0]?.value || ""
           : "";
         
+        // Fetch stock details if we have stockId
+        if (initialData.stockId) {
+          const fetchStockDetails = async () => {
+            try {
+              // Check cache first
+              if (stockDetailsCache.has(initialData.stockId)) {
+                console.log('Using cached stock details for ID:', initialData.stockId);
+                setSelectedStockDetails(stockDetailsCache.get(initialData.stockId));
+              } else {
+                console.log('Fetching stock details for ID:', initialData.stockId);
+                const stock = await fetchStockSymbolById(initialData.stockId);
+                console.log('Fetched stock details:', stock);
+                stockDetailsCache.set(initialData.stockId, stock);
+                setSelectedStockDetails(stock);
+              }
+            } catch (error) {
+              console.error("Error fetching stock details:", error);
+              // Fallback to creating a stock details object from initialData
+              setSelectedStockDetails({
+                _id: initialData.stockId,
+                symbol: initialData.stockSymbol || '',
+                name: initialData.stockName || '',
+                exchange: '',
+                currentPrice: initialData.targetPrice || '0',
+                previousPrice: '0'
+              });
+            }
+          };
+          
+          fetchStockDetails();
+        }
+        
+        // Log the initialData to see what we're working with
+        console.log('Initializing form with data:', initialData);
+        
         reset({
           title: initialData.title || "",
           stockId: initialData.stockId || "",
-          stockSymbol: "",
+          stockSymbol: initialData.stockSymbol || "",
+          stockName: initialData.stockName || "",
           category: initialData.category || "basic",
           content: contentString,
           description: initialData.description || "",
@@ -243,6 +286,7 @@ export function TipFormDialog({
           title: "",
           stockId: "",
           stockSymbol: "",
+          stockName: "",
           category: "basic",
           content: "",
           description: "",
@@ -288,11 +332,17 @@ export function TipFormDialog({
       if (!stockId) {
         throw new Error("Stock ID is required");
       }
+      
+      // Get stock symbol from selected stock or form data
+      const stockSymbol = selectedStockDetails?.symbol || data.stockSymbol;
+      const stockName = selectedStockDetails?.name || "";
 
       // Create tip data matching API structure
       const tipData: CreateTipRequest = {
         title: data.title,
         stockId: stockId as string,
+        stockSymbol: stockSymbol,  // Include stock symbol
+        stockName: stockName,      // Include stock name
         category: data.category,
         content: contentArray,
         description: data.description,
@@ -402,8 +452,18 @@ export function TipFormDialog({
     setSelectedStockDetails(stock);
     setSearchTerm("");
     setShowResults(false);
-    setValue("stockId", stock._id || stock.id || "");
+    
+    const stockId = stock._id || stock.id || "";
+    setValue("stockId", stockId);
     setValue("stockSymbol", stock.symbol);
+    
+    // Store stock name in form state (even though it's not a visible field)
+    form.setValue("stockName", stock.name);
+    
+    // Cache the stock details for future use
+    if (stockId) {
+      stockDetailsCache.set(stockId, stock);
+    }
     
     // Auto-generate title if empty
     const currentTitle = form.getValues("title");
@@ -418,6 +478,7 @@ export function TipFormDialog({
     setShowResults(false);
     setValue("stockId", "");
     setValue("stockSymbol", "");
+    setValue("stockName", "");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -488,21 +549,28 @@ export function TipFormDialog({
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <span className="text-white font-bold text-lg">{selectedStockDetails.symbol}</span>
-                      <Badge variant="secondary" className="text-xs bg-zinc-700 text-zinc-300">
-                        {selectedStockDetails.exchange}
-                      </Badge>
+                      {selectedStockDetails.exchange && (
+                        <Badge variant="secondary" className="text-xs bg-zinc-700 text-zinc-300">
+                          {selectedStockDetails.exchange}
+                        </Badge>
+                      )}
                     </div>
                     <button
                       type="button"
                       onClick={handleStockClear}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !!initialData}
                       className="p-1 hover:bg-zinc-700 rounded text-zinc-400 hover:text-white"
                     >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                   <div className="text-zinc-300 text-sm">
-                    Current Price: ₹{parseFloat(selectedStockDetails.currentPrice).toLocaleString()}
+                    {selectedStockDetails.name && (
+                      <div className="mb-1">{selectedStockDetails.name}</div>
+                    )}
+                    {selectedStockDetails.currentPrice && (
+                      <div>Current Price: ₹{parseFloat(selectedStockDetails.currentPrice).toLocaleString()}</div>
+                    )}
                   </div>
                 </div>
               )}

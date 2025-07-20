@@ -14,6 +14,8 @@ export interface Tip {
   portfolio?: string;
   title: string;
   stockId: string;
+  stockSymbol?: string;
+  stockName?: string;
   category: "basic" | "premium" | "social_media";
   content: TipContent[];
   description: string;
@@ -41,6 +43,8 @@ export interface Tip {
 export interface CreateTipRequest {
   title: string;
   stockId: string;
+  stockSymbol?: string;
+  stockName?: string;
   category: "basic" | "premium" | "social_media";
   content: TipContent[];
   description: string;

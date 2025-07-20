@@ -33,6 +33,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Search, X, Plus, Minus } from "lucide-react";
 import { searchStockSymbols } from "@/lib/api-stock-symbols";
+import { fetchWithAuth } from "@/lib/auth";
 
 // Stock symbol interface
 interface StockSymbol {
@@ -48,6 +49,9 @@ interface StockSymbol {
 interface Portfolio {
   _id: string;
   name: string;
+  currentValue?: number;
+  cashBalance?: number;
+  minInvestmentValue?: number;
   holdings?: Array<{
     symbol: string;
     sector?: string;
@@ -188,6 +192,28 @@ export function PortfolioTipDialog({
       }
     }
   }, [watchedAction, watchedStockSymbol, form]);
+  
+  // Update investment value when stock details or weightage changes
+  React.useEffect(() => {
+    if (selectedStockDetails && weightageValue) {
+      // This effect will trigger a re-render with the updated investment value
+      console.log('Investment value updated:', calculateInvestmentValue(selectedStockDetails.currentPrice || "0", weightageValue));
+    }
+  }, [selectedStockDetails, weightageValue]);
+  
+  // Log portfolio details when component mounts
+  React.useEffect(() => {
+    if (portfolio) {
+      console.log('Portfolio details:', {
+        name: portfolio.name,
+        currentValue: portfolio.currentValue,
+        cashBalance: portfolio.cashBalance,
+        minInvestmentValue: portfolio.minInvestmentValue,
+        investedValue: getPortfolioInvestedValue(),
+        usingMinValue: getPortfolioInvestedValue() === (portfolio.minInvestmentValue || 100000)
+      });
+    }
+  }, [portfolio]);
 
   // Define which fields to show based on action
   const getFieldsForAction = (action: string) => {
@@ -405,6 +431,61 @@ export function PortfolioTipDialog({
     setWeightageValue(clampedValue.toString());
     form.setValue("weightage", clampedValue.toString());
   };
+  
+  // Get portfolio invested value (currentValue - cashBalance)
+  const getPortfolioInvestedValue = (): number => {
+    if (!portfolio) return 100000; // Default to 1,00,000 if no portfolio
+    
+    const currentValue = portfolio.currentValue || 0;
+    const cashBalance = portfolio.cashBalance || 0;
+    
+    // Calculate invested value (currentValue - cashBalance)
+    const investedValue = Math.max(0, currentValue - cashBalance);
+    
+    // If invested value is 0, use minInvestmentValue from database or default to 100000
+    const minInvestmentValue = portfolio.minInvestmentValue || 100000;
+    
+    return investedValue > 0 ? investedValue : minInvestmentValue;
+  };
+  
+  // Calculate number of shares based on price and weightage
+  const calculateNumberOfShares = (price: string, weightage: string): string => {
+    const priceValue = parseFloat(price) || 0;
+    const weightageValue = parseFloat(weightage) || 0;
+    
+    // Get portfolio invested value
+    const portfolioInvestedValue = getPortfolioInvestedValue();
+    
+    // Calculate the investment amount based on weightage
+    const investmentAmount = portfolioInvestedValue * (weightageValue / 100);
+    
+    // Calculate number of shares
+    const numberOfShares = priceValue > 0 ? investmentAmount / priceValue : 0;
+    
+    // Return the formatted value
+    return numberOfShares.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
+  
+  // Calculate investment value based on price and weightage
+  const calculateInvestmentValue = (price: string, weightage: string): string => {
+    const priceValue = parseFloat(price) || 0;
+    const weightageValue = parseFloat(weightage) || 0;
+    
+    // Get portfolio invested value
+    const portfolioInvestedValue = getPortfolioInvestedValue();
+    
+    // Calculate the investment amount based on weightage
+    const investmentAmount = portfolioInvestedValue * (weightageValue / 100);
+    
+    // Calculate number of shares
+    const numberOfShares = priceValue > 0 ? investmentAmount / priceValue : 0;
+    
+    // Calculate current value (price * number of shares)
+    const currentValue = priceValue * numberOfShares;
+    
+    // Return the formatted value
+    return currentValue.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -422,30 +503,29 @@ export function PortfolioTipDialog({
                 title: data.title,
                 stockId: data.stockId as string,
                 category: data.category,
-                content: content,
+                content: [{ key: "main", value: data.description }],
                 description: data.description,
                 status: "Active" as const,
                 action: data.action,
                 buyRange: data.buyRange,
                 addMoreAt: data.addMoreAt,
                 horizon: "Long Term" as const,
-                downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
+                downloadLinks: data.pdfLink ? [{ name: "Analysis Report", url: data.pdfLink }] : undefined,
               };
               
-              const response = await fetchWithAuth('/api/tips', {
-                method: 'POST',
-                body: JSON.stringify(tipData),
-              });
+              // Use the onSubmit prop to handle the submission
+              await onSubmit(tipData);
               
-              if (!response.ok) {
-                throw new Error('Submission failed: ' + await response.text());
-              }
-              
-              toast({ title: 'Tip created successfully' });
-              onClose();
+              toast({ title: 'Tip saved successfully' });
+              onOpenChange(false);
+              reset();
             } catch (error) {
               console.error('Error submitting tip:', error);
-              toast({ title: 'Error', description: error.message, variant: 'destructive' });
+              toast({ 
+                title: 'Error', 
+                description: error instanceof Error ? error.message : 'Failed to submit tip', 
+                variant: 'destructive' 
+              });
             }
           })} className="space-y-6">
             {/* Stock Symbol Display */}
@@ -470,7 +550,24 @@ export function PortfolioTipDialog({
                   </button>
                 </div>
                 <div className="text-gray-300 text-sm mb-3">
-                  Weight: 10.4% Price: ₹{parseFloat(selectedStockDetails.currentPrice || "0").toLocaleString()} Status: Hold
+                  <div className="flex justify-between">
+                    <span>Price: ₹{parseFloat(selectedStockDetails.currentPrice || "0").toLocaleString()}</span>
+                    <span>Weight: {weightageValue || "0"}%</span>
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span>Shares: {calculateNumberOfShares(selectedStockDetails.currentPrice || "0", weightageValue)}</span>
+                    <span className="font-medium text-green-400">
+                      Value: ₹{calculateInvestmentValue(selectedStockDetails.currentPrice || "0", weightageValue)}
+                    </span>
+                  </div>
+                  {portfolio && (
+                    <div className="mt-1 text-xs text-gray-400">
+                      Portfolio: ₹{portfolio.currentValue?.toLocaleString() || '0'} 
+                      {portfolio.cashBalance ? ` (Cash: ₹${portfolio.cashBalance.toLocaleString()})` : ''}
+                      {portfolio.minInvestmentValue && getPortfolioInvestedValue() === portfolio.minInvestmentValue ? 
+                        ` (Using min: ₹${portfolio.minInvestmentValue.toLocaleString()})` : ''}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -744,6 +841,19 @@ export function PortfolioTipDialog({
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
+                    {selectedStockDetails && weightageValue && (
+                      <div className="mt-2 text-sm">
+                        <div className="text-gray-400">
+                          Based on {portfolio ? 
+                            `₹${getPortfolioInvestedValue().toLocaleString()} ${getPortfolioInvestedValue() === (portfolio.minInvestmentValue || 100000) ? '(min value)' : 'invested value'}` : 
+                            `₹1,00,000 portfolio`}:
+                        </div>
+                        <div className="flex justify-between text-gray-300">
+                          <span>Shares: {calculateNumberOfShares(selectedStockDetails.currentPrice || "0", weightageValue)}</span>
+                          <span className="text-green-400">Value: ₹{calculateInvestmentValue(selectedStockDetails.currentPrice || "0", weightageValue)}</span>
+                        </div>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

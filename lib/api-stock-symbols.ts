@@ -455,10 +455,17 @@ export const fetchStockSymbolById = async (id: string): Promise<StockSymbol> => 
       throw new Error("Stock symbol ID is required");
     }
 
+    // Validate ID format (should be a valid MongoDB ObjectId or similar)
+    if (typeof id !== 'string' || id.trim().length === 0) {
+      throw new Error("Invalid stock symbol ID format");
+    }
+
     const adminToken = getAdminAccessToken();
     if (!adminToken) {
       throw new Error("Admin authentication required");
     }
+
+    console.log(`Fetching stock symbol with ID: ${id}`);
 
     const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/stock-symbols/${id}`, {
       method: "GET",
