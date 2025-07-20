@@ -142,8 +142,8 @@ export function PortfolioFormDialog({
   const [portfolioCategory, setPortfolioCategory] = useState("Basic");
   const [timeHorizon, setTimeHorizon] = useState("");
   const [rebalancing, setRebalancing] = useState("");
-  const [lastRebalancingDate, setLastRebalancingDate] = useState("");
-  const [nextRebalancingDate, setNextRebalancingDate] = useState("");
+  const [lastRebalanceDate, setlastRebalanceDate] = useState("");
+  const [nextRebalanceDate, setnextRebalanceDate] = useState("");
   const [index, setIndex] = useState("");
   const [details, setDetails] = useState("");
   const [monthlyGains, setMonthlyGains] = useState("");
@@ -211,6 +211,11 @@ export function PortfolioFormDialog({
     }).format(value);
   };
 
+  const isValidDate = (dateString: string): boolean => {
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date.getTime());
+  };
+
   const calculateInvestmentDetails = (weightPercent: number, buyPrice: number, totalInvestment: number) => {
     const allocatedAmount = (weightPercent / 100) * totalInvestment;
     const quantity = Math.floor(allocatedAmount / buyPrice);
@@ -234,6 +239,19 @@ export function PortfolioFormDialog({
   const holdingsValue = totalActualInvestment;
   const remainingWeight = 100 - totalWeightUsed;
 
+  // Auto-adjust minimum investment based on total investment
+  const calculateAdjustedMinInvestment = () => {
+    if (totalActualInvestment > 0) {
+      // Add 10% buffer to ensure minimum investment covers all holdings
+      const adjustedMinInvestment = Math.ceil(totalActualInvestment * 1.1);
+      return adjustedMinInvestment;
+    }
+    return Number(minInvestment || 0);
+  };
+
+  const adjustedMinInvestment = calculateAdjustedMinInvestment();
+  const needsMinInvestmentAdjustment = adjustedMinInvestment > Number(minInvestment || 0);
+
   // NEW: Calculate total unrealized P&L for portfolio
   const totalUnrealizedPnL = holdings.reduce((sum, holding) => {
     if (holding.currentMarketPrice && holding.originalBuyPrice) {
@@ -243,6 +261,18 @@ export function PortfolioFormDialog({
     }
     return sum;
   }, 0);
+
+  // Auto-adjust minimum investment and notify admin
+  const handleAutoAdjustMinInvestment = () => {
+    if (needsMinInvestmentAdjustment) {
+      setMinInvestment(adjustedMinInvestment.toString());
+      toast({
+        title: "Minimum Investment Adjusted",
+        description: `Minimum investment has been automatically adjusted from ₹${formatCurrency(Number(minInvestment || 0))} to ₹${formatCurrency(adjustedMinInvestment)} to accommodate all holdings with a 10% buffer.`,
+        variant: "default",
+      });
+    }
+  };
 
   // Update all stock prices
   const handleUpdateAllPrices = async () => {
@@ -383,8 +413,8 @@ export function PortfolioFormDialog({
         setPortfolioCategory(initialData.PortfolioCategory || "Basic");
         setTimeHorizon(initialData.timeHorizon || "");
         setRebalancing(initialData.rebalancing || "");
-        setLastRebalancingDate(initialData.lastRebalancingDate || "");
-        setNextRebalancingDate(initialData.nextRebalancingDate || "");
+        setlastRebalanceDate(initialData.lastRebalanceDate || "");
+        setnextRebalanceDate(initialData.nextRebalanceDate || "");
         setIndex(initialData.index || "");
         setDetails(initialData.details || "");
         setMonthlyGains(initialData.monthlyGains || "");
@@ -444,8 +474,8 @@ export function PortfolioFormDialog({
         setPortfolioCategory("Basic");
         setTimeHorizon("");
         setRebalancing("");
-        setLastRebalancingDate("");
-        setNextRebalancingDate("");
+        setlastRebalanceDate("");
+        setnextRebalanceDate("");
         setIndex("");
         setDetails("");
         setMonthlyGains("");
@@ -479,6 +509,35 @@ export function PortfolioFormDialog({
       toast({
         title: "Validation Error",
         description: "Minimum investment is required and must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate monthly contribution if provided
+    if (monthlyContribution && Number(monthlyContribution) < 0) {
+      toast({
+        title: "Validation Error",
+        description: "Monthly contribution must be greater than or equal to 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate date fields if provided
+    if (lastRebalanceDate && !isValidDate(lastRebalanceDate)) {
+      toast({
+        title: "Validation Error",
+        description: "Last rebalancing date must be a valid date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (nextRebalanceDate && !isValidDate(nextRebalanceDate)) {
+      toast({
+        title: "Validation Error",
+        description: "Next rebalancing date must be a valid date",
         variant: "destructive",
       });
       return;
@@ -549,6 +608,7 @@ export function PortfolioFormDialog({
       }
 
       // Convert ExtendedHolding back to PortfolioHolding for submission
+      // Make a deep copy to ensure we don't lose any data
       const portfolioHoldings: PortfolioHolding[] = holdings.map(holding => ({
         symbol: holding.symbol,
         weight: holding.weight,
@@ -558,8 +618,13 @@ export function PortfolioFormDialog({
         buyPrice: holding.buyPrice,
         quantity: holding.quantity,
         minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
+        // Preserve these fields to ensure P&L tracking works correctly
+        originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
+        totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
+        realizedPnL: holding.realizedPnL || 0,
       }));
 
+      // Create a deep copy of the portfolio data to ensure we don't lose any fields
       const portfolioData: CreatePortfolioRequest = {
         name,
         description: filteredDescriptions,
@@ -573,8 +638,8 @@ export function PortfolioFormDialog({
         youTubeLinks: youTubeLinks.length > 0 ? youTubeLinks : undefined,
         timeHorizon,
         rebalancing,
-        lastRebalancingDate,
-        nextRebalancingDate,
+        lastRebalanceDate,
+        nextRebalanceDate,
         index,
         details,
         monthlyGains,
@@ -584,12 +649,20 @@ export function PortfolioFormDialog({
         cashBalance: cashBalance,
         currentValue: currentValue,
       };
+      
+      // If we're updating an existing portfolio, preserve the ID
+      if (initialData && initialData.id) {
+        console.log(`Preserving portfolio ID: ${initialData.id}`);
+      }
 
       console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
       console.log("Portfolio Name:", portfolioData.name);
       console.log("Description:", portfolioData.description);
       console.log("Subscription Fees:", portfolioData.subscriptionFee);
       console.log("Min Investment:", portfolioData.minInvestment);
+      console.log("Monthly Contribution:", portfolioData.monthlyContribution);
+      console.log("Last Rebalancing Date:", portfolioData.lastRebalanceDate);
+      console.log("Next Rebalancing Date:", portfolioData.nextRebalanceDate);
       console.log("Holdings Count:", portfolioData.holdings?.length || 0);
       console.log("Holdings Data:", portfolioData.holdings);
       console.log("Full Portfolio Data:", JSON.stringify(portfolioData, null, 2));
@@ -705,6 +778,19 @@ export function PortfolioFormDialog({
     setHoldings([...holdings, holdingToAdd]);
     resetNewHolding();
 
+    // Auto-adjust minimum investment if needed
+    const newTotalInvestment = totalActualInvestment + investmentDetails.actualInvestmentAmount;
+    const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
+    
+    if (newAdjustedMinInvestment > Number(minInvestment || 0)) {
+      setMinInvestment(newAdjustedMinInvestment.toString());
+      toast({
+        title: "Minimum Investment Auto-Adjusted",
+        description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} to accommodate the new holding with a 10% buffer.`,
+        variant: "default",
+      });
+    }
+
     // Show notification about leftover amount if any
     if (investmentDetails.leftoverAmount > 0) {
       toast({
@@ -715,9 +801,24 @@ export function PortfolioFormDialog({
   };
 
   const removeHolding = (index: number) => {
+    const removedHolding = holdings[index];
     const updated = [...holdings];
     updated.splice(index, 1);
     setHoldings(updated);
+
+    // Auto-adjust minimum investment if needed after removal
+    const newTotalInvestment = totalActualInvestment - removedHolding.minimumInvestmentValueStock;
+    if (newTotalInvestment > 0) {
+      const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
+      if (newAdjustedMinInvestment < Number(minInvestment || 0)) {
+        setMinInvestment(newAdjustedMinInvestment.toString());
+        toast({
+          title: "Minimum Investment Auto-Adjusted",
+          description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} after removing the holding.`,
+          variant: "default",
+        });
+      }
+    }
   };
   
   const startEditHolding = async (index: number) => {
@@ -907,6 +1008,19 @@ export function PortfolioFormDialog({
     }
 
     setHoldings(updatedHoldings);
+
+    // Auto-adjust minimum investment based on new total investment
+    const newTotalInvestment = updatedHoldings.reduce((sum, holding) => sum + holding.minimumInvestmentValueStock, 0);
+    const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
+    
+    if (newAdjustedMinInvestment !== Number(minInvestment || 0)) {
+      setMinInvestment(newAdjustedMinInvestment.toString());
+      toast({
+        title: "Minimum Investment Auto-Adjusted",
+        description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} to accommodate all holdings with a 10% buffer.`,
+        variant: "default",
+      });
+    }
 
     // NEW: Handle profit reinvestment for profitable sales
     if (pnlPreview && pnlPreview.profitLoss > 0 && (action === 'partial-sell' || action === 'sell')) {
@@ -1217,6 +1331,28 @@ export function PortfolioFormDialog({
                       disabled={isSubmitting}
                       required
                     />
+                    {needsMinInvestmentAdjustment && (
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <div className="flex-1 text-sm text-amber-800">
+                          <p className="font-medium">Minimum investment needs adjustment</p>
+                          <p className="text-xs">
+                            Total investment: ₹{formatCurrency(totalActualInvestment)} | 
+                            Recommended: ₹{formatCurrency(adjustedMinInvestment)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAutoAdjustMinInvestment}
+                          disabled={isSubmitting}
+                          className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                        >
+                          Auto Adjust
+                        </Button>
+                      </div>
+                    )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="monthly-contribution">Monthly Contribution</Label>
@@ -1358,8 +1494,8 @@ export function PortfolioFormDialog({
                         <Input
                           id="last-rebalancing-date"
                           type="date"
-                          value={lastRebalancingDate}
-                          onChange={(e) => setLastRebalancingDate(e.target.value)}
+                          value={lastRebalanceDate}
+                          onChange={(e) => setlastRebalanceDate(e.target.value)}
                           placeholder="Enter Date"
                           disabled={isSubmitting}
                         />
@@ -1369,8 +1505,8 @@ export function PortfolioFormDialog({
                         <Input
                           id="next-rebalancing-date"
                           type="date"
-                          value={nextRebalancingDate}
-                          onChange={(e) => setNextRebalancingDate(e.target.value)}
+                          value={nextRebalanceDate}
+                          onChange={(e) => setnextRebalanceDate(e.target.value)}
                           placeholder="Enter Date"
                           disabled={isSubmitting}
                         />
@@ -1668,6 +1804,48 @@ export function PortfolioFormDialog({
                   </Card>
 
                   <div>
+                    {/* Portfolio Summary Section */}
+                    {holdings.length > 0 && (
+                      <Card className="border-2 border-blue-200 bg-blue-50 mb-4">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Calculator className="h-5 w-5 text-blue-600" />
+                            <h4 className="font-medium text-blue-800">Portfolio Summary</h4>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div className="text-center">
+                              <p className="text-blue-600 font-medium">Total Investment</p>
+                              <p className="text-lg font-bold">₹{formatCurrency(totalActualInvestment)}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-blue-600 font-medium">Current Min Investment</p>
+                              <p className="text-lg font-bold">₹{formatCurrency(Number(minInvestment || 0))}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-blue-600 font-medium">Recommended Min</p>
+                              <p className="text-lg font-bold">₹{formatCurrency(adjustedMinInvestment)}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-blue-600 font-medium">Cash Balance</p>
+                              <p className={`text-lg font-bold ${cashBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                ₹{formatCurrency(cashBalance)}
+                              </p>
+                            </div>
+                          </div>
+                          {needsMinInvestmentAdjustment && (
+                            <div className="mt-3 p-2 bg-amber-100 border border-amber-300 rounded-md">
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                <span className="text-sm text-amber-800 font-medium">
+                                  Minimum investment needs adjustment to accommodate all holdings
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <h4 className="font-medium mb-3">Current Holdings ({holdings.length})</h4>
                     {holdings.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No holdings added yet.</p>

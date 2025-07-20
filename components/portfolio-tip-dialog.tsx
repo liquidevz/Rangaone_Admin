@@ -88,6 +88,7 @@ export interface CreateTipRequest {
   addMoreAt?: string;
   horizon?: string;
   downloadLinks?: Array<{ name: string; url: string }>;
+  portfolioId?: string; // Ensure tip is associated with the correct portfolio
 }
 
 // Validation schema
@@ -138,6 +139,13 @@ export function PortfolioTipDialog({
   title,
   description,
 }: PortfolioTipDialogProps) {
+  // Safeguard: Ensure we have a valid portfolio
+  React.useEffect(() => {
+    if (open && !portfolio) {
+      console.error('Portfolio is required for PortfolioTipDialog');
+      onOpenChange(false);
+    }
+  }, [open, portfolio, onOpenChange]);
   const { toast } = useToast();
   const [selectedStockDetails, setSelectedStockDetails] = React.useState<StockSymbol | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -245,6 +253,21 @@ export function PortfolioTipDialog({
   React.useEffect(() => {
     if (open) {
       if (initialData) {
+        // Ensure the tip belongs to the current portfolio
+        if (portfolio && initialData.portfolio && initialData.portfolio !== portfolio._id) {
+          console.error('Tip belongs to a different portfolio!', {
+            tipPortfolioId: initialData.portfolio,
+            currentPortfolioId: portfolio._id
+          });
+          toast({
+            title: "Portfolio Mismatch",
+            description: "This tip belongs to a different portfolio",
+            variant: "destructive"
+          });
+          onOpenChange(false);
+          return;
+        }
+        
         reset({
           title: initialData.title || "",
           stockSymbol: initialData.stockSymbol || "",
@@ -335,12 +358,26 @@ export function PortfolioTipDialog({
   }, []);
 
   const handleCancel = () => {
+    // Clear all form data and state
     onOpenChange(false);
-    reset();
+    reset({
+      title: "",
+      stockSymbol: "",
+      stockId: "",
+      category: "basic",
+      action: "",
+      buyRange: "",
+      addMoreAt: "",
+      exitPrice: "",
+      weightage: "",
+      description: "",
+      pdfLink: "",
+    });
     setSelectedStockDetails(null);
     setSearchTerm("");
     setShowResults(false);
     setWeightageValue("");
+    setFocusedIndex(-1);
   };
 
   const handleStockSelect = (stock: StockSymbol) => {
@@ -499,11 +536,19 @@ export function PortfolioTipDialog({
           <form onSubmit={form.handleSubmit(async (data) => {
             console.log('Form submit attempted with data:', data);  // Debug log
             try {
+              // Ensure we're using the correct portfolio ID
+              if (!portfolio || !portfolio._id) {
+                throw new Error('Portfolio ID is missing or invalid');
+              }
+              
+              // Create content array from description
+              const content = [{ key: "main", value: data.description }];
+              
               const tipData: CreateTipRequest = {
                 title: data.title,
                 stockId: data.stockId as string,
                 category: data.category,
-                content: [{ key: "main", value: data.description }],
+                content: content,
                 description: data.description,
                 status: "Active" as const,
                 action: data.action,
@@ -511,7 +556,25 @@ export function PortfolioTipDialog({
                 addMoreAt: data.addMoreAt,
                 horizon: "Long Term" as const,
                 downloadLinks: data.pdfLink ? [{ name: "Analysis Report", url: data.pdfLink }] : undefined,
+                // Add portfolio ID to ensure the tip is associated with the correct portfolio
+                portfolioId: portfolio._id,
               };
+              
+              // Ensure content is properly formatted
+              if (!Array.isArray(tipData.content) || !tipData.content.length) {
+                throw new Error("Content must be provided as an array of objects");
+              }
+              
+              console.log(`Submitting tip for portfolio: ${portfolio.name} (${portfolio._id})`);
+              
+              // Double-check that we're submitting to the correct portfolio
+              if (initialData && initialData.portfolio && initialData.portfolio !== portfolio._id) {
+                console.error('Portfolio mismatch detected!', {
+                  tipPortfolio: initialData.portfolio,
+                  currentPortfolio: portfolio._id
+                });
+                throw new Error('Cannot move tip between portfolios');
+              }
               
               // Use the onSubmit prop to handle the submission
               await onSubmit(tipData);

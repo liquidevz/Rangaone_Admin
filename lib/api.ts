@@ -264,6 +264,10 @@ export interface PortfolioHolding {
   buyPrice: number;
   quantity: number;
   minimumInvestmentValueStock: number;
+  // Additional fields for P&L tracking
+  originalBuyPrice?: number;
+  totalQuantityOwned?: number;
+  realizedPnL?: number;
 }
 
 export interface DownloadLink {
@@ -290,8 +294,8 @@ export interface Portfolio {
   currentValue: number;
   timeHorizon?: string;
   rebalancing?: string;
-  lastRebalancingDate?: string;
-  nextRebalancingDate?: string;
+  lastRebalanceDate?: string;
+  nextRebalanceDate?: string;
   index?: string;
   details?: string;
   monthlyGains?: string;
@@ -331,8 +335,8 @@ export interface CreatePortfolioRequest {
   youTubeLinks?: YouTubeLink[];
   timeHorizon?: string;
   rebalancing?: string;
-  lastRebalancingDate?: string;
-  nextRebalancingDate?: string;
+  lastRebalanceDate?: string;
+  nextRebalanceDate?: string;
   index?: string;
   details?: string;
   monthlyGains?: string;

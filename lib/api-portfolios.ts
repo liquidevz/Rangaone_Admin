@@ -58,6 +58,9 @@ export interface Portfolio {
   PortfolioCategory: string
   compareWith?: string
   expiryDate?: string
+  monthlyContribution?: number
+  nextRebalanceDate?: string
+  lastRebalanceDate?: string
   holdings: PortfolioHolding[]
   downloadLinks?: DownloadLink[]
   youTubeLinks?: YouTubeLink[]
@@ -84,6 +87,9 @@ export interface CreatePortfolioRequest {
   PortfolioCategory?: string
   compareWith?: string
   expiryDate?: string
+  monthlyContribution?: number
+  nextRebalanceDate?: string
+  lastRebalanceDate?: string
   holdings?: PortfolioHolding[]
   downloadLinks?: DownloadLink[]
   youTubeLinks?: YouTubeLink[]
@@ -489,6 +495,7 @@ const formatPortfolioData = (data: CreatePortfolioRequest) => {
     durationMonths: typeof data.durationMonths === "string" ? Number.parseInt(data.durationMonths, 10) : data.durationMonths,
     cashBalance: typeof data.cashBalance === "string" ? Number.parseFloat(data.cashBalance) : data.cashBalance,
     currentValue: typeof data.currentValue === "string" ? Number.parseFloat(data.currentValue) : data.currentValue,
+    monthlyContribution: typeof data.monthlyContribution === "string" ? Number.parseFloat(data.monthlyContribution) : data.monthlyContribution,
   }
 
   // Format subscription fees
