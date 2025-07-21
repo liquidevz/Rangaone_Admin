@@ -382,6 +382,10 @@ export function PortfolioFormDialog({
               const index = newDescriptions.findIndex(d => d.key === desc.key);
               if (index !== -1) {
                 newDescriptions[index].value = desc.value;
+              } else {
+                // If it's a custom description key not in our default list, add it
+                console.log(`Adding custom description key: ${desc.key}`);
+                newDescriptions.push(desc);
               }
             }
           });
@@ -391,7 +395,16 @@ export function PortfolioFormDialog({
 
         // Handle YouTube links
         if (Array.isArray(initialData.youTubeLinks)) {
-          setYouTubeLinks(initialData.youTubeLinks);
+          console.log("Processing YouTube links:", initialData.youTubeLinks);
+          
+          // Make sure all YouTube links have the required fields
+          const normalizedYouTubeLinks = initialData.youTubeLinks.map(link => ({
+            ...link,
+            link: link.link || ""
+          }));
+          
+          console.log("Normalized YouTube links:", normalizedYouTubeLinks);
+          setYouTubeLinks(normalizedYouTubeLinks);
         }
 
         // Financial Details
@@ -400,21 +413,44 @@ export function PortfolioFormDialog({
 
         // Handle subscription fees
         if (Array.isArray(initialData.subscriptionFee)) {
-          const extendedFees: ExtendedSubscriptionFee[] = initialData.subscriptionFee.map(fee => ({
-            ...fee,
-            actualPrice: fee.price,
-            discountPrice: fee.price,
-            discountPercentage: 0,
-          }));
-          setSubscriptionFees(extendedFees);
+          console.log("Processing subscription fees:", initialData.subscriptionFee);
+          
+          // Make sure we have at least one fee
+          if (initialData.subscriptionFee.length === 0) {
+            setSubscriptionFees([{
+              type: 'monthly',
+              price: 0,
+              actualPrice: 0,
+              discountPrice: 0,
+              discountPercentage: 0
+            }]);
+          } else {
+            const extendedFees: ExtendedSubscriptionFee[] = initialData.subscriptionFee.map(fee => {
+              // Calculate discount percentage if actualPrice exists and is different from price
+              const actualPrice = fee.actualPrice || fee.price;
+              const discountPrice = fee.price;
+              const discountPercentage = actualPrice > 0 ? Math.round(((actualPrice - discountPrice) / actualPrice) * 100) : 0;
+              
+              return {
+                ...fee,
+                actualPrice: actualPrice,
+                discountPrice: discountPrice,
+                discountPercentage: discountPercentage,
+              };
+            });
+            
+            console.log("Extended subscription fees:", extendedFees);
+            setSubscriptionFees(extendedFees);
+          }
         }
 
         // Portfolio Characteristics
         setPortfolioCategory(initialData.PortfolioCategory || "Basic");
         setTimeHorizon(initialData.timeHorizon || "");
         setRebalancing(initialData.rebalancing || "");
-        setlastRebalanceDate(initialData.lastRebalanceDate || "");
-        setnextRebalanceDate(initialData.nextRebalanceDate || "");
+        // Handle both field name conventions
+        setlastRebalanceDate(initialData.lastRebalanceDate || initialData.lastRebalancingDate || "");
+        setnextRebalanceDate(initialData.nextRebalanceDate || initialData.nextRebalancingDate || "");
         setIndex(initialData.index || "");
         setDetails(initialData.details || "");
         setMonthlyGains(initialData.monthlyGains || "");
@@ -424,38 +460,52 @@ export function PortfolioFormDialog({
 
         // Handle holdings with enhanced P&L tracking
         if (Array.isArray(initialData.holdings)) {
+          console.log("Processing holdings from initialData:", initialData.holdings);
+          
           const convertedHoldings: ExtendedHolding[] = initialData.holdings.map(h => {
             const allocatedAmount = (h.weight / 100) * (initialData.minInvestment || 0);
             const actualInvestmentAmount = h.quantity * h.buyPrice;
             const leftoverAmount = allocatedAmount - actualInvestmentAmount;
             
+            // Preserve all original fields and add calculated ones
             return {
               ...h,
               buyPrice: h.buyPrice || 0,
               quantity: h.quantity || 0,
-              minimumInvestmentValueStock: actualInvestmentAmount,
+              minimumInvestmentValueStock: h.minimumInvestmentValueStock || actualInvestmentAmount,
               allocatedAmount: allocatedAmount,
               leftoverAmount: Math.max(0, leftoverAmount),
               stockCapType: h.stockCapType || undefined,
               originalWeight: h.weight,
-              // NEW: Enhanced P&L tracking fields
-              originalBuyPrice: h.buyPrice, // Track original purchase price
-              totalQuantityOwned: h.quantity, // Track total quantity
-              realizedPnL: 0, // Initialize realized P&L
+              // Enhanced P&L tracking fields - preserve existing values if present
+              originalBuyPrice: h.originalBuyPrice || h.buyPrice,
+              totalQuantityOwned: h.totalQuantityOwned || h.quantity,
+              realizedPnL: h.realizedPnL || 0,
+              status: h.status || 'Hold',
+              sector: h.sector || '',
             };
           });
+          
+          console.log("Converted holdings:", convertedHoldings);
           setHoldings(convertedHoldings);
           
           // Load stock details for existing holdings
-          refreshAllHoldingsStockData();
+          refreshAllHoldingsStockData(convertedHoldings);
         }
 
         // Handle download links
         if (Array.isArray(initialData.downloadLinks)) {
+          console.log("Processing download links:", initialData.downloadLinks);
+          
           const normalizedDownloadLinks: DownloadLink[] = initialData.downloadLinks.map(link => ({
             ...link,
-            linkDiscription: link.linkDiscription || ""
+            linkType: link.linkType || "pdf",
+            linkUrl: link.linkUrl || link.url || "",
+            linkDiscription: link.linkDiscription || "",
+            name: link.name || ""
           }));
+          
+          console.log("Normalized download links:", normalizedDownloadLinks);
           setDownloadLinks(normalizedDownloadLinks);
         }
       } else {
@@ -638,8 +688,11 @@ export function PortfolioFormDialog({
         youTubeLinks: youTubeLinks.length > 0 ? youTubeLinks : undefined,
         timeHorizon,
         rebalancing,
-        lastRebalanceDate,
-        nextRebalanceDate,
+        // Use both field names for compatibility with API
+        lastRebalanceDate: lastRebalanceDate,
+        lastRebalancingDate: lastRebalanceDate,
+        nextRebalanceDate: nextRebalanceDate,
+        nextRebalancingDate: nextRebalanceDate,
         index,
         details,
         monthlyGains,

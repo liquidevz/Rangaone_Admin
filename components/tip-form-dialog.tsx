@@ -40,6 +40,7 @@ import { Plus, Trash2, Search, X, Loader2, Calculator } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import type { CreateTipRequest, Tip } from "@/lib/api-tips";
+import { updateTip } from "@/lib/api-tips";
 import { searchStockSymbols, type StockSymbol } from "@/lib/api-stock-symbols";
 import { Badge } from "@/components/ui/badge";
 import { RichTextEditor } from "@/components/rich-text-editor";
@@ -81,8 +82,8 @@ const tipSchema = z.object({
       message: "Buy range must be in format: 100-200 or 100.50-200.75",
     }),
   targetPrice: z.string().optional(),
-  targetPercentage: z.string().optional(),
-  addMoreAt: z.string().optional(),
+  targetPercentage: z.string().optional(), 
+  addMoreAt: z.string().optional(), 
   exitPrice: z.string().optional(),
   exitStatus: z.string().optional(),
   exitStatusPercentage: z.string().optional(),
@@ -243,14 +244,16 @@ export function TipFormDialog({
             } catch (error) {
               console.error("Error fetching stock details:", error);
               // Fallback to creating a stock details object from initialData
-              setSelectedStockDetails({
+              const fallbackStock = {
                 _id: initialData.stockId,
                 symbol: initialData.stockSymbol || '',
                 name: initialData.stockName || '',
                 exchange: '',
                 currentPrice: initialData.targetPrice || '0',
                 previousPrice: '0'
-              });
+              };
+              console.log('Creating fallback stock object:', fallbackStock);
+              setSelectedStockDetails(fallbackStock);
             }
           };
           
@@ -309,6 +312,11 @@ export function TipFormDialog({
       }
     }
   }, [open, initialData, reset]);
+  
+  // Debug selectedStockDetails state
+  React.useEffect(() => {
+    console.log('TipFormDialog - selectedStockDetails state changed:', selectedStockDetails);
+  }, [selectedStockDetails]);
 
   const onValidSubmit = async (data: TipFormValues) => {
     console.log('onValidSubmit started with data:', data);
@@ -369,13 +377,23 @@ export function TipFormDialog({
       }
 
       console.log("Transformed tip data for backend:", tipData);
-      await onSubmit(tipData);
-      console.log('onSubmit prop completed successfully');
       
+      // Use updateTip API for editing, onSubmit for creating
+      if (initialData && initialData._id) {
+        console.log('Updating existing tip with ID:', initialData._id);
+        await updateTip(initialData._id, tipData);
+        toast({
+          title: "Success",
+          description: "Tip updated successfully",
+        });
+      } else {
+        console.log('Creating new tip');
+      await onSubmit(tipData);
       toast({
         title: "Success",
-        description: "Tip saved successfully",
+          description: "Tip created successfully",
       });
+      }
       
       onOpenChange(false);
       reset();
@@ -445,7 +463,7 @@ export function TipFormDialog({
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-    };
+  };
   }, []);
 
   const handleStockSelect = (stock: StockSymbol) => {

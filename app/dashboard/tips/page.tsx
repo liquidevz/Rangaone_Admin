@@ -435,7 +435,24 @@ export default function TipsManagementPage() {
       cell: ({ row }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
-        
+        const [stockSymbol, setStockSymbol] = useState<string | null>(null);
+        useEffect(() => {
+          let isMounted = true;
+          if (tip.stockId) {
+            if (stockDetailsCache.has(tip.stockId)) {
+              const stock = stockDetailsCache.get(tip.stockId);
+              if (isMounted) setStockSymbol(stock?.symbol || null);
+            } else {
+              fetchStockSymbolById(tip.stockId).then(stock => {
+                stockDetailsCache.set(tip.stockId, stock);
+                if (isMounted) setStockSymbol(stock?.symbol || null);
+              }).catch(() => {
+                if (isMounted) setStockSymbol(null);
+              });
+            }
+          }
+          return () => { isMounted = false; };
+        }, [tip.stockId]);
         return (
           <div className="min-w-[200px] space-y-2">
             <button
@@ -448,10 +465,9 @@ export default function TipsManagementPage() {
               title={isGeneral ? "Click to view details" : "Click to go to portfolio page"}
             >
               <div className="line-clamp-2 break-words">
-                {row.getValue("title")}
+                {stockSymbol ? `${stockSymbol} - ${tip.action}` : row.getValue("title")}
               </div>
             </button>
-            
             <div className="flex items-center gap-1">
               {isGeneral ? (
                 <>

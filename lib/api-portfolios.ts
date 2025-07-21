@@ -59,8 +59,11 @@ export interface Portfolio {
   compareWith?: string
   expiryDate?: string
   monthlyContribution?: number
+  // Support both naming conventions for rebalancing dates
   nextRebalanceDate?: string
+  nextRebalancingDate?: string
   lastRebalanceDate?: string
+  lastRebalancingDate?: string
   holdings: PortfolioHolding[]
   downloadLinks?: DownloadLink[]
   youTubeLinks?: YouTubeLink[]
@@ -88,8 +91,11 @@ export interface CreatePortfolioRequest {
   compareWith?: string
   expiryDate?: string
   monthlyContribution?: number
+  // Support both naming conventions for rebalancing dates
   nextRebalanceDate?: string
+  nextRebalancingDate?: string
   lastRebalanceDate?: string
+  lastRebalancingDate?: string
   holdings?: PortfolioHolding[]
   downloadLinks?: DownloadLink[]
   youTubeLinks?: YouTubeLink[]
@@ -496,6 +502,23 @@ const formatPortfolioData = (data: CreatePortfolioRequest) => {
     cashBalance: typeof data.cashBalance === "string" ? Number.parseFloat(data.cashBalance) : data.cashBalance,
     currentValue: typeof data.currentValue === "string" ? Number.parseFloat(data.currentValue) : data.currentValue,
     monthlyContribution: typeof data.monthlyContribution === "string" ? Number.parseFloat(data.monthlyContribution) : data.monthlyContribution,
+  }
+  
+  // Ensure rebalancing dates are properly formatted and use both field names
+  if (data.lastRebalanceDate) {
+    formattedData.lastRebalanceDate = data.lastRebalanceDate;
+    formattedData.lastRebalancingDate = data.lastRebalanceDate;
+  } else if (data.lastRebalancingDate) {
+    formattedData.lastRebalanceDate = data.lastRebalancingDate;
+    formattedData.lastRebalancingDate = data.lastRebalancingDate;
+  }
+  
+  if (data.nextRebalanceDate) {
+    formattedData.nextRebalanceDate = data.nextRebalanceDate;
+    formattedData.nextRebalancingDate = data.nextRebalanceDate;
+  } else if (data.nextRebalancingDate) {
+    formattedData.nextRebalanceDate = data.nextRebalancingDate;
+    formattedData.nextRebalancingDate = data.nextRebalancingDate;
   }
 
   // Format subscription fees

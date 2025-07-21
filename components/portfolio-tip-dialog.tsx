@@ -32,8 +32,9 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Search, X, Plus, Minus } from "lucide-react";
-import { searchStockSymbols } from "@/lib/api-stock-symbols";
+import { searchStockSymbols, fetchStockSymbolById } from "@/lib/api-stock-symbols";
 import { fetchWithAuth } from "@/lib/auth";
+import { updateTip } from "@/lib/api-tips";
 
 // Stock symbol interface
 interface StockSymbol {
@@ -189,6 +190,13 @@ export function PortfolioTipDialog({
   const watchedAction = watch("action");
   const watchedStockSymbol = watch("stockSymbol");
   
+  // Debug selectedStockDetails state
+  React.useEffect(() => {
+    console.log('selectedStockDetails state changed:', selectedStockDetails);
+  }, [selectedStockDetails]);
+  
+
+  
   // Auto-update title when action changes
   React.useEffect(() => {
     if (watchedAction && watchedStockSymbol) {
@@ -270,18 +278,33 @@ export function PortfolioTipDialog({
         
         reset({
           title: initialData.title || "",
-          stockSymbol: initialData.stockSymbol || "",
+          stockSymbol: (initialData as any).stockSymbol || "",
           stockId: initialData.stockId || "",
-          category: "basic",
+          category: (initialData as any).category || "basic",
           action: initialData.action || "",
           buyRange: initialData.buyRange || "",
           addMoreAt: initialData.addMoreAt || "",
-          exitPrice: "",
+          exitPrice: (initialData as any).exitPrice || "",
           weightage: initialData.weightage || "",
-          description: initialData.description || "",
-          pdfLink: initialData.pdfLink || "",
-        });
+          description: initialData.description || ((initialData as any).content?.[0]?.value ?? ""),
+          pdfLink: (initialData as any).tipUrl || "",
+        } as TipFormValues);
         setWeightageValue(initialData.weightage || "");
+        
+        // Always fetch and set stock details by stockId if present
+        if (initialData.stockId) {
+          fetchStockSymbolById(initialData.stockId)
+            .then(stock => {
+              setSelectedStockDetails(stock);
+              setValue("stockSymbol", stock.symbol);
+            })
+            .catch(err => {
+              setSelectedStockDetails(null);
+              toast({ title: "Stock not found", description: "Could not fetch stock details for this tip.", variant: "destructive" });
+            });
+        } else {
+          setSelectedStockDetails(null);
+        }
       } else {
         reset({
           title: "",
@@ -547,6 +570,7 @@ export function PortfolioTipDialog({
               const tipData: CreateTipRequest = {
                 title: data.title,
                 stockId: data.stockId as string,
+                stockSymbol: data.stockSymbol,
                 category: data.category,
                 content: content,
                 description: data.description,
@@ -555,9 +579,9 @@ export function PortfolioTipDialog({
                 buyRange: data.buyRange,
                 addMoreAt: data.addMoreAt,
                 horizon: "Long Term" as const,
+                tipUrl: data.pdfLink,
+                analysistConfidence: 5, // Default confidence score
                 downloadLinks: data.pdfLink ? [{ name: "Analysis Report", url: data.pdfLink }] : undefined,
-                // Add portfolio ID to ensure the tip is associated with the correct portfolio
-                portfolioId: portfolio._id,
               };
               
               // Ensure content is properly formatted
@@ -576,10 +600,17 @@ export function PortfolioTipDialog({
                 throw new Error('Cannot move tip between portfolios');
               }
               
-              // Use the onSubmit prop to handle the submission
-              await onSubmit(tipData);
+              // Use updateTip API for editing, onSubmit for creating
+              if (initialData && initialData._id) {
+                console.log('Updating existing tip with ID:', initialData._id);
+                await updateTip(initialData._id, tipData);
+                toast({ title: 'Tip updated successfully' });
+              } else {
+                console.log('Creating new tip');
+                await onSubmit(tipData);
+                toast({ title: 'Tip created successfully' });
+              }
               
-              toast({ title: 'Tip saved successfully' });
               onOpenChange(false);
               reset();
             } catch (error) {
@@ -591,6 +622,7 @@ export function PortfolioTipDialog({
               });
             }
           })} className="space-y-6">
+
             {/* Stock Symbol Display */}
             {selectedStockDetails && (
               <div className="p-4 bg-gray-800 rounded-lg border border-gray-600">
