@@ -449,8 +449,8 @@ export function PortfolioFormDialog({
         setTimeHorizon(initialData.timeHorizon || "");
         setRebalancing(initialData.rebalancing || "");
         // Handle both field name conventions
-        setlastRebalanceDate(initialData.lastRebalanceDate || initialData.lastRebalancingDate || "");
-        setnextRebalanceDate(initialData.nextRebalanceDate || initialData.nextRebalancingDate || "");
+        setlastRebalanceDate(initialData.lastRebalanceDate || initialData.lastRebalanceDate || "");
+        setnextRebalanceDate(initialData.nextRebalanceDate || initialData.nextRebalanceDate || "");
         setIndex(initialData.index || "");
         setDetails(initialData.details || "");
         setMonthlyGains(initialData.monthlyGains || "");
@@ -690,9 +690,7 @@ export function PortfolioFormDialog({
         rebalancing,
         // Use both field names for compatibility with API
         lastRebalanceDate: lastRebalanceDate,
-        lastRebalancingDate: lastRebalanceDate,
         nextRebalanceDate: nextRebalanceDate,
-        nextRebalancingDate: nextRebalanceDate,
         index,
         details,
         monthlyGains,
@@ -2055,11 +2053,11 @@ export function PortfolioFormDialog({
                                       <SelectValue placeholder="Select link type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="prospectus">Prospectus</SelectItem>
-                                      <SelectItem value="research">Research Report</SelectItem>
-                                      <SelectItem value="fact-sheet">Fact Sheet</SelectItem>
-                                      <SelectItem value="annual-report">Annual Report</SelectItem>
-                                      <SelectItem value="other">Other</SelectItem>
+                                      <SelectItem value="Prospectus">Prospectus</SelectItem>
+                                      <SelectItem value="Research">Research Report</SelectItem>
+                                      <SelectItem value="Fact-sheet">Fact Sheet</SelectItem>
+                                      <SelectItem value="Annual-Report">Annual Report</SelectItem>
+                                      <SelectItem value="Other">Other</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
