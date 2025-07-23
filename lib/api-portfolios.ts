@@ -17,7 +17,7 @@ export interface PortfolioHolding {
   weight: number
   sector: string
   stockCapType?: 'small cap' | 'mid cap' | 'large cap' | 'micro cap' | 'mega cap'
-  status: 'Hold' | 'Fresh-Buy' | 'partial-sell' | 'Sell'
+  status: 'Hold' | 'Fresh-Buy' | 'partial-sell' | 'Sell' | 'addon-buy' // Add 'addon-buy'
   buyPrice: number
   quantity: number
   minimumInvestmentValueStock: number

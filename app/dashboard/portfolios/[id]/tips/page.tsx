@@ -26,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   fetchPortfolioById,
-  type Portfolio,
 } from "@/lib/api";
 import { 
   createTip, 
@@ -36,6 +35,7 @@ import {
   type CreateTipRequest, 
   type Tip 
 } from "@/lib/api-tips";
+import { Portfolio } from "@/lib/api-portfolios"; // Explicitly import Portfolio
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertCircle,
@@ -51,6 +51,10 @@ import {
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
+import { fetchStockSymbolById } from "@/lib/api-stock-symbols"; // Import fetchStockSymbolById
+
+// Cache for stock details to avoid redundant API calls
+const stockDetailsCache = new Map();
 
 export default function PortfolioTipsPage() {
   const params = useParams();
@@ -393,15 +397,38 @@ export default function PortfolioTipsPage() {
     {
       accessorKey: "title",
       header: "Title",
-      cell: ({ row }) => (
-        <div 
-          className="font-medium max-w-[200px] truncate cursor-pointer text-blue-600 hover:text-blue-800 hover:underline" 
-          title={row.getValue("title")}
-          onClick={() => openViewDialog(row.original)}
-        >
-          {row.getValue("title")}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const tip = row.original;
+        const [stockSymbol, setStockSymbol] = useState<string | null>(null);
+
+        useEffect(() => {
+          let isMounted = true;
+          if (tip.stockId) {
+            if (stockDetailsCache.has(tip.stockId)) {
+              const stock = stockDetailsCache.get(tip.stockId);
+              if (isMounted) setStockSymbol(stock?.symbol || null);
+            } else {
+              fetchStockSymbolById(tip.stockId).then(stock => {
+                stockDetailsCache.set(tip.stockId, stock);
+                if (isMounted) setStockSymbol(stock?.symbol || null);
+              }).catch(() => {
+                if (isMounted) setStockSymbol(null);
+              });
+            }
+          }
+          return () => { isMounted = false; };
+        }, [tip.stockId]);
+
+        return (
+          <div 
+            className="font-medium max-w-[200px] truncate cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
+            title={stockSymbol ? `${stockSymbol} - ${tip.action}` : row.getValue("title")}
+            onClick={() => openViewDialog(row.original)}
+          >
+            {stockSymbol ? `${stockSymbol} - ${tip.action}` : row.getValue("title")}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "stockId",
