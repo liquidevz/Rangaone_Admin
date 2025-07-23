@@ -35,6 +35,7 @@ import { Search, X, Plus, Minus } from "lucide-react";
 import { searchStockSymbols, fetchStockSymbolById } from "@/lib/api-stock-symbols";
 import { fetchWithAuth } from "@/lib/auth";
 import { updateTip } from "@/lib/api-tips";
+import { RichTextEditor } from "@/components/rich-text-editor"; // Import the RichTextEditor component
 
 // Stock symbol interface
 interface StockSymbol {
@@ -90,6 +91,9 @@ export interface CreateTipRequest {
   horizon?: string;
   downloadLinks?: Array<{ name: string; url: string }>;
   portfolioId?: string; // Ensure tip is associated with the correct portfolio
+  stockSymbol?: string; // Add stockSymbol to CreateTipRequest
+  analysistConfidence?: number;
+  tipUrl?: string;
 }
 
 // Validation schema
@@ -963,11 +967,14 @@ export function PortfolioTipDialog({
                 <FormItem>
                   <FormLabel className="text-white">Description</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="WHY BUY THIS / Summary"
-                      className="min-h-[100px] bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                      {...field}
+                    <RichTextEditor
+                      value={field.value}
+                      onChange={field.onChange}
                       disabled={isSubmitting}
+                      placeholder="WHY BUY THIS / Summary"
+                      height={200} // Add height
+                      className="bg-gray-800 border-gray-600 text-white placeholder-gray-400" // Add className
+                      id={field.name} // Add id
                     />
                   </FormControl>
                   <FormMessage />
