@@ -183,6 +183,7 @@ export function TipFormDialog({
 
   const { handleSubmit, control, reset, watch, setValue, formState: { isSubmitting } } = form;
   const watchedAction = watch("action");
+  const watchedStatus = watch("status");
   const watchedTargetPrice = watch("targetPrice");
   const watchedExitPrice = watch("exitPrice");
 
@@ -190,6 +191,7 @@ export function TipFormDialog({
   const showTargetFields = watchedAction === "buy" || watchedAction === "sell";
   const showExitFields = watchedAction === "partial sell" || watchedAction === "partial profit";
   const showAddMoreField = watchedAction === "buy" || watchedAction === "hold" || watchedAction === "add more";
+  const showClosedTipFields = watchedStatus === "Closed";
 
   // Auto-calculate target percentage
   React.useEffect(() => {
@@ -952,19 +954,71 @@ export function TipFormDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white text-sm">Exit Status *</FormLabel>
-                      <FormControl>
-                        <Input
-                            placeholder="Enter Exit Status"
-                          {...field}
-                          disabled={isSubmitting}
-                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                              <SelectValue placeholder="Select exit status" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-800 border-zinc-700">
+                              <SelectItem value="Loss Booked" className="text-white hover:bg-zinc-700">Loss Booked</SelectItem>
+                              <SelectItem value="Profit Booked" className="text-white hover:bg-zinc-700">Profit Booked</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
               </div>
+              )}
+
+              {/* Exit Status and Percentage for Closed Tips */}
+              {showClosedTipFields && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="exitStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Status *</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                              <SelectValue placeholder="Select exit status" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-800 border-zinc-700">
+                              <SelectItem value="Loss Booked" className="text-white hover:bg-zinc-700">Loss Booked</SelectItem>
+                              <SelectItem value="Profit Booked" className="text-white hover:bg-zinc-700">Profit Booked</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="exitStatusPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Status Percentage *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 25% or -15%"
+                            {...field}
+                            disabled={isSubmitting}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-zinc-500 text-xs">
+                          Enter percentage gain/loss (positive for profit, negative for loss)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               )}
 
               {/* Horizon, Status and Analyst Confidence */}
