@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, Bold, Italic, Underline, List, ListOrdered, Link, RotateCcw } from 'lucide-react';
+import { ChevronDown, Bold, Italic, Underline, List, ListOrdered, Link, RotateCcw, Type, Palette } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Dynamically import TinyMCE Editor with SSR disabled
@@ -70,9 +70,14 @@ export function QuillEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFormatDropdown, setShowFormatDropdown] = useState(false);
+  const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
+  const [showColorDropdown, setShowColorDropdown] = useState(false);
   const [currentFormat, setCurrentFormat] = useState('Paragraph');
+  const [currentFontSize, setCurrentFontSize] = useState('14px');
   const editorRef = useRef<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fontSizeDropdownRef = useRef<HTMLDivElement>(null);
+  const colorDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -83,6 +88,12 @@ export function QuillEditor({
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowFormatDropdown(false);
+      }
+      if (fontSizeDropdownRef.current && !fontSizeDropdownRef.current.contains(event.target as Node)) {
+        setShowFontSizeDropdown(false);
+      }
+      if (colorDropdownRef.current && !colorDropdownRef.current.contains(event.target as Node)) {
+        setShowColorDropdown(false);
       }
     };
 
@@ -178,12 +189,61 @@ export function QuillEditor({
     { label: 'Heading 6', command: 'h6' },
   ];
 
+  // Font size options
+  const fontSizeOptions = [
+    { label: '10px', value: '10px' },
+    { label: '12px', value: '12px' },
+    { label: '14px', value: '14px' },
+    { label: '16px', value: '16px' },
+    { label: '18px', value: '18px' },
+    { label: '20px', value: '20px' },
+    { label: '24px', value: '24px' },
+    { label: '28px', value: '28px' },
+    { label: '32px', value: '32px' },
+  ];
+
+  // Color options
+  const colorOptions = [
+    { label: 'White', value: '#ffffff' },
+    { label: 'Black', value: '#000000' },
+    { label: 'Red', value: '#ef4444' },
+    { label: 'Green', value: '#22c55e' },
+    { label: 'Blue', value: '#3b82f6' },
+    { label: 'Yellow', value: '#eab308' },
+    { label: 'Purple', value: '#a855f7' },
+    { label: 'Orange', value: '#f97316' },
+  ];
+
   // Apply formatting
   const applyFormat = (command: string, label: string) => {
     if (editorRef.current) {
       editorRef.current.execCommand('FormatBlock', false, command);
       setCurrentFormat(label);
       setShowFormatDropdown(false);
+      editorRef.current.focus();
+    }
+  };
+
+  // Apply font size
+  const applyFontSize = (size: string) => {
+    if (editorRef.current) {
+      const selectedText = editorRef.current.selection.getContent();
+      if (selectedText) {
+        editorRef.current.selection.setContent(`<span style="font-size: ${size}">${selectedText}</span>`);
+      } else {
+        editorRef.current.insertContent(`<span style="font-size: ${size}">`);
+      }
+      setCurrentFontSize(size);
+      setShowFontSizeDropdown(false);
+      editorRef.current.focus();
+    }
+  };
+
+  // Apply text color
+  const applyTextColor = (color: string) => {
+    if (editorRef.current) {
+      editorRef.current.execCommand('ForeColor', false, color);
+      setShowColorDropdown(false);
       editorRef.current.focus();
     }
   };
@@ -259,6 +319,71 @@ export function QuillEditor({
                       onClick={() => applyFormat(option.command, option.label)}
                       className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 first:rounded-t-md last:rounded-b-md"
                     >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Font Size Dropdown */}
+            <div className="relative" ref={fontSizeDropdownRef}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFontSizeDropdown(!showFontSizeDropdown)}
+                disabled={disabled}
+                className="h-8 px-3 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 min-w-[60px] justify-between"
+              >
+                <Type className="h-3 w-3 mr-1" />
+                <span className="text-xs">{currentFontSize}</span>
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+              
+              {showFontSizeDropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50 min-w-[80px]">
+                  {fontSizeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => applyFontSize(option.value)}
+                      className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 first:rounded-t-md last:rounded-b-md"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Color Dropdown */}
+            <div className="relative" ref={colorDropdownRef}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowColorDropdown(!showColorDropdown)}
+                disabled={disabled}
+                className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
+                title="Text Color"
+              >
+                <Palette className="h-4 w-4" />
+              </Button>
+              
+              {showColorDropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50 min-w-[120px]">
+                  {colorOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => applyTextColor(option.value)}
+                      className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 first:rounded-t-md last:rounded-b-md flex items-center gap-2"
+                    >
+                      <div 
+                        className="w-4 h-4 rounded border border-zinc-600" 
+                        style={{ backgroundColor: option.value }}
+                      />
                       {option.label}
                     </button>
                   ))}
