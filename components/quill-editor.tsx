@@ -306,7 +306,7 @@ export function QuillEditor({
               </Button>
               
               {showFormatDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50 min-w-[150px]">
+                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-[9999] min-w-[150px]">
                   {formatOptions.map((option) => (
                     <button
                       key={option.command}
@@ -337,7 +337,7 @@ export function QuillEditor({
               </Button>
               
               {showFontSizeDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50 min-w-[80px]">
+                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-[9999] min-w-[80px]">
                   {fontSizeOptions.map((option) => (
                     <button
                       key={option.value}
@@ -367,7 +367,7 @@ export function QuillEditor({
               </Button>
               
               {showColorDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50 min-w-[120px]">
+                <div className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-[9999] min-w-[120px]">
                   {colorOptions.map((option) => (
                     <button
                       key={option.value}
