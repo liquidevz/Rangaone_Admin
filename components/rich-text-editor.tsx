@@ -1,8 +1,8 @@
 "use client";
 
-import { Editor } from '@tinymce/tinymce-react';
 import { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 interface RichTextEditorProps {
   value: string;
@@ -14,25 +14,41 @@ interface RichTextEditorProps {
   id?: string;
 }
 
-export function RichTextEditor({ value, onChange, placeholder, disabled, height, className, id }) {
+export function RichTextEditor({ 
+  value, 
+  onChange, 
+  placeholder, 
+  disabled, 
+  height = 200, 
+  className, 
+  id 
+}: RichTextEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = `${height}px`;
+    }
+  }, [height]);
+
   return (
-    <div className={className}>
-      <Editor
-        apiKey='v3mpfcq1pwxsfwyb6zlw5id8ljf9hmi6ygbx5j69crowejj4'
-        onInit={(_, editor) => console.log('Editor initialized')}
-        initialValue={value}
-        init={{
-          height: height || 300,
-          menubar: false,
-          plugins: [
-            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'anchor',
-            'searchreplace', 'visualblocks', 'code', 'fullscreen', 'insertdatetime',
-            'media', 'table', 'help', 'wordcount'
-          ],
-          toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist outdent indent | help'
-        }}
-        onEditorChange={onChange}
+    <div className={cn("relative", className)}>
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={cn(
+          "min-h-[200px] resize-none bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500",
+          "font-mono text-sm leading-relaxed"
+        )}
+        style={{ height: `${height}px` }}
+        id={id}
       />
+      <div className="absolute bottom-2 right-2 text-xs text-zinc-500">
+        {value.length} characters
+      </div>
     </div>
   );
 }

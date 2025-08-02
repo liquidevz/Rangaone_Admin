@@ -58,13 +58,17 @@ const tipSchema = z.object({
     required_error: "Category is required",
   }),
   content: z.string()
-    .min(1, "Content is required")
-    .min(20, "Content must be at least 20 characters")
-    .max(5000, "Content must be less than 5000 characters"),
+    .min(1, "Stop loss is required")
+    .refine((val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num > 0;
+    }, {
+      message: "Please enter a valid stop loss price",
+    }),
   description: z.string()
     .min(1, "Description is required")
     .min(10, "Description must be at least 10 characters")
-    .max(1000, "Description must be less than 1000 characters"),
+    .max(5000, "Description must be less than 5000 characters"),
   status: z.enum(["Active", "Closed"], {
     required_error: "Status is required",
   }),
@@ -193,18 +197,25 @@ export function TipFormDialog({
   const showAddMoreField = watchedAction === "buy" || watchedAction === "hold" || watchedAction === "add more";
   const showClosedTipFields = watchedStatus === "Closed";
 
-  // Auto-calculate target percentage
+  // Auto-calculate target/exit percentage
   React.useEffect(() => {
     if (isAutoCalcTarget && selectedStockDetails && watchedTargetPrice) {
       const currentPrice = parseFloat(selectedStockDetails.currentPrice);
       const targetPrice = parseFloat(watchedTargetPrice);
       
       if (currentPrice > 0 && targetPrice > 0) {
-        const percentage = ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
+        let percentage;
+        if (watchedAction === "sell") {
+          // For sell action, calculate exit percentage (how much to sell at)
+          percentage = ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
+        } else {
+          // For buy action, calculate target percentage (expected returns)
+          percentage = ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
+        }
         setValue("targetPercentage", `${percentage}%`);
       }
     }
-  }, [watchedTargetPrice, selectedStockDetails, isAutoCalcTarget, setValue]);
+  }, [watchedTargetPrice, selectedStockDetails, isAutoCalcTarget, setValue, watchedAction]);
 
   // Auto-calculate exit percentage
   React.useEffect(() => {
@@ -226,6 +237,11 @@ export function TipFormDialog({
         // Convert content array to string for form display
         const contentString = Array.isArray(initialData.content) 
           ? initialData.content.find(c => c.key === "main")?.value || initialData.content[0]?.value || ""
+          : "";
+        
+        // Extract exit-range from content array for sell actions
+        const exitRangeContent = Array.isArray(initialData.content) 
+          ? initialData.content.find(c => c.key === "exit-range")?.value || ""
           : "";
         
         // Fetch stock details if we have stockId
@@ -271,13 +287,13 @@ export function TipFormDialog({
           stockSymbol: initialData.stockSymbol || "",
           stockName: initialData.stockName || "",
           category: initialData.category || "basic",
-          content: contentString,
-          description: initialData.description || "",
+          content: initialData.stopLoss || "", // Use stopLoss for content field
+          description: contentString, // Use contentString for description field (rich text)
           status: initialData.status || "Active",
           action: initialData.action || "",
           buyRange: initialData.buyRange || "",
           targetPrice: initialData.targetPrice || "",
-          targetPercentage: initialData.targetPercentage || "",
+          targetPercentage: initialData.action === "sell" && exitRangeContent ? exitRangeContent : (initialData.targetPercentage || ""),
           addMoreAt: initialData.addMoreAt || "",
           exitPrice: initialData.exitPrice || "",
           exitStatus: initialData.exitStatus || "",
@@ -327,10 +343,15 @@ export function TipFormDialog({
         throw new Error('Stock ID is missing');
       }
       console.log('Preparing tipData object');
-      // Convert content string to array format expected by API
+      // Convert description string to array format expected by API (since description is now the rich text content)
       const contentArray = [
-        { key: "main", value: data.content }
+        { key: "main", value: data.description }
       ];
+
+      // Add exit-range to content array for sell actions
+      if (data.action === "sell" && data.targetPercentage) {
+        contentArray.push({ key: "exit-range", value: data.targetPercentage });
+      }
 
       // Create downloadLinks array
       const downloadLinks: Array<{ name: string; url: string }> = [];
@@ -366,6 +387,7 @@ export function TipFormDialog({
         exitPrice: data.exitPrice,
         exitStatus: data.exitStatus,
         exitStatusPercentage: data.exitStatusPercentage,
+        stopLoss: data.content, // Use content field as stop loss
         horizon: data.horizon || "Long Term",
         analysistConfidence: data.analysistConfidence,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
@@ -702,28 +724,33 @@ export function TipFormDialog({
                 )}
               />
 
-              {/* Content with TinyMCE */}
+              {/* Stop Loss */}
               <FormField
                 control={control}
                 name="content"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white text-sm">Content *</FormLabel>
+                    <FormLabel className="text-white text-sm">Stop Loss *</FormLabel>
                     <FormControl>
-                      <RichTextEditor
-                        value={field.value}
-                        onChange={field.onChange}
-                        placeholder="Enter detailed tip content with formatting (min 20 chars)..."
-                        height={200}
+                      <Input
+                        placeholder="Enter stop loss price (e.g., 150.75)"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        {...field}
                         disabled={isSubmitting}
-                        className="bg-zinc-800 border-zinc-700" id={undefined}                      />
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                      />
                     </FormControl>
+                    <FormDescription className="text-zinc-500 text-xs">
+                      Price at which to stop losses
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Description */}
+              {/* Description with TinyMCE */}
               <FormField
                 control={control}
                 name="description"
@@ -731,11 +758,14 @@ export function TipFormDialog({
                   <FormItem>
                     <FormLabel className="text-white text-sm">Description *</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Brief summary/description (min 10 chars)"
-                        {...field}
+                      <RichTextEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Enter detailed tip description with formatting (min 10 chars)..."
+                        height={200}
                         disabled={isSubmitting}
-                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[80px]"
+                        className="bg-zinc-800 border-zinc-700"
+                        id="description-editor"
                       />
                     </FormControl>
                     <FormMessage />
@@ -802,7 +832,7 @@ export function TipFormDialog({
                   name="targetPrice"
                   render={({ field }) => (
                     <FormItem>
-                          <FormLabel className="text-white text-sm">Target Price (₹) *</FormLabel>
+                          <FormLabel className="text-white text-sm">{watchedAction === "sell" ? "Exit Price" : "Target Price"} (₹) *</FormLabel>
                       <FormControl>
                         <Input
                               placeholder="e.g., 150.75"
@@ -815,7 +845,10 @@ export function TipFormDialog({
                         />
                       </FormControl>
                           <FormDescription className="text-zinc-500 text-xs">
-                            Enter positive number (auto-calculates percentage)
+                            {watchedAction === "sell" 
+                              ? "Enter exit price (auto-calculates exit percentage)"
+                              : "Enter positive number (auto-calculates percentage)"
+                            }
                           </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -827,8 +860,15 @@ export function TipFormDialog({
                   name="targetPercentage"
                   render={({ field }) => (
                     <FormItem>
-                          <FormLabel className="text-white text-sm flex items-center gap-2">
-                            Target Percentage *
+                          <FormLabel className={`text-sm flex items-center gap-2 ${
+                            watchedStatus === "Closed" ? "text-orange-300" : "text-white"
+                          }`}>
+                            {watchedStatus === "Closed" ? "Exit Range" : watchedAction === "sell" ? "Exit Percentage" : "Target Percentage"} *
+                            {watchedStatus === "Closed" && (
+                              <Badge variant="outline" className="text-xs bg-orange-900/20 text-orange-300 border-orange-600">
+                                Closed Tip
+                              </Badge>
+                            )}
                             <Button
                               type="button"
                               variant="ghost"
@@ -842,14 +882,23 @@ export function TipFormDialog({
                           </FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="e.g., 25% or 25"
+                              placeholder={watchedStatus === "Closed" ? "e.g., 150-200 or 25-30%" : watchedAction === "sell" ? "e.g., 25% or 25" : "e.g., 25% or 25"}
                               {...field}
                               disabled={isSubmitting || isAutoCalcTarget}
-                              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                              className={`bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 ${
+                                watchedStatus === "Closed" ? "border-orange-600" : ""
+                              }`}
                             />
                           </FormControl>
-                          <FormDescription className="text-zinc-500 text-xs">
-                            {isAutoCalcTarget ? "Auto-calculated from target price" : "Enter percentage manually"}
+                          <FormDescription className={`text-xs ${
+                            watchedStatus === "Closed" ? "text-orange-400" : "text-zinc-500"
+                          }`}>
+                            {watchedStatus === "Closed" 
+                              ? (isAutoCalcTarget ? "Auto-calculated exit range" : "Enter exit range manually (e.g., 150-200 or 25-30%)")
+                              : watchedAction === "sell" 
+                                ? (isAutoCalcTarget ? "Auto-calculated exit percentage" : "Enter exit percentage manually")
+                                : (isAutoCalcTarget ? "Auto-calculated from target price" : "Enter percentage manually")
+                            }
                           </FormDescription>
                           <FormMessage />
                         </FormItem>

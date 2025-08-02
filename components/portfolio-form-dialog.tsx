@@ -426,8 +426,8 @@ export function PortfolioFormDialog({
             }]);
           } else {
             const extendedFees: ExtendedSubscriptionFee[] = initialData.subscriptionFee.map(fee => {
-              // Calculate discount percentage if actualPrice exists and is different from price
-              const actualPrice = fee.actualPrice || fee.price;
+              // Calculate discount percentage - use price as both actual and discount price initially
+              const actualPrice = (fee as any).actualPrice || fee.price;
               const discountPrice = fee.price;
               const discountPercentage = actualPrice > 0 ? Math.round(((actualPrice - discountPrice) / actualPrice) * 100) : 0;
               
@@ -500,7 +500,7 @@ export function PortfolioFormDialog({
           const normalizedDownloadLinks: DownloadLink[] = initialData.downloadLinks.map(link => ({
             ...link,
             linkType: link.linkType || "pdf",
-            linkUrl: link.linkUrl || link.url || "",
+            linkUrl: link.linkUrl || (link as any).url || "",
             linkDiscription: link.linkDiscription || "",
             name: link.name || ""
           }));

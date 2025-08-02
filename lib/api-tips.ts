@@ -29,6 +29,8 @@ export interface Tip {
   exitPrice?: string;
   exitStatus?: string;
   exitStatusPercentage?: string;
+  exitedPrice?: string;
+  stopLoss?: string;
   horizon?: string;
   analysistConfidence?: number;
   downloadLinks?: Array<{
@@ -58,6 +60,8 @@ export interface CreateTipRequest {
   exitPrice?: string;
   exitStatus?: string;
   exitStatusPercentage?: string;
+  exitedPrice?: string;
+  stopLoss?: string;
   horizon?: string;
   analysistConfidence?: number;
   downloadLinks?: Array<{
