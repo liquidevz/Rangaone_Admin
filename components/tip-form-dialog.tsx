@@ -43,7 +43,7 @@ import type { CreateTipRequest, Tip } from "@/lib/api-tips";
 import { updateTip } from "@/lib/api-tips";
 import { searchStockSymbols, type StockSymbol } from "@/lib/api-stock-symbols";
 import { Badge } from "@/components/ui/badge";
-import { RichTextEditor } from "@/components/rich-text-editor";
+import { QuillEditor } from "@/components/quill-editor";
 
 // Updated validation schema with all fields required
 const tipSchema = z.object({
@@ -57,7 +57,7 @@ const tipSchema = z.object({
   category: z.enum(["basic", "premium", "social_media"], {
     required_error: "Category is required",
   }),
-  content: z.string()
+  stopLoss: z.string()
     .min(1, "Stop loss is required")
     .refine((val) => {
       const num = parseFloat(val);
@@ -168,7 +168,7 @@ export function TipFormDialog({
       stockSymbol: "",
       stockName: "",
       category: "basic",
-      content: "",
+      stopLoss: "",
       description: "",
       status: "Active",
       action: "",
@@ -234,10 +234,16 @@ export function TipFormDialog({
   React.useEffect(() => {
     if (open) {
       if (initialData) {
-        // Convert content array to string for form display
-        const contentString = Array.isArray(initialData.content) 
-          ? initialData.content.find(c => c.key === "main")?.value || initialData.content[0]?.value || ""
+        // Extract stop loss from content array stop-loss key
+        const stopLossContent = Array.isArray(initialData.content) 
+          ? initialData.content.find(c => c.key === "stop-loss")?.value || ""
           : "";
+        
+        console.log('Edit mode - extracting stop loss from stop-loss key:', {
+          contentArray: initialData.content,
+          stopLossContent,
+          fallbackStopLoss: initialData.stopLoss
+        });
         
         // Extract exit-range from content array for sell actions
         const exitRangeContent = Array.isArray(initialData.content) 
@@ -287,8 +293,8 @@ export function TipFormDialog({
           stockSymbol: initialData.stockSymbol || "",
           stockName: initialData.stockName || "",
           category: initialData.category || "basic",
-          content: initialData.stopLoss || "", // Use stopLoss for content field
-          description: contentString, // Use contentString for description field (rich text)
+          stopLoss: stopLossContent || initialData.stopLoss || "", // Use stop loss from content array stop-loss key
+          description: initialData.description || "", // Use separate description field
           status: initialData.status || "Active",
           action: initialData.action || "",
           buyRange: initialData.buyRange || "",
@@ -309,7 +315,7 @@ export function TipFormDialog({
           stockSymbol: "",
           stockName: "",
           category: "basic",
-          content: "",
+          stopLoss: "",
           description: "",
           status: "Active",
           action: "",
@@ -343,10 +349,16 @@ export function TipFormDialog({
         throw new Error('Stock ID is missing');
       }
       console.log('Preparing tipData object');
-      // Convert description string to array format expected by API (since description is now the rich text content)
+      // Store stop loss in content array with stop-loss key
       const contentArray = [
-        { key: "main", value: data.description }
+        { key: "stop-loss", value: data.stopLoss }
       ];
+      
+      console.log('CONTENT ARRAY DEBUG:', {
+        stopLossFromForm: data.stopLoss,
+        contentArrayBeingCreated: contentArray,
+        descriptionFromForm: data.description
+      });
 
       // Add exit-range to content array for sell actions
       if (data.action === "sell" && data.targetPercentage) {
@@ -387,7 +399,7 @@ export function TipFormDialog({
         exitPrice: data.exitPrice,
         exitStatus: data.exitStatus,
         exitStatusPercentage: data.exitStatusPercentage,
-        stopLoss: data.content, // Use content field as stop loss
+        stopLoss: data.stopLoss, // Use stopLoss field
         horizon: data.horizon || "Long Term",
         analysistConfidence: data.analysistConfidence,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
@@ -727,7 +739,7 @@ export function TipFormDialog({
               {/* Stop Loss */}
               <FormField
                 control={control}
-                name="content"
+                name="stopLoss"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-white text-sm">Stop Loss *</FormLabel>
@@ -758,7 +770,7 @@ export function TipFormDialog({
                   <FormItem>
                     <FormLabel className="text-white text-sm">Description *</FormLabel>
                     <FormControl>
-                      <RichTextEditor
+                      <QuillEditor
                         value={field.value}
                         onChange={field.onChange}
                         placeholder="Enter detailed tip description with formatting (min 10 chars)..."

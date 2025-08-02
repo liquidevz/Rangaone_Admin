@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useEffect } from 'react';
+import { Editor } from '@tinymce/tinymce-react';
 import { cn } from '@/lib/utils';
-import { Textarea } from '@/components/ui/textarea';
 
 interface RichTextEditorProps {
   value: string;
@@ -23,32 +22,52 @@ export function RichTextEditor({
   className, 
   id 
 }: RichTextEditorProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = `${height}px`;
-    }
-  }, [height]);
-
   return (
-    <div className={cn("relative", className)}>
-      <Textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={cn(
-          "min-h-[200px] resize-none bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500",
-          "font-mono text-sm leading-relaxed"
-        )}
-        style={{ height: `${height}px` }}
+    <div className={cn("tinymce-wrapper", className)}>
+      <Editor
+        apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY}
         id={id}
+        value={value}
+        onEditorChange={(content) => onChange(content)}
+        disabled={disabled}
+        init={{
+          height: height,
+          menubar: false,
+          plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+          ],
+          toolbar: 'undo redo | blocks | ' +
+            'bold italic forecolor | alignleft aligncenter ' +
+            'alignright alignjustify | bullist numlist outdent indent | ' +
+            'removeformat | help',
+          content_style: `
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
+              font-size: 14px;
+              background-color: #27272a;
+              color: #ffffff;
+            }
+          `,
+          skin: 'oxide-dark',
+          content_css: 'dark',
+          placeholder: placeholder,
+          branding: false,
+          resize: false,
+          statusbar: false,
+          setup: (editor) => {
+            editor.on('init', () => {
+              // Apply dark theme styles to the editor
+              const editorContainer = editor.getContainer();
+              if (editorContainer) {
+                editorContainer.style.border = '1px solid #3f3f46';
+                editorContainer.style.borderRadius = '6px';
+              }
+            });
+          }
+        }}
       />
-      <div className="absolute bottom-2 right-2 text-xs text-zinc-500">
-        {value.length} characters
-      </div>
     </div>
   );
 }

@@ -107,3 +107,46 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* TinyMCE Dark Theme Styles */
+.tinymce-wrapper .tox.tox-tinymce {
+  border: 1px solid #3f3f46 !important;
+  border-radius: 6px !important;
+}
+
+.tinymce-wrapper .tox .tox-editor-header {
+  background-color: #27272a !important;
+  border-bottom: 1px solid #3f3f46 !important;
+}
+
+.tinymce-wrapper .tox .tox-toolbar__primary {
+  background-color: #27272a !important;
+}
+
+.tinymce-wrapper .tox .tox-edit-area {
+  background-color: #27272a !important;
+}
+
+.tinymce-wrapper .tox .tox-edit-area__iframe {
+  background-color: #27272a !important;
+}
+
+.tinymce-wrapper .tox:not(.tox-tinymce-inline) .tox-editor-header {
+  box-shadow: none !important;
+}
+
+.tinymce-wrapper .tox .tox-tbtn {
+  color: #ffffff !important;
+}
+
+.tinymce-wrapper .tox .tox-tbtn:hover {
+  background-color: #3f3f46 !important;
+}
+
+.tinymce-wrapper .tox .tox-tbtn--enabled {
+  background-color: #3f3f46 !important;
+}
+
+.tinymce-wrapper .tox .tox-tbtn svg {
+  fill: #ffffff !important;
+}

@@ -110,7 +110,7 @@ export function QuillEditor({
         line-height: 1.6;
         margin: 8px;
         color: #ffffff;
-        background-color: #09090b;
+        background-color: #27272a;
       }
       h1 { font-size: 2em; font-weight: bold; margin: 0.5em 0; color: #ffffff; }
       h2 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; color: #ffffff; }
@@ -232,9 +232,9 @@ export function QuillEditor({
 
   try {
     return (
-      <div className={cn("w-full border border-zinc-700 rounded-md bg-zinc-950", className)}>
+      <div className={cn("w-full border border-zinc-700 rounded-md bg-zinc-800", className)}>
         {/* Custom Toolbar */}
-        <div className="border-b border-zinc-700 p-2 bg-zinc-900 rounded-t-md">
+        <div className="border-b border-zinc-700 p-2 bg-zinc-800 rounded-t-md">
           <div className="flex items-center gap-1">
             {/* Format Dropdown */}
             <div className="relative" ref={dropdownRef}>
@@ -244,7 +244,7 @@ export function QuillEditor({
                 size="sm"
                 onClick={() => setShowFormatDropdown(!showFormatDropdown)}
                 disabled={disabled}
-                className="h-8 px-3 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 min-w-[120px] justify-between"
+                className="h-8 px-3 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 min-w-[120px] justify-between"
               >
                 <span className="text-sm">{currentFormat}</span>
                 <ChevronDown className="h-3 w-3" />
@@ -275,7 +275,7 @@ export function QuillEditor({
               size="sm"
               onClick={() => execCommand('Bold')}
               disabled={disabled}
-              className="h-8 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
               title="Bold (Ctrl+B)"
             >
               <Bold className="h-4 w-4" />
@@ -287,7 +287,7 @@ export function QuillEditor({
               size="sm"
               onClick={() => execCommand('Italic')}
               disabled={disabled}
-              className="h-8 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
               title="Italic (Ctrl+I)"
             >
               <Italic className="h-4 w-4" />
@@ -299,7 +299,7 @@ export function QuillEditor({
               size="sm"
               onClick={() => execCommand('Underline')}
               disabled={disabled}
-              className="h-8 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
               title="Underline (Ctrl+U)"
             >
               <Underline className="h-4 w-4" />
@@ -313,7 +313,7 @@ export function QuillEditor({
               size="sm"
               onClick={() => execCommand('InsertUnorderedList')}
               disabled={disabled}
-              className="h-8 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
               title="Bullet List"
             >
               <List className="h-4 w-4" />
@@ -325,7 +325,7 @@ export function QuillEditor({
               size="sm"
               onClick={() => execCommand('InsertOrderedList')}
               disabled={disabled}
-              className="h-8 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
               title="Numbered List"
             >
               <ListOrdered className="h-4 w-4" />
@@ -339,7 +339,7 @@ export function QuillEditor({
               size="sm"
               onClick={insertLink}
               disabled={disabled}
-              className="h-8 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
               title="Insert Link"
             >
               <Link className="h-4 w-4" />
@@ -351,7 +351,7 @@ export function QuillEditor({
               size="sm"
               onClick={() => execCommand('RemoveFormat')}
               disabled={disabled}
-              className="h-8 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              className="h-8 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
               title="Clear Formatting"
             >
               <RotateCcw className="h-4 w-4" />
