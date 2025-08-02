@@ -227,12 +227,7 @@ export function QuillEditor({
   // Apply font size
   const applyFontSize = (size: string) => {
     if (editorRef.current) {
-      const selectedText = editorRef.current.selection.getContent();
-      if (selectedText) {
-        editorRef.current.selection.setContent(`<span style="font-size: ${size}">${selectedText}</span>`);
-      } else {
-        editorRef.current.insertContent(`<span style="font-size: ${size}">`);
-      }
+      editorRef.current.execCommand('fontSize', false, size);
       setCurrentFontSize(size);
       setShowFontSizeDropdown(false);
       editorRef.current.focus();
