@@ -17,9 +17,11 @@ import {
   ArrowDown,
   Minus,
   Bot,
+  Target,
+  Activity,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
-import { fetchPortfolios } from "@/lib/api-portfolios";
+import { fetchPortfolios, Portfolio } from "@/lib/api-portfolios";
 
 // Types for the price history API
 interface PriceHistoryDataPoint {
@@ -37,18 +39,13 @@ interface PriceHistoryResponse {
   data: PriceHistoryDataPoint[];
 }
 
-interface Portfolio {
-  id: string;
-  name: string;
-  description?: string;
-}
-
 export default function PriceHistoryPage() {
   const { toast } = useToast();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>("");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("1m");
   const [priceHistory, setPriceHistory] = useState<PriceHistoryResponse | null>(null);
+  const [compareData, setCompareData] = useState<PriceHistoryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const periods = [
@@ -75,20 +72,21 @@ export default function PriceHistoryPage() {
     }
   };
 
-  // Load price history
+  // Load price history for portfolio and compare data
   const loadPriceHistory = async () => {
     if (!selectedPortfolio) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch(
+      // Load portfolio data
+      const portfolioResponse = await fetch(
         `${API_BASE_URL}/api/portfolios/${selectedPortfolio}/price-history?period=${selectedPeriod}`
       );
       
-      if (response.ok) {
-        const data: PriceHistoryResponse = await response.json();
-        setPriceHistory(data);
-      } else if (response.status === 404) {
+      if (portfolioResponse.ok) {
+        const portfolioData: PriceHistoryResponse = await portfolioResponse.json();
+        setPriceHistory(portfolioData);
+      } else if (portfolioResponse.status === 404) {
         toast({
           title: "No Data",
           description: "No price history found for this portfolio",
@@ -98,10 +96,33 @@ export default function PriceHistoryPage() {
       } else {
         toast({
           title: "Error",
-          description: "Failed to load price history",
+          description: "Failed to load portfolio price history",
           variant: "destructive",
         });
         setPriceHistory(null);
+      }
+
+      // Load compare data if available
+      const selectedPortfolioData = portfolios.find(p => p.id === selectedPortfolio);
+      if (selectedPortfolioData?.compareWith) {
+        try {
+          const compareResponse = await fetch(
+            `${API_BASE_URL}/api/portfolios/${selectedPortfolioData.compareWith}/price-history?period=${selectedPeriod}`
+          );
+          
+          if (compareResponse.ok) {
+            const compareDataResponse: PriceHistoryResponse = await compareResponse.json();
+            setCompareData(compareDataResponse);
+          } else {
+            console.warn("Failed to load compare data");
+            setCompareData(null);
+          }
+        } catch (error) {
+          console.warn("Error loading compare data:", error);
+          setCompareData(null);
+        }
+      } else {
+        setCompareData(null);
       }
     } catch (error) {
       console.error("Error loading price history:", error);
@@ -111,6 +132,7 @@ export default function PriceHistoryPage() {
         variant: "destructive",
       });
       setPriceHistory(null);
+      setCompareData(null);
     } finally {
       setIsLoading(false);
     }
@@ -156,20 +178,41 @@ export default function PriceHistoryPage() {
     });
   };
 
-  const calculateTotalValue = () => {
+  // Calculate meaningful averages
+  const calculatePortfolioAverage = () => {
     if (!priceHistory?.data.length) return 0;
-    return priceHistory.data.reduce((sum, point) => sum + point.value, 0);
+    const values = priceHistory.data.map(point => point.cash); // Use cash as portfolio value
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
   };
 
-  const calculateTotalCash = () => {
-    if (!priceHistory?.data.length) return 0;
-    return priceHistory.data.reduce((sum, point) => sum + point.cash, 0);
-  };
-
-  const calculateAverageChange = () => {
+  const calculatePortfolioAverageChange = () => {
     if (!priceHistory?.data.length) return 0;
     const changes = priceHistory.data.map(point => point.change);
     return changes.reduce((sum, change) => sum + change, 0) / changes.length;
+  };
+
+  const calculateCompareAverage = () => {
+    if (!compareData?.data.length) return 0;
+    const values = compareData.data.map(point => point.cash); // Use cash as portfolio value
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
+
+  const calculateCompareAverageChange = () => {
+    if (!compareData?.data.length) return 0;
+    const changes = compareData.data.map(point => point.change);
+    return changes.reduce((sum, change) => sum + change, 0) / changes.length;
+  };
+
+  const getSelectedPortfolioName = () => {
+    return portfolios.find(p => p.id === selectedPortfolio)?.name || 'Selected Portfolio';
+  };
+
+  const getComparePortfolioName = () => {
+    const selectedPortfolioData = portfolios.find(p => p.id === selectedPortfolio);
+    if (selectedPortfolioData?.compareWith) {
+      return portfolios.find(p => p.id === selectedPortfolioData.compareWith)?.name || 'Compare Portfolio';
+    }
+    return null;
   };
 
   return (
@@ -206,7 +249,7 @@ export default function PriceHistoryPage() {
               </SelectTrigger>
               <SelectContent>
                 {portfolios.map((portfolio) => (
-                  <SelectItem key={portfolio.id} value={portfolio.id}>
+                  <SelectItem key={portfolio.id} value={portfolio.id || ''}>
                     {portfolio.name}
                   </SelectItem>
                 ))}
@@ -232,54 +275,60 @@ export default function PriceHistoryPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Meaningful Summary Cards */}
       {priceHistory && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Portfolio Average</CardTitle>
+              <Target className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(calculateTotalValue())}</div>
-              <p className="text-xs text-muted-foreground">Portfolio value</p>
+              <div className="text-2xl font-bold text-blue-600">{formatCurrency(calculatePortfolioAverage())}</div>
+              <p className="text-xs text-muted-foreground">Average portfolio value</p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cash</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <CardTitle className="text-sm font-medium">Portfolio Avg Change</CardTitle>
+              <Activity className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(calculateTotalCash())}</div>
-              <p className="text-xs text-muted-foreground">Cash holdings</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Average Change</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${getChangeColor(calculateAverageChange())}`}>
-                {formatCurrency(calculateAverageChange())}
+              <div className={`text-2xl font-bold ${getChangeColor(calculatePortfolioAverageChange())}`}>
+                {formatCurrency(calculatePortfolioAverageChange())}
               </div>
               <p className="text-xs text-muted-foreground">Average daily change</p>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Data Points</CardTitle>
-              <BarChart3 className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{priceHistory.dataPoints}</div>
-              <p className="text-xs text-muted-foreground">Historical records</p>
-            </CardContent>
-          </Card>
+          {compareData && (
+            <>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Compare Average</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-600">{formatCurrency(calculateCompareAverage())}</div>
+                  <p className="text-xs text-muted-foreground">Average compare value</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Compare Avg Change</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-orange-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${getChangeColor(calculateCompareAverageChange())}`}>
+                    {formatCurrency(calculateCompareAverageChange())}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Average daily change</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       )}
 
@@ -292,7 +341,8 @@ export default function PriceHistoryPage() {
               Price History
             </CardTitle>
             <CardDescription>
-              Historical price data for {portfolios.find(p => p.id === selectedPortfolio)?.name || 'Selected Portfolio'}
+              Historical price data for {getSelectedPortfolioName()}
+              {getComparePortfolioName() && ` vs ${getComparePortfolioName()}`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -317,44 +367,59 @@ export default function PriceHistoryPage() {
                     <TableRow>
                       <TableHead>Date & Time</TableHead>
                       <TableHead>Portfolio Value</TableHead>
-                      <TableHead>Cash</TableHead>
+                      <TableHead>Portfolio Value</TableHead>
                       <TableHead>Change</TableHead>
                       <TableHead>Change %</TableHead>
+                      {compareData && <TableHead>Compare Value</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {priceHistory.data.map((point, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {formatDate(point.date)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{formatCurrency(point.value)}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-green-600">{formatCurrency(point.cash)}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getChangeIcon(point.change)}
-                            <span className={`font-medium ${getChangeColor(point.change)}`}>
-                              {formatCurrency(point.change)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={(point.changePercent || 0) > 0 ? "default" : (point.changePercent || 0) < 0 ? "destructive" : "secondary"}
-                            className={(point.changePercent || 0) === 0 ? "bg-gray-100 text-gray-800" : ""}
-                          >
-                            {(point.changePercent || 0) > 0 ? '+' : ''}{(point.changePercent || 0).toFixed(2)}%
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {priceHistory.data.map((point, index) => {
+                      const comparePoint = compareData?.data[index];
+                      return (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              {formatDate(point.date)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{formatCurrency(point.cash)}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-green-600">{formatCurrency(point.value)}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getChangeIcon(point.change)}
+                              <span className={`font-medium ${getChangeColor(point.change)}`}>
+                                {formatCurrency(point.change)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={(point.changePercent || 0) > 0 ? "default" : (point.changePercent || 0) < 0 ? "destructive" : "secondary"}
+                              className={(point.changePercent || 0) === 0 ? "bg-gray-100 text-gray-800" : ""}
+                            >
+                              {(point.changePercent || 0) > 0 ? '+' : ''}{(point.changePercent || 0).toFixed(2)}%
+                            </Badge>
+                          </TableCell>
+                          {compareData && (
+                            <TableCell>
+                              {comparePoint ? (
+                                <div className="font-medium text-purple-600">
+                                  {formatCurrency(comparePoint.cash)}
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground">-</div>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
