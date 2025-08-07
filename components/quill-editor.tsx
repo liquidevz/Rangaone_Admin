@@ -7,16 +7,26 @@ import { Button } from '@/components/ui/button';
 import { ChevronDown, Bold, Italic, Underline, List, ListOrdered, Link, RotateCcw, Type, Palette } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
-// Dynamically import TinyMCE Editor with SSR disabled
-const Editor = dynamic(
-  () => import('@tinymce/tinymce-react').then((mod) => mod.Editor),
-  { 
+// Wrapper to avoid type conflicts with dynamic and tinymce typings
+const EditorWrapper = (props: any) => {
+  // Use require to avoid SSR import
+  const { Editor: TinyMCEEditor } = require('@tinymce/tinymce-react');
+  return <TinyMCEEditor {...props} />;
+};
+
+// Dynamically load the wrapper with SSR disabled
+const Editor = dynamic<any>(
+  () => Promise.resolve(EditorWrapper as any),
+  {
     ssr: false,
     loading: () => (
-      <div className="w-full border border-border rounded-md bg-background flex items-center justify-center" style={{ height: 200 }}>
+      <div
+        className="w-full border border-border rounded-md bg-background flex items-center justify-center"
+        style={{ height: 200 }}
+      >
         <div className="text-muted-foreground">Loading TinyMCE editor...</div>
       </div>
-    )
+    ),
   }
 );
 
