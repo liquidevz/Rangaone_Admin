@@ -49,7 +49,8 @@ interface StockSymbol {
 
 // Portfolio interface
 interface Portfolio {
-  _id: string;
+  id?: string;
+  _id?: string;
   name: string;
   currentValue?: number;
   cashBalance?: number;

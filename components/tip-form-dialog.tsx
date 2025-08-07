@@ -55,7 +55,7 @@ const tipSchema = z.object({
   stockSymbol: z.string().min(1, "Stock symbol is required"),
   stockName: z.string().optional(),
   category: z.enum(["basic", "premium", "social_media"], {
-    required_error: "Category is required",
+    message: "Category is required",
   }),
   stopLoss: z.string()
     .min(1, "Stop loss is required")
@@ -70,7 +70,7 @@ const tipSchema = z.object({
     .min(10, "Description must be at least 10 characters")
     .max(5000, "Description must be less than 5000 characters"),
   status: z.enum(["Active", "Closed"], {
-    required_error: "Status is required",
+    message: "Status is required",
   }),
   action: z.string()
     .min(1, "Action is required")

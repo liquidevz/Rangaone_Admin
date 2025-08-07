@@ -341,11 +341,12 @@ export const createGeneralTip = async (
 
     // Handle both string and array content formats
     if (typeof tipData.content === 'string') {
-      if (!tipData.content.trim()) {
+      const contentStr = tipData.content as string;
+      if (!contentStr.trim()) {
         throw new Error("Content is required");
       }
       // Convert string content to array format
-      tipData.content = [{ key: "main", value: tipData.content }];
+      tipData.content = [{ key: "main", value: contentStr }];
     } else if (Array.isArray(tipData.content)) {
       if (!tipData.content.length || !tipData.content[0]?.value?.trim()) {
         throw new Error("Content is required");

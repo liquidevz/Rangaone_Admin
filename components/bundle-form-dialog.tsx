@@ -47,9 +47,9 @@ const bundleFormSchema = z.object({
   category: z.enum(["basic", "premium"], {
     message: "Category must be either basic or premium.",
   }),
-  monthlyPrice: z.coerce.number().min(0).optional().nullable(),
-  quarterlyPrice: z.coerce.number().min(0).optional().nullable(),
-  yearlyPrice: z.coerce.number().min(0).optional().nullable(),
+  monthlyPrice: z.number().min(0).optional().nullable(),
+  quarterlyPrice: z.number().min(0).optional().nullable(),
+  yearlyPrice: z.number().min(0).optional().nullable(),
 }).refine(
   (data) => {
     const hasMonthly = data.monthlyPrice != null && data.monthlyPrice > 0;

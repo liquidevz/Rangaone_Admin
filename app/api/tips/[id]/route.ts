@@ -42,7 +42,6 @@ export async function GET(
       targetPercentage: "20%",
       addMoreAt: "95",
       analysistConfidence: 85,
-      analysistConfidence: 85,
       tipUrl: "https://example.com/analysis/stock-xyz",
       exitPrice: "200",
       exitStatus: "Target Achieved",

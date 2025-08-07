@@ -27,7 +27,6 @@ const createTipSchema = z.object({
   exitStatusPercentage: z.string().optional(),
   horizon: z.string().optional(),
   analysistConfidence: z.number().optional(),
-  analysistConfidence: z.number().optional(),
   downloadLinks: z.array(
     z.object({
       name: z.string().min(1, "Name is required"),
@@ -59,9 +58,9 @@ export async function POST(req: NextRequest) {
     const validationResult = createTipSchema.safeParse(processedBody);
 
     if (!validationResult.success) {
-      console.error('Validation errors:', validationResult.error.errors);
+      console.error('Validation errors:', validationResult.error.issues);
       return NextResponse.json(
-        { message: "Invalid input", errors: validationResult.error.errors },
+        { message: "Invalid input", errors: validationResult.error.issues },
         { status: 400 }
       );
     }
@@ -93,8 +92,7 @@ export async function POST(req: NextRequest) {
       status: tipData.status || "Active",
       horizon: tipData.horizon || "Long Term",
       // Handle both spellings of the confidence field
-      analysistConfidence: tipData.analysistConfidence || tipData.analysistConfidence || 5,
-      analysistConfidence: tipData.analysistConfidence || tipData.analysistConfidence || 5,
+      analysistConfidence: tipData.analysistConfidence || 5,
       downloadLinks: tipData.downloadLinks?.filter(link => link.name?.trim() && link.url?.trim()) || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

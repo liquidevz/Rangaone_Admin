@@ -241,3 +241,13 @@ export const testWebhook = async (): Promise<{
 }> => {
   return await apiRequest('/api/telegram/webhook/test');
 };
+
+// Health API
+export const getTelegramHealth = async (): Promise<{
+  success: boolean;
+  botInitialized: boolean;
+  hasToken: boolean;
+  timestamp: string;
+}> => {
+  return await apiRequest('/api/telegram/health');
+};

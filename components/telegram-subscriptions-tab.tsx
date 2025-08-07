@@ -299,7 +299,7 @@ export function SubscriptionsTab() {
                   <Label htmlFor="product">Product</Label>
                   <Select 
                     value={formData.product_id?.toString() || ''} 
-                    onValueChange={(value) => setFormData({ ...formData, product_id: value, product_name: undefined })}
+                    onValueChange={(value: string) => setFormData({ ...formData, product_id: value, product_name: undefined })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a product" />

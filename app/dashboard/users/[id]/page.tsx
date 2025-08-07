@@ -17,6 +17,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isInvalid, setIsInvalid] = useState(false) // Add this line
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isBanDialogOpen, setIsBanDialogOpen] = useState(false)
@@ -26,15 +27,28 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   // Load user data
   const loadUser = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-      setError(null)
-      const { id } = await params;
-      const data = await fetchUserById(id)
-      setUser(data)
+      const { id } = await params // Await the params promise
+      if (!id || id === "undefined") {
+        setIsInvalid(true)
+        toast({
+          title: "Invalid User",
+          description: "The user ID is invalid or missing",
+          variant: "destructive",
+        })
+        return
+      }
+      const userData = await fetchUserById(id)
+      setUser(userData)
     } catch (err) {
       console.error("Error loading user:", err)
       setError(err instanceof Error ? err.message : "Failed to load user")
+      toast({
+        title: "Failed to load user",
+        description: err instanceof Error ? err.message : "An unknown error occurred",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -42,7 +56,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     loadUser()
-  }, [params.id])
+  }, [params]) // Depend on params object itself, as its content changes after resolution
 
   // Handle user update
   const handleUpdateUser = async (userData: any) => {

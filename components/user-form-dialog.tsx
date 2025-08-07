@@ -43,7 +43,7 @@ const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().optional(),
   role: z.enum(["admin", "manager", "user"]).default("user").optional(),
-  emailVerified: z.boolean().default(true),
+  emailVerified: z.boolean().default(true).optional(),
 });
 
 interface UserFormDialogProps {
