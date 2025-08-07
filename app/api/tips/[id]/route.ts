@@ -3,7 +3,7 @@ import { isAuthenticated } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -11,7 +11,7 @@ export async function GET(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await params;
     if (!id) {
       return NextResponse.json(
         { message: "Tip ID is required" },
@@ -58,7 +58,7 @@ export async function GET(
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error(`Error fetching tip with ID ${params.id}:`, error);
+    console.error(`Error fetching tip with ID ${(await params).id}:`, error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
@@ -68,7 +68,7 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -76,7 +76,7 @@ export async function PUT(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await params;
     if (!id) {
       return NextResponse.json(
         { message: "Tip ID is required" },
@@ -101,7 +101,7 @@ export async function PUT(
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error(`Error updating tip with ID ${params.id}:`, error);
+    console.error(`Error updating tip with ID ${(await params).id}:`, error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
@@ -111,7 +111,7 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -119,7 +119,7 @@ export async function DELETE(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await params;
     if (!id) {
       return NextResponse.json(
         { message: "Tip ID is required" },
@@ -135,7 +135,7 @@ export async function DELETE(
       message: `Tip with ID ${id} deleted successfully`
     });
   } catch (error) {
-    console.error(`Error deleting tip with ID ${params.id}:`, error);
+    console.error(`Error deleting tip with ID ${(await params).id}:`, error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

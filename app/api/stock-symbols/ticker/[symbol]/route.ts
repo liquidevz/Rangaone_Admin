@@ -5,7 +5,7 @@ import { fetchWithAuth, API_BASE_URL } from "@/lib/auth";
 
 export async function GET(
   req: Request,
-  { params }: { params: { symbol: string } }
+  { params }: { params: Promise<{ symbol: string }> }
 ) {
   try {
     // Get the session
@@ -15,7 +15,7 @@ export async function GET(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const { symbol } = params;
+    const { symbol } = await params;
 
     if (!symbol) {
       return new NextResponse("Symbol is required", { status: 400 });
