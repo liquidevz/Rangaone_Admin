@@ -6,7 +6,7 @@ import { fetchWithAuth, API_BASE_URL } from "@/lib/auth";
 
 export async function GET(
   req: Request,
-  { params }: { params: { bundleId: string } }
+  { params }: { params: Promise<{ bundleId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function GET(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const { bundleId } = params;
+    const { bundleId } = await params;
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/bundles/${bundleId}`);
 
@@ -37,7 +37,7 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  { params }: { params: { bundleId: string } }
+  { params }: { params: Promise<{ bundleId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -46,7 +46,7 @@ export async function PUT(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const { bundleId } = params;
+    const { bundleId } = await params;
     const body = await req.json();
 
     const response = await fetchWithAuth(
@@ -78,7 +78,7 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { bundleId: string } }
+  { params }: { params: Promise<{ bundleId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -87,7 +87,7 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const { bundleId } = params;
+    const { bundleId } = await params;
 
     const response = await fetchWithAuth(
       `${API_BASE_URL}/api/bundles/${bundleId}`,
