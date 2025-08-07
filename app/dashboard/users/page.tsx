@@ -189,12 +189,21 @@ export default function UsersPage() {
       header: "Username",
       cell: ({ row }) => {
         const username = row.getValue("username") as string;
-        return username || row.original.email.split("@")[0];
+        return (
+          <div className="font-medium text-sm sm:text-base">
+            {username || row.original.email.split("@")[0]}
+          </div>
+        );
       },
     },
     {
       accessorKey: "email",
       header: "Email",
+      cell: ({ row }) => (
+        <div className="text-sm break-all text-muted-foreground">
+          {row.getValue("email")}
+        </div>
+      ),
     },
     {
       accessorKey: "role",
@@ -210,11 +219,12 @@ export default function UsersPage() {
                 ? "outline"
                 : "secondary"
             }
+            className="text-xs"
           >
             {role}
           </Badge>
         ) : (
-          <Badge variant="secondary">user</Badge>
+          <Badge variant="secondary" className="text-xs">user</Badge>
         );
       },
     },
@@ -227,8 +237,9 @@ export default function UsersPage() {
         return (
           <Badge
             variant={
-              isBanned ? "destructive" : emailVerified ? "success" : "secondary"
+              isBanned ? "destructive" : emailVerified ? "default" : "secondary"
             }
+            className="text-xs"
           >
             {isBanned ? "Banned" : emailVerified ? "Active" : "Inactive"}
           </Badge>
@@ -240,9 +251,13 @@ export default function UsersPage() {
       header: "Created",
       cell: ({ row }) => {
         const createdAt = row.getValue("createdAt") as string;
-        return createdAt
-          ? formatDistanceToNow(new Date(createdAt), { addSuffix: true })
-          : "Unknown";
+        return (
+          <div className="text-xs sm:text-sm text-muted-foreground">
+            {createdAt
+              ? formatDistanceToNow(new Date(createdAt), { addSuffix: true })
+              : "Unknown"}
+          </div>
+        );
       },
     },
     {
@@ -253,53 +268,53 @@ export default function UsersPage() {
         const isBanned = user.banInfo;
 
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-1">
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               onClick={() => {
                 setUserToEdit(user);
                 setIsEditDialogOpen(true);
               }}
-              className="h-8 w-8"
+              className="h-8 w-8 p-0"
               title="Edit User"
             >
-              <Edit className="h-4 w-4" />
+              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="sr-only">Edit</span>
             </Button>
 
             {isBanned ? (
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
                 onClick={() => setUserToUnban(user)}
-                className="h-8 w-8"
+                className="h-8 w-8 p-0"
                 title="Unban User"
               >
-                <UserCheck className="h-4 w-4" />
+                <UserCheck className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="sr-only">Unban</span>
               </Button>
             ) : (
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
                 onClick={() => setUserToBan(user)}
-                className="h-8 w-8"
+                className="h-8 w-8 p-0"
                 title="Ban User"
               >
-                <Ban className="h-4 w-4" />
+                <Ban className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="sr-only">Ban</span>
               </Button>
             )}
 
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               onClick={() => setUserToDelete(user)}
-              className="h-8 w-8 text-destructive hover:text-destructive"
+              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
               title="Delete User"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="sr-only">Delete</span>
             </Button>
           </div>
@@ -309,10 +324,10 @@ export default function UsersPage() {
   ];
 
   return (
-    <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
+    <div className="w-full min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:px-8 space-y-4 sm:space-y-6">
       <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Users</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Users</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
             Manage user accounts and permissions.
           </p>
@@ -328,7 +343,7 @@ export default function UsersPage() {
             <RefreshCw
               className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
             />
-            Refresh
+            {loading ? "Refreshing..." : "Refresh"}
           </Button>
           <Button size="sm" onClick={() => setIsCreateDialogOpen(true)} className="w-full sm:w-auto">
             <UserPlus className="h-4 w-4 mr-2" />
@@ -344,16 +359,16 @@ export default function UsersPage() {
         </Alert>
       )}
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="rounded-lg border overflow-hidden">
         {/* Mobile: Add horizontal scroll wrapper for table */}
         <div className="w-full overflow-x-auto">
-          <div className="min-w-[600px]">
-        <DataTable
-          columns={columns}
-          data={users}
-          searchColumn="email"
-          isLoading={loading}
-        />
+          <div className="min-w-[700px]">
+            <DataTable
+              columns={columns}
+              data={users}
+              searchColumn="email"
+              isLoading={loading}
+            />
           </div>
         </div>
       </div>

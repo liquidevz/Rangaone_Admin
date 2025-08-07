@@ -263,11 +263,11 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">Manage system settings and configurations</p>
+    <div className="w-full min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:px-8 space-y-4 sm:space-y-6">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage system settings and configurations</p>
         </div>
       </div>
 
@@ -278,15 +278,15 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="configurations" className="space-y-4 mt-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">Configuration Management</h2>
-              <p className="text-muted-foreground">Manage system configuration settings</p>
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
+            <div className="space-y-1">
+              <h2 className="text-lg sm:text-xl font-semibold">Configuration Management</h2>
+              <p className="text-sm text-muted-foreground">Manage system configuration settings</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">Actions</Button>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">Actions</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setBulkUpdateDialogOpen(true)}>
@@ -299,13 +299,15 @@ export default function SettingsPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button onClick={() => loadConfigs()} variant="outline">
+              <Button onClick={() => loadConfigs()} variant="outline" size="sm" className="w-full sm:w-auto">
                 <RefreshCw className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Refresh</span>
+                <span className="hidden xs:inline">Refresh</span>
+                <span className="xs:hidden">Refresh</span>
               </Button>
-              <Button onClick={() => setCreateDialogOpen(true)}>
+              <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Add Config</span>
+                <span className="hidden xs:inline">Add Config</span>
+                <span className="xs:hidden">Add</span>
               </Button>
             </div>
           </div>
@@ -334,13 +336,17 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-6">
               {isLoading ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <DataTable columns={columns} data={filteredConfigs} />
+                <div className="w-full overflow-x-auto">
+                  <div className="min-w-[800px]">
+                    <DataTable columns={columns} data={filteredConfigs} />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

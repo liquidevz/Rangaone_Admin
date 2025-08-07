@@ -446,11 +446,11 @@ export default function BundlesPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="w-full min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:px-8 space-y-4 sm:space-y-6">
       <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
         <div className="space-y-1">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Portfolio Bundles</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Portfolio Bundles</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Create and manage portfolio bundles with custom pricing
           </p>
         </div>
@@ -463,7 +463,7 @@ export default function BundlesPage() {
             className="text-muted-foreground hover:text-foreground w-full sm:w-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
+            {isLoading ? "Refreshing..." : "Refresh"}
           </Button>
           <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="bg-primary w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />

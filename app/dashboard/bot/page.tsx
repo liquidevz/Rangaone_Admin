@@ -47,42 +47,46 @@ export default function BotManagementPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:px-8 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Bot className="h-8 w-8 text-blue-600" />
-            Telegram Bot Manager
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Bot className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+            <span className="break-words">Telegram Bot Manager</span>
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage products, groups, mappings, and subscriptions for your Telegram bot
           </p>
         </div>
-        <Button onClick={handleRefresh} disabled={isLoading}>
+        <Button onClick={handleRefresh} disabled={isLoading} size="sm" className="w-full sm:w-auto">
           <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
+          {isLoading ? "Refreshing..." : "Refresh"}
         </Button>
       </div>
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="products" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Products
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
+          <TabsTrigger value="products" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Package className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden xs:inline sm:inline">Products</span>
+            <span className="xs:hidden sm:hidden">Prod</span>
           </TabsTrigger>
-          <TabsTrigger value="groups" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Groups
+          <TabsTrigger value="groups" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden xs:inline sm:inline">Groups</span>
+            <span className="xs:hidden sm:hidden">Grp</span>
           </TabsTrigger>
-          <TabsTrigger value="mapping" className="flex items-center gap-2">
-            <LinkIcon className="h-4 w-4" />
-            Mapping
+          <TabsTrigger value="mapping" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <LinkIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden xs:inline sm:inline">Mapping</span>
+            <span className="xs:hidden sm:hidden">Map</span>
           </TabsTrigger>
-          <TabsTrigger value="subscriptions" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Subscriptions
+          <TabsTrigger value="subscriptions" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden xs:inline sm:inline">Subscriptions</span>
+            <span className="xs:hidden sm:hidden">Sub</span>
           </TabsTrigger>
         </TabsList>
 
