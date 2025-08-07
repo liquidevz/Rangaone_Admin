@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Edit, Trash2, Ban, UserCheck, RefreshCw, Clock, Mail, UserIcon } from "lucide-react"
 import { formatDistanceToNow, format } from "date-fns"
 
-export default function UserDetailPage({ params }: { params: { id: string } }) {
+export default function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +29,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
     try {
       setLoading(true)
       setError(null)
-      const data = await fetchUserById(params.id)
+      const { id } = await params;
+      const data = await fetchUserById(id)
       setUser(data)
     } catch (err) {
       console.error("Error loading user:", err)
@@ -46,7 +47,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
   // Handle user update
   const handleUpdateUser = async (userData: any) => {
     try {
-      const updatedUser = await updateUser(params.id, userData)
+      const { id } = await params;
+      const updatedUser = await updateUser(id, userData)
       setUser(updatedUser)
       toast({
         title: "User updated successfully",
@@ -65,7 +67,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
   // Handle user deletion
   const handleDeleteUser = async () => {
     try {
-      await deleteUser(params.id)
+      const { id } = await params;
+      await deleteUser(id)
       toast({
         title: "User deleted successfully",
       })
@@ -83,7 +86,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
   // Handle user ban
   const handleBanUser = async () => {
     try {
-      await banUser(params.id)
+      const { id } = await params;
+      await banUser(id)
       // Update the user status in the local state
       setUser((user) => (user ? { ...user, emailVerified: false, status: "inactive", isBanned: true } : null))
       toast({
@@ -102,7 +106,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
   // Handle user unban
   const handleUnbanUser = async () => {
     try {
-      await unbanUser(params.id)
+      const { id } = await params;
+      await unbanUser(id)
       // Update the user status in the local state
       setUser((user) => (user ? { ...user, emailVerified: true, status: "active", isBanned: false } : null))
       toast({

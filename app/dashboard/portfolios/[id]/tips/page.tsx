@@ -56,9 +56,7 @@ import { fetchStockSymbolById } from "@/lib/api-stock-symbols"; // Import fetchS
 // Cache for stock details to avoid redundant API calls
 const stockDetailsCache = new Map();
 
-export default function PortfolioTipsPage() {
-  const params = useParams();
-  const portfolioId = params.id as string;
+export default function PortfolioTipsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -80,6 +78,8 @@ export default function PortfolioTipsPage() {
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
+
+    const { id: portfolioId } = await params; // Destructure and await params
 
     // Check if portfolioId is valid
     if (!portfolioId || portfolioId === "undefined") {
@@ -169,7 +169,7 @@ export default function PortfolioTipsPage() {
 
   useEffect(() => {
     loadData();
-  }, [portfolioId]);
+  }, [params]); // Change dependency to params object
 
   // Filter tips based on selected filters and search term
   const filteredTips = useMemo(() => {
@@ -222,6 +222,7 @@ export default function PortfolioTipsPage() {
   const hasActiveFilters = statusFilter !== "all" || actionFilter !== "all" || searchTerm.trim() !== "";
 
   const handleCreateTip = async (tipData: CreateTipRequest) => {
+    const { id: portfolioId } = await params; // Await params here as well
     if (!portfolioId || portfolioId === "undefined") {
       toast({
         title: "Invalid Portfolio",
@@ -260,6 +261,8 @@ export default function PortfolioTipsPage() {
           error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
+
+      throw error;
     }
   };
 
