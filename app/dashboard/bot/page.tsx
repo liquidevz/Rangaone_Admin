@@ -70,23 +70,23 @@ export default function BotManagementPage() {
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
           <TabsTrigger value="products" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
             <Package className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline sm:inline">Products</span>
-            <span className="xs:hidden sm:hidden">Prod</span>
+            <span className="hidden sm:inline">Products</span>
+            <span className="sm:hidden">Prod</span>
           </TabsTrigger>
           <TabsTrigger value="groups" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
             <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline sm:inline">Groups</span>
-            <span className="xs:hidden sm:hidden">Grp</span>
+            <span className="hidden sm:inline">Groups</span>
+            <span className="sm:hidden">Grp</span>
           </TabsTrigger>
           <TabsTrigger value="mapping" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
             <LinkIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline sm:inline">Mapping</span>
-            <span className="xs:hidden sm:hidden">Map</span>
+            <span className="hidden sm:inline">Mapping</span>
+            <span className="sm:hidden">Map</span>
           </TabsTrigger>
           <TabsTrigger value="subscriptions" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
             <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline sm:inline">Subscriptions</span>
-            <span className="xs:hidden sm:hidden">Sub</span>
+            <span className="hidden sm:inline">Subscriptions</span>
+            <span className="sm:hidden">Sub</span>
           </TabsTrigger>
         </TabsList>
 
