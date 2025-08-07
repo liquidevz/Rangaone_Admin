@@ -1,14 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
+  async rewrites() {
+    return [
+      // Proxy telegram API calls to avoid CORS in development
+      {
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_TELEGRAM_API_BASE_URL || 'https://subscription-manager-tg-bot.onrender.com'}/:path*`,
+      },
+    ];
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  images: {
-    unoptimized: true,
-  },
-}
+};
 
-export default nextConfig
+export default nextConfig;

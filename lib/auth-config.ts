@@ -83,8 +83,10 @@ export const authOptions: AuthOptions = {
       return token;
     },
     async session({ session, token }: { session: any; token: any }) {
-      session.user = token.user;
-      session.accessToken = token.accessToken;
+      if (token.user) {
+        session.user = token.user;
+        session.accessToken = token.accessToken;
+      }
       return session;
     },
   },
