@@ -36,6 +36,7 @@ export interface TelegramGroup {
 export interface User {
   id: number;
   email: string;
+  telegram_user_id?: number;
 }
 
 export interface Subscription {
@@ -250,4 +251,112 @@ export const getTelegramHealth = async (): Promise<{
   timestamp: string;
 }> => {
   return await apiRequest('/api/telegram/health');
+};
+
+// New: Kick a user from a Telegram group (by product or group)
+export interface KickUserRequestByProduct {
+  product_id: string;
+  telegram_user_id: number;
+}
+
+export interface KickUserRequestByGroup {
+  telegram_group_id: string;
+  telegram_user_id: number;
+}
+
+export interface KickUserResponse {
+  success: boolean;
+  message: string;
+}
+
+export const kickUser = async (
+  data: KickUserRequestByProduct | KickUserRequestByGroup
+): Promise<KickUserResponse> => {
+  return await apiRequest('/api/telegram/kick-user', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+// New: Regenerate invite link for a group (by product or group)
+export interface RegenerateInviteRequestByProduct {
+  product_id: string;
+  token?: string;
+}
+
+export interface RegenerateInviteRequestByGroup {
+  telegram_group_id: string;
+  token?: string;
+}
+
+export interface RegenerateInviteResponse {
+  success: boolean;
+  message: string;
+  invite_link: string | null;
+  token: string;
+}
+
+export const regenerateInvite = async (
+  data: RegenerateInviteRequestByProduct | RegenerateInviteRequestByGroup
+): Promise<RegenerateInviteResponse> => {
+  return await apiRequest('/api/telegram/invite/regenerate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+// New: Users who joined via invite link with context
+export interface JoinedUserRecord {
+  user: {
+    id: number;
+    email: string;
+    telegram_user_id?: number;
+  };
+  product?: {
+    id: string;
+    name?: string;
+  } | null;
+  group?: {
+    telegram_group_id: string;
+    telegram_group_name?: string;
+  } | null;
+  subscription?: {
+    id: number;
+    status: 'active' | 'cancelled' | 'expired';
+    subscription_expires_at?: string;
+  } | null;
+}
+
+export const getJoinedUsers = async (params: {
+  product_id?: string;
+  telegram_group_id?: string;
+  status?: string;
+} = {}): Promise<JoinedUserRecord[]> => {
+  const queryParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, value.toString());
+    }
+  });
+  const queryString = queryParams.toString();
+  const endpoint = queryString ? `/api/users/joined?${queryString}` : '/api/users/joined';
+  return await apiRequest(endpoint);
+};
+
+// New: Convenience member lists
+export interface GroupMemberRecord {
+  telegram_user_id: number;
+  username?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  joined_at?: string;
+  status?: string;
+}
+
+export const getProductMembers = async (productId: string): Promise<GroupMemberRecord[]> => {
+  return await apiRequest(`/api/products/${productId}/members`);
+};
+
+export const getGroupMembers = async (telegramGroupId: string): Promise<GroupMemberRecord[]> => {
+  return await apiRequest(`/api/groups/${telegramGroupId}/members`);
 };

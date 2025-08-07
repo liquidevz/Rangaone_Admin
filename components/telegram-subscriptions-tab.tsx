@@ -37,6 +37,10 @@ import {
   createSubscription,
   cancelSubscriptionById,
   cancelSubscription,
+  getJoinedUsers,
+  type JoinedUserRecord,
+  kickUser,
+  regenerateInvite,
 } from "@/lib/api-telegram-bot";
 
 export function SubscriptionsTab() {
@@ -49,6 +53,9 @@ export function SubscriptionsTab() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [joinedUsers, setJoinedUsers] = useState<JoinedUserRecord[] | null>(null);
+  const [isJoinedLoading, setIsJoinedLoading] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
   const [formData, setFormData] = useState<CreateSubscriptionRequest>({
     email: '',
     product_id: undefined,
@@ -138,6 +145,39 @@ export function SubscriptionsTab() {
         description: "Failed to cancel subscription",
         variant: "destructive",
       });
+    }
+  };
+
+  // New: Load users who joined via invite with optional filters
+  const loadJoinedUsers = async () => {
+    setIsJoinedLoading(true);
+    try {
+      const data = await getJoinedUsers({ status: statusFilter || undefined });
+      setJoinedUsers(data);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to load joined users", variant: "destructive" });
+    } finally {
+      setIsJoinedLoading(false);
+    }
+  };
+
+  const handleKickByProduct = async (productId: string, telegramUserId: number) => {
+    if (!confirm(`Kick user ${telegramUserId} from product ${productId}?`)) return;
+    try {
+      const res = await kickUser({ product_id: productId, telegram_user_id: telegramUserId });
+      toast({ title: res.success ? "Success" : "Info", description: res.message });
+      await loadJoinedUsers();
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to kick user", variant: "destructive" });
+    }
+  };
+
+  const handleRegenerateInviteForProduct = async (productId: string) => {
+    try {
+      const res = await regenerateInvite({ product_id: productId, token: inviteToken || undefined });
+      toast({ title: res.success ? "Invite Regenerated" : "Info", description: res.message });
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to regenerate invite", variant: "destructive" });
     }
   };
 
@@ -270,6 +310,9 @@ export function SubscriptionsTab() {
         </div>
 
         <div className="flex gap-2">
+          <Button variant="outline" onClick={loadJoinedUsers}>
+            Load Joined Users
+          </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -507,6 +550,104 @@ export function SubscriptionsTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* Joined Users via Invite */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Joined via Invite
+          </CardTitle>
+          <CardDescription>
+            Users detected by the bot as joined via tracked invite links
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2 items-center mb-4">
+            <Input
+              placeholder="Optional custom token for regenerate"
+              value={inviteToken}
+              onChange={(e) => setInviteToken(e.target.value)}
+              className="max-w-sm"
+            />
+            <Button variant="outline" onClick={loadJoinedUsers} disabled={isJoinedLoading}>
+              {isJoinedLoading ? 'Loading…' : 'Refresh Joined Users'}
+            </Button>
+          </div>
+
+          {isJoinedLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+              Loading…
+            </div>
+          ) : !joinedUsers || joinedUsers.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No joined users found. Click refresh to load.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Group</TableHead>
+                  <TableHead>Telegram</TableHead>
+                  <TableHead>Subscription</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {joinedUsers.map((row, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{row.user.email}</TableCell>
+                    <TableCell>
+                      {row.product?.name || row.product?.id || '—'}
+                    </TableCell>
+                    <TableCell>
+                      {row.group ? (
+                        <div>
+                          <div className="font-medium">{row.group.telegram_group_name || 'Group'}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{row.group.telegram_group_id}</div>
+                        </div>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {row.user.telegram_user_id ?? '—'}
+                    </TableCell>
+                    <TableCell>
+                      {row.subscription ? (
+                        <Badge className={getStatusColor(row.subscription.status)}>
+                          {row.subscription.status}
+                        </Badge>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        {row.product?.id && row.user.telegram_user_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleKickByProduct(row.product!.id, row.user.telegram_user_id!)}
+                          >
+                            <UserX className="h-3 w-3 mr-1" /> Kick
+                          </Button>
+                        )}
+                        {row.product?.id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRegenerateInviteForProduct(row.product!.id!)}
+                          >
+                            Regenerate Invite
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users,
@@ -20,6 +22,10 @@ import {
   getGroups,
   getUnmappedGroups,
   getProducts,
+  getGroupMembers,
+  type GroupMemberRecord,
+  regenerateInvite,
+  kickUser,
 } from "@/lib/api-telegram-bot";
 
 export function GroupsTab() {
@@ -28,6 +34,13 @@ export function GroupsTab() {
   const [unmappedGroups, setUnmappedGroups] = useState<TelegramGroup[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<TelegramGroup | null>(null);
+  const [groupMembers, setGroupMembers] = useState<GroupMemberRecord[]>([]);
+  const [isMembersLoading, setIsMembersLoading] = useState(false);
+  const [inviteToken, setInviteToken] = useState<string>("");
+  const [inviteResult, setInviteResult] = useState<{ link: string | null; token: string } | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -71,6 +84,53 @@ export function GroupsTab() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const openMembersDialog = async (group: TelegramGroup) => {
+    setSelectedGroup(group);
+    setIsMembersDialogOpen(true);
+    setIsMembersLoading(true);
+    try {
+      const members = await getGroupMembers(group.telegram_group_id);
+      setGroupMembers(members);
+    } catch (error) {
+      console.error("Failed to load group members:", error);
+      toast({ title: "Error", description: "Failed to load group members", variant: "destructive" });
+    } finally {
+      setIsMembersLoading(false);
+    }
+  };
+
+  const handleKick = async (member: GroupMemberRecord) => {
+    if (!selectedGroup) return;
+    if (!confirm(`Kick user ${member.username || member.telegram_user_id}?`)) return;
+    try {
+      const res = await kickUser({ telegram_group_id: selectedGroup.telegram_group_id, telegram_user_id: member.telegram_user_id });
+      toast({ title: res.success ? "Success" : "Info", description: res.message });
+      // Refresh members
+      const members = await getGroupMembers(selectedGroup.telegram_group_id);
+      setGroupMembers(members);
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to kick user", variant: "destructive" });
+    }
+  };
+
+  const openInviteDialog = (group: TelegramGroup) => {
+    setSelectedGroup(group);
+    setInviteToken("");
+    setInviteResult(null);
+    setIsInviteDialogOpen(true);
+  };
+
+  const handleRegenerateInvite = async () => {
+    if (!selectedGroup) return;
+    try {
+      const res = await regenerateInvite({ telegram_group_id: selectedGroup.telegram_group_id, token: inviteToken || undefined });
+      setInviteResult({ link: res.invite_link, token: res.token });
+      toast({ title: res.success ? "Invite Regenerated" : "Info", description: res.message });
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to regenerate invite", variant: "destructive" });
+    }
+  };
 
   const getProductName = (productId: string | null) => {
     if (!productId) return null;
@@ -153,13 +213,14 @@ export function GroupsTab() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Group Details</TableHead>
                 <TableHead>Product Mapping</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Updated</TableHead>
+                  <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -203,6 +264,12 @@ export function GroupsTab() {
                     <TableCell>
                       {new Date(group.updated_at).toLocaleDateString()}
                     </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openMembersDialog(group)}>Members</Button>
+                        <Button variant="outline" size="sm" onClick={() => openInviteDialog(group)}>Regenerate Invite</Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -210,6 +277,62 @@ export function GroupsTab() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Members Dialog */}
+      <Dialog open={isMembersDialogOpen} onOpenChange={setIsMembersDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Group Members</DialogTitle>
+            <DialogDescription>
+              {selectedGroup ? `${selectedGroup.telegram_group_name} (${selectedGroup.telegram_group_id})` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {isMembersLoading ? (
+            <div className="flex items-center justify-center p-4">Loading...</div>
+          ) : groupMembers.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No members found</div>
+          ) : (
+            <div className="max-h-96 overflow-auto space-y-2">
+              {groupMembers.map((m) => (
+                <div key={m.telegram_user_id} className="flex items-center justify-between border rounded p-2">
+                  <div>
+                    <div className="font-medium">{m.username || `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Unknown'}</div>
+                    <div className="text-xs text-muted-foreground">ID: {m.telegram_user_id}</div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => handleKick(m)}>Kick</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Regenerate Invite Dialog */}
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Regenerate Invite Link</DialogTitle>
+            <DialogDescription>
+              {selectedGroup ? `For ${selectedGroup.telegram_group_name}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm">Custom Token (optional)</label>
+              <Input value={inviteToken} onChange={(e) => setInviteToken(e.target.value)} placeholder="Enter custom token" />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleRegenerateInvite}>Regenerate</Button>
+            </div>
+            {inviteResult && (
+              <div className="space-y-1">
+                <div className="text-sm">Token: <span className="font-mono">{inviteResult.token}</span></div>
+                <div className="text-sm">Invite Link: {inviteResult.link ? <a className="text-blue-600 underline" href={inviteResult.link} target="_blank" rel="noreferrer">Open</a> : 'None'}</div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
