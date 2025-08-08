@@ -813,9 +813,12 @@ export function PortfolioFormDialog({
       Number(minInvestment)
     );
 
+    // Recompute accurate weight based on integer quantity actual investment
+    const accurateWeight = Number(((investmentDetails.actualInvestmentAmount / Number(minInvestment)) * 100).toFixed(2));
+
     const holdingToAdd: ExtendedHolding = {
       symbol: newHolding.symbol,
-      weight: newHolding.weight,
+      weight: accurateWeight,
       sector: newHolding.sector,
       status: "Fresh-Buy",
       buyPrice: newHolding.buyPrice,
@@ -824,7 +827,7 @@ export function PortfolioFormDialog({
       allocatedAmount: investmentDetails.allocatedAmount,
       leftoverAmount: investmentDetails.leftoverAmount,
       stockCapType: newHolding.stockCapType || undefined,
-      originalWeight: newHolding.weight,
+      originalWeight: accurateWeight,
       stockDetails: newHolding.stockDetails,
       currentMarketPrice: newHolding.stockDetails ? parseFloat(newHolding.stockDetails.currentPrice) : newHolding.buyPrice,
       // NEW: Enhanced P&L tracking fields
@@ -1048,9 +1051,12 @@ export function PortfolioFormDialog({
     const nextAllocated = (newWeight / 100) * Number(minInvestment);
     const nextLeftover = Math.max(0, nextAllocated - nextActualInvestment);
 
+    // Recalculate accurate weight based on actual integer quantity investment
+    const accurateWeight = Number(((nextActualInvestment / Number(minInvestment)) * 100).toFixed(2));
+
     const updatedHolding: ExtendedHolding = {
       ...originalHolding,
-      weight: Number(newWeight.toFixed(2)),
+      weight: accurateWeight,
       status: status,
       buyPrice: investmentPrice,
       quantity: nextQuantity,
