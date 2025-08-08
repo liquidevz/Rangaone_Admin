@@ -2371,6 +2371,7 @@ export function PortfolioFormDialog({
                         const newAllocated = (editingHolding.newWeight / 100) * Number(minInvestment);
                         const currentInvestment = editingHolding.originalHolding.minimumInvestmentValueStock;
                         const investmentChange = newActualInvestment - currentInvestment;
+                        const newLeftover = Math.max(0, newAllocated - newActualInvestment);
                         
                         return (
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -2398,7 +2399,7 @@ export function PortfolioFormDialog({
                             </div>
                             <div>
                               <span className="text-muted-foreground">Leftover:</span>
-                              <p className="font-medium text-orange-600">₹{investmentDetails.leftoverAmount.toFixed(2)}</p>
+                              <p className="font-medium text-orange-600">₹{newLeftover.toFixed(2)}</p>
                             </div>
                           </div>
                         );
