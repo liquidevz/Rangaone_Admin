@@ -531,15 +531,22 @@ const formatPortfolioData = (data: CreatePortfolioRequest) => {
 
   // Format holdings
   if (formattedData.holdings && Array.isArray(formattedData.holdings)) {
-    formattedData.holdings = formattedData.holdings.map(holding => ({
-      ...holding,
-      weight: typeof holding.weight === "string" ? Number.parseFloat(holding.weight) : holding.weight,
-      buyPrice: typeof holding.buyPrice === "string" ? Number.parseFloat(holding.buyPrice) : holding.buyPrice,
-      quantity: typeof holding.quantity === "string" ? Number.parseInt(holding.quantity, 10) : holding.quantity,
-      minimumInvestmentValueStock: typeof holding.minimumInvestmentValueStock === "string" 
-        ? Number.parseFloat(holding.minimumInvestmentValueStock) 
-        : holding.minimumInvestmentValueStock,
-    }))
+    formattedData.holdings = formattedData.holdings.map(holding => {
+      // Pick only the fields accepted by backend schema
+      const cleanedHolding: PortfolioHolding = {
+        symbol: holding.symbol,
+        weight: typeof (holding as any).weight === "string" ? Number.parseFloat((holding as any).weight) : (holding as any).weight,
+        sector: (holding as any).sector,
+        stockCapType: (holding as any).stockCapType,
+        status: (holding as any).status,
+        buyPrice: typeof (holding as any).buyPrice === "string" ? Number.parseFloat((holding as any).buyPrice) : (holding as any).buyPrice,
+        quantity: typeof (holding as any).quantity === "string" ? Number.parseInt((holding as any).quantity, 10) : (holding as any).quantity,
+        minimumInvestmentValueStock: typeof (holding as any).minimumInvestmentValueStock === "string"
+          ? Number.parseFloat((holding as any).minimumInvestmentValueStock)
+          : (holding as any).minimumInvestmentValueStock,
+      }
+      return cleanedHolding
+    })
   }
 
   // Clean up undefined values to avoid sending them to the API
