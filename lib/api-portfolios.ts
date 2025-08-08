@@ -523,8 +523,8 @@ const formatPortfolioData = (data: CreatePortfolioRequest) => {
 
   // Format subscription fees
   if (formattedData.subscriptionFee && Array.isArray(formattedData.subscriptionFee)) {
-    formattedData.subscriptionFee = formattedData.subscriptionFee.map(fee => ({
-      ...fee,
+    formattedData.subscriptionFee = formattedData.subscriptionFee.map((fee) => ({
+      type: fee.type,
       price: typeof fee.price === "string" ? Number.parseFloat(fee.price) : fee.price,
     }))
   }
@@ -549,9 +549,26 @@ const formatPortfolioData = (data: CreatePortfolioRequest) => {
     })
   }
 
-  // Clean up undefined values to avoid sending them to the API
-  Object.keys(formattedData).forEach(key => {
-    if (formattedData[key as keyof CreatePortfolioRequest] === undefined) {
+  // Sanitize download links (only keep fields backend expects)
+  if (formattedData.downloadLinks && Array.isArray(formattedData.downloadLinks)) {
+    formattedData.downloadLinks = formattedData.downloadLinks.map((link) => ({
+      linkType: link.linkType,
+      linkUrl: link.linkUrl,
+      ...(link.linkDiscription ? { linkDiscription: link.linkDiscription } : {}),
+    }))
+  }
+
+  // Sanitize YouTube links (only keep link field)
+  if (formattedData.youTubeLinks && Array.isArray(formattedData.youTubeLinks)) {
+    formattedData.youTubeLinks = formattedData.youTubeLinks.map((yt) => ({
+      link: yt.link,
+    }))
+  }
+
+  // Clean up undefined or null values to avoid sending them to the API
+  Object.keys(formattedData).forEach((key) => {
+    const value = formattedData[key as keyof CreatePortfolioRequest]
+    if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
       delete formattedData[key as keyof CreatePortfolioRequest]
     }
   })
