@@ -285,8 +285,15 @@ export const createPortfolio = async (portfolioData: CreatePortfolioRequest): Pr
     console.log(`Using admin token: ${adminToken.substring(0, 10)}...`)
     console.log("Portfolio data being sent:", JSON.stringify(portfolioData, null, 2))
 
+    // Fetch existing portfolio to preserve immutable fields (like minInvestment)
+    const existing = await fetchPortfolioById(id)
+    const lockedPortfolioData: CreatePortfolioRequest = {
+      ...portfolioData,
+      minInvestment: existing.minInvestment,
+    }
+
     // Validate and format the data before sending
-    const formattedData = formatPortfolioData(portfolioData)
+    const formattedData = formatPortfolioData(lockedPortfolioData)
 
     // Make the request with the admin token in the Authorization header
     const headers: HeadersInit = {
