@@ -184,7 +184,14 @@ export function PortfolioFormDialog({
     currentMarketPrice: number,
     proportionToSell: number // 0 to 1 (e.g., 0.5 for 50%)
   ): PnLCalculation => {
-    const quantitySold = Math.floor(originalQuantity * proportionToSell);
+    // Ensure integer shares are sold: round to nearest and sell at least 1 if selling at all
+    let quantitySold = 0;
+    if (proportionToSell >= 1) {
+      quantitySold = originalQuantity;
+    } else if (proportionToSell > 0) {
+      quantitySold = Math.max(1, Math.round(originalQuantity * proportionToSell));
+      quantitySold = Math.min(quantitySold, originalQuantity);
+    }
     const saleValue = quantitySold * currentMarketPrice;
     const originalCost = quantitySold * originalBuyPrice;
     const profitLoss = saleValue - originalCost;
@@ -1027,25 +1034,33 @@ export function PortfolioFormDialog({
 
     // Calculate new investment amounts
     const investmentPrice = editingHolding.latestPrice || originalHolding.buyPrice;
-    const investmentDetails = calculateInvestmentDetails(
-      newWeight, 
-      investmentPrice, 
+    const recomputed = calculateInvestmentDetails(
+      newWeight,
+      investmentPrice,
       Number(minInvestment)
     );
 
+    // For sell/partial-sell, enforce integer-share logic using pnlPreview quantities
+    const isSellOperation = action === 'sell' || action === 'partial-sell';
+    const applyPreview = isSellOperation && pnlPreview;
+    const nextQuantity = applyPreview ? pnlPreview!.remainingQuantity : recomputed.quantity;
+    const nextActualInvestment = applyPreview ? nextQuantity * investmentPrice : recomputed.actualInvestmentAmount;
+    const nextAllocated = (newWeight / 100) * Number(minInvestment);
+    const nextLeftover = Math.max(0, nextAllocated - nextActualInvestment);
+
     const updatedHolding: ExtendedHolding = {
       ...originalHolding,
-      weight: newWeight,
+      weight: Number(newWeight.toFixed(2)),
       status: status,
       buyPrice: investmentPrice,
-      quantity: investmentDetails.quantity,
-      minimumInvestmentValueStock: investmentDetails.actualInvestmentAmount,
-      allocatedAmount: investmentDetails.allocatedAmount,
-      leftoverAmount: investmentDetails.leftoverAmount,
+      quantity: nextQuantity,
+      minimumInvestmentValueStock: nextActualInvestment,
+      allocatedAmount: nextAllocated,
+      leftoverAmount: Number(nextLeftover.toFixed(2)),
       currentMarketPrice: editingHolding.latestPrice,
       // Preserve P&L tracking fields
       originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
-      totalQuantityOwned: investmentDetails.quantity,
+      totalQuantityOwned: nextQuantity,
       realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
     };
 
@@ -1179,18 +1194,18 @@ export function PortfolioFormDialog({
 
   // NEW: P&L Preview Component
   const PnLPreviewCard = ({ pnlData }: { pnlData: PnLCalculation }) => (
-    <Card className={`border-2 ${pnlData.profitLoss >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+    <Card className={`border-2 ${pnlData.profitLoss >= 0 ? 'border-green-300 dark:border-green-800 bg-green-50/60 dark:bg-green-950/30' : 'border-red-300 dark:border-red-800 bg-red-50/60 dark:bg-red-950/30'}`}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-lg">
           {pnlData.profitLoss >= 0 ? (
             <>
-              <TrendingUp className="h-5 w-5 text-green-600" />
-              <span className="text-green-800">Profit Preview</span>
+              <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <span className="text-green-800 dark:text-green-300">Profit Preview</span>
             </>
           ) : (
             <>
-              <TrendingDown className="h-5 w-5 text-red-600" />
-              <span className="text-red-800">Loss Preview</span>
+              <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <span className="text-red-800 dark:text-red-300">Loss Preview</span>
             </>
           )}
         </CardTitle>
@@ -1203,7 +1218,7 @@ export function PortfolioFormDialog({
           </div>
           <div className="text-center">
             <p className="text-muted-foreground">Sale Value</p>
-            <p className="font-bold text-lg text-blue-600">{formatCurrency(pnlData.saleValue)}</p>
+            <p className="font-bold text-lg text-blue-600 dark:text-blue-400">{formatCurrency(pnlData.saleValue)}</p>
           </div>
           <div className="text-center">
             <p className="text-muted-foreground">Original Cost</p>
@@ -1211,7 +1226,7 @@ export function PortfolioFormDialog({
           </div>
           <div className="text-center">
             <p className="text-muted-foreground">P&L</p>
-            <div className={`font-bold text-lg ${pnlData.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <div className={`font-bold text-lg ${pnlData.profitLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               <p>{pnlData.profitLoss >= 0 ? '+' : ''}{formatCurrency(pnlData.profitLoss)}</p>
               <p className="text-xs">({pnlData.profitLossPercent >= 0 ? '+' : ''}{pnlData.profitLossPercent.toFixed(2)}%)</p>
             </div>
@@ -1234,12 +1249,12 @@ export function PortfolioFormDialog({
         )}
 
         {pnlData.profitLoss > 0 && (
-          <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-md">
-            <div className="flex items-center gap-2 text-green-800">
+          <div className="mt-4 p-3 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-800 rounded-md">
+            <div className="flex items-center gap-2 text-green-800 dark:text-green-300">
               <CheckCircle2 className="h-4 w-4" />
               <span className="font-medium">Profit will be added to investment pool</span>
             </div>
-            <p className="text-sm text-green-700 mt-1">
+            <p className="text-sm text-green-700 dark:text-green-300 mt-1">
               New minimum investment: {formatCurrency(Number(minInvestment) + pnlData.profitLoss)}
             </p>
           </div>
@@ -1383,9 +1398,9 @@ export function PortfolioFormDialog({
                       required
                     />
                     {needsMinInvestmentAdjustment && (
-                      <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
-                        <AlertTriangle className="h-4 w-4 text-amber-600" />
-                        <div className="flex-1 text-sm text-amber-800">
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <div className="flex-1 text-sm text-amber-800 dark:text-amber-300">
                           <p className="font-medium">Minimum investment needs adjustment</p>
                           <p className="text-xs">
                             Total investment: ₹{formatCurrency(totalActualInvestment)} | 
@@ -1398,7 +1413,7 @@ export function PortfolioFormDialog({
                           size="sm"
                           onClick={handleAutoAdjustMinInvestment}
                           disabled={isSubmitting}
-                          className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                          className="text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40"
                         >
                           Auto Adjust
                         </Button>
@@ -1667,13 +1682,13 @@ export function PortfolioFormDialog({
                         </div>
                         <div>
                           <p className="text-muted-foreground">Cash Balance</p>
-                          <p className={`font-semibold ${cashBalance < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                          <p className={`font-semibold ${cashBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                             ₹{cashBalance.toLocaleString()}
                           </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Weight Used</p>
-                          <p className={`font-semibold ${totalWeightUsed > 100 ? 'text-red-500' : ''}`}>
+                          <p className={`font-semibold ${totalWeightUsed > 100 ? 'text-red-600 dark:text-red-400' : ''}`}>
                             {totalWeightUsed.toFixed(2)}% / 100%
                           </p>
                         </div>
@@ -1681,13 +1696,13 @@ export function PortfolioFormDialog({
 
                       {/* NEW: Total Unrealized P&L Display */}
                       {totalUnrealizedPnL !== 0 && (
-                        <div className="mt-4 p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
+                        <div className="mt-4 p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Calculator className="h-4 w-4 text-blue-600" />
                               <span className="font-medium">Total Unrealized P&L</span>
                             </div>
-                            <div className={`font-bold text-lg ${totalUnrealizedPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <div className={`font-bold text-lg ${totalUnrealizedPnL >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                               {totalUnrealizedPnL >= 0 ? '+' : ''}{formatCurrency(totalUnrealizedPnL)}
                             </div>
                           </div>
@@ -1695,14 +1710,14 @@ export function PortfolioFormDialog({
                       )}
                       
                       {totalLeftover > 0 && (
-                        <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-800 rounded">
                           <div className="flex items-center gap-2">
                             <AlertCircle className="h-4 w-4 text-blue-600" />
-                            <p className="text-sm font-medium text-blue-800">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
                               Leftover Amount Information
                             </p>
                           </div>
-                          <div className="mt-2 text-sm text-blue-700">
+                          <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                             <p>Total Allocated: ₹{totalAllocated.toLocaleString()}</p>
                             <p>Actual Investment: ₹{totalActualInvestment.toLocaleString()}</p>
                             <p>Total Leftover: ₹{totalLeftover.toFixed(2)} (credited to cash balance)</p>
@@ -1916,11 +1931,11 @@ export function PortfolioFormDialog({
                                       </Badge>
                                     )}
                                     <Badge className={`text-xs ${
-                                      holding.status === 'Fresh-Buy' ? 'bg-green-100 text-green-800' :
-                                      holding.status === 'addon-buy' ? 'bg-blue-100 text-blue-800' :
-                                      holding.status === 'Hold' ? 'bg-gray-100 text-gray-800' :
-                                      holding.status === 'partial-sell' ? 'bg-orange-100 text-orange-800' :
-                                      'bg-red-100 text-red-800'
+                                      holding.status === 'Fresh-Buy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                                      holding.status === 'addon-buy' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
+                                      holding.status === 'Hold' ? 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300' :
+                                      holding.status === 'partial-sell' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300' :
+                                      'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                                     }`}>
                                       {holding.status}
                                     </Badge>
@@ -1954,9 +1969,9 @@ export function PortfolioFormDialog({
                                       </div>
                                       <div className="flex items-center gap-1">
                                         <span className="text-muted-foreground">Price Change: </span>
-                                        <span className={`font-medium flex items-center gap-1 ${
-                                          holding.currentMarketPrice > holding.originalBuyPrice ? 'text-green-600' : 
-                                          holding.currentMarketPrice < holding.originalBuyPrice ? 'text-red-600' : 'text-gray-600'
+                                      <span className={`font-medium flex items-center gap-1 ${
+                                          holding.currentMarketPrice > holding.originalBuyPrice ? 'text-green-600 dark:text-green-400' : 
+                                          holding.currentMarketPrice < holding.originalBuyPrice ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'
                                         }`}>
                                           {holding.currentMarketPrice > holding.originalBuyPrice ? <TrendingUp className="h-3 w-3" /> : 
                                            holding.currentMarketPrice < holding.originalBuyPrice ? <TrendingDown className="h-3 w-3" /> : null}
@@ -1966,7 +1981,7 @@ export function PortfolioFormDialog({
                                       <div>
                                         <span className="text-muted-foreground">Unrealized P&L: </span>
                                         <span className={`font-medium ${
-                                          (holding.currentMarketPrice * holding.quantity) > (holding.originalBuyPrice * holding.quantity) ? 'text-green-600' : 'text-red-600'
+                                          (holding.currentMarketPrice * holding.quantity) > (holding.originalBuyPrice * holding.quantity) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                                         }`}>
                                           ₹{((holding.currentMarketPrice - holding.originalBuyPrice) * holding.quantity).toFixed(2)}
                                         </span>
@@ -1974,7 +1989,7 @@ export function PortfolioFormDialog({
                                       {holding.realizedPnL && holding.realizedPnL !== 0 && (
                                         <div>
                                           <span className="text-muted-foreground">Realized P&L: </span>
-                                          <span className={`font-medium ${holding.realizedPnL > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          <span className={`font-medium ${holding.realizedPnL > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                             ₹{holding.realizedPnL.toFixed(2)}
                                           </span>
                                         </div>
@@ -2143,13 +2158,13 @@ export function PortfolioFormDialog({
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
+                      <div>
                     <span className="text-muted-foreground">Original Weight:</span>
-                    <span className="font-medium ml-2">{(editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight).toFixed(2)}%</span>
+                        <span className="font-medium ml-2">{(editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight).toFixed(2)}%</span>
                   </div>
-                  <div>
+                      <div>
                     <span className="text-muted-foreground">Current Weight:</span>
-                    <span className="font-medium ml-2">{editingHolding.originalHolding.weight.toFixed(2)}%</span>
+                        <span className="font-medium ml-2">{editingHolding.originalHolding.weight.toFixed(2)}%</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Original Buy Price:</span>
@@ -2270,7 +2285,7 @@ export function PortfolioFormDialog({
                         <p className="text-sm text-muted-foreground mb-1">Original Weight %</p>
                         <div className="w-20 h-10 bg-blue-100 border border-blue-300 rounded flex items-center justify-center">
                           <span className="font-semibold text-blue-800">
-                            {(editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight).toFixed(1)}
+                            {(editingHolding.originalHolding.originalWeight || editingHolding.originalHolding.weight).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -2295,12 +2310,12 @@ export function PortfolioFormDialog({
                            'Change Weight %'}
                         </p>
                         {editingHolding.action === 'hold' ? (
-                          <div className="w-20 h-10 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
-                            <span className="text-gray-600 font-medium text-sm">0</span>
+            <div className="w-20 h-10 bg-gray-100 dark:bg-gray-900/40 border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+                            <span className="text-gray-600 dark:text-gray-300 font-medium text-sm">0</span>
                           </div>
                         ) : editingHolding.action === 'sell' ? (
-                          <div className="w-20 h-10 bg-red-100 border border-red-300 rounded flex items-center justify-center">
-                            <span className="text-red-600 font-medium text-sm">All</span>
+                          <div className="w-20 h-10 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded flex items-center justify-center">
+                            <span className="text-red-600 dark:text-red-400 font-medium text-sm">All</span>
                           </div>
                         ) : (
                           <Input
@@ -2329,43 +2344,47 @@ export function PortfolioFormDialog({
                       {/* Final Weight */}
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground mb-1">Final Weight %</p>
-                        <div className="w-20 h-10 bg-green-100 border border-green-300 rounded flex items-center justify-center">
-                          <span className="font-semibold text-green-800">
-                            {editingHolding.newWeight.toFixed(1)}
+                        <div className="w-20 h-10 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-800 rounded flex items-center justify-center">
+                          <span className="font-semibold text-green-800 dark:text-green-300">
+                            {editingHolding.newWeight.toFixed(2)}
                           </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Investment Impact Calculation */}
-                    <div className="p-4 bg-blue-50 rounded-md">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-md">
                       <h5 className="font-medium mb-3 flex items-center gap-2">
                         <IndianRupee className="h-4 w-4" />
                         Investment Impact:
                       </h5>
                       {(() => {
                         const investmentPrice = editingHolding.latestPrice || editingHolding.originalHolding.buyPrice;
-                        const investmentDetails = calculateInvestmentDetails(
+                        const baseDetails = calculateInvestmentDetails(
                           editingHolding.newWeight,
                           investmentPrice,
                           Number(minInvestment)
                         );
+                        const usePreview = (editingHolding.action === 'sell' || editingHolding.action === 'partial-sell') && editingHolding.pnlPreview;
+                        const newQty = usePreview ? editingHolding.pnlPreview!.remainingQuantity : baseDetails.quantity;
+                        const newActualInvestment = newQty * investmentPrice;
+                        const newAllocated = (editingHolding.newWeight / 100) * Number(minInvestment);
                         const currentInvestment = editingHolding.originalHolding.minimumInvestmentValueStock;
-                        const investmentChange = investmentDetails.actualInvestmentAmount - currentInvestment;
+                        const investmentChange = newActualInvestment - currentInvestment;
                         
                         return (
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">New Allocated:</span>
-                              <p className="font-medium">₹{investmentDetails.allocatedAmount.toLocaleString()}</p>
+                              <p className="font-medium">₹{newAllocated.toLocaleString()}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">New Quantity:</span>
-                              <p className="font-medium">{investmentDetails.quantity} shares</p>
+                              <p className="font-medium">{newQty} shares</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">New Investment:</span>
-                              <p className="font-medium">₹{investmentDetails.actualInvestmentAmount.toLocaleString()}</p>
+                              <p className="font-medium">₹{newActualInvestment.toLocaleString()}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Investment Change:</span>

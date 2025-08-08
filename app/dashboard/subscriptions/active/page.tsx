@@ -416,7 +416,11 @@ export default function ActiveSubscriptionsPage() {
               </p>
             </div>
           ) : (
-            <DataTable columns={subscriptionColumns} data={filteredSubscriptions} />
+            <div className="w-full overflow-x-auto">
+              <div className="min-w-[900px]">
+                <DataTable columns={subscriptionColumns} data={filteredSubscriptions} />
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

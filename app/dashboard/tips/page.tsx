@@ -677,14 +677,16 @@ export default function TipsManagementPage() {
               </div>
               
         {/* Tips Table */}
-        <div className="rounded-md border">
-                      <DataTable 
-                        columns={columns} 
-                        data={filteredTips} 
-            isLoading={isLoading}
-                        searchColumn="title"
-                      />
-                    </div>
+        <div className="rounded-md border w-full overflow-x-auto">
+          <div className="min-w-[900px]">
+            <DataTable 
+              columns={columns} 
+              data={filteredTips} 
+              isLoading={isLoading}
+              searchColumn="title"
+            />
+          </div>
+        </div>
                   </div>
 
       {/* Dialogs */}

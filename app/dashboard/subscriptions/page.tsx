@@ -457,7 +457,11 @@ export default function SubscriptionsPage() {
                   </Button>
                 </div>
               ) : (
-                <DataTable columns={subscriptionColumns} data={subscriptions} />
+                <div className="w-full overflow-x-auto">
+                  <div className="min-w-[800px]">
+                    <DataTable columns={subscriptionColumns} data={subscriptions} />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -504,10 +508,14 @@ export default function SubscriptionsPage() {
                   </p>
                 </div>
               ) : (
-                <DataTable
-                  columns={paymentHistoryColumns}
-                  data={paymentHistory}
-                />
+                <div className="w-full overflow-x-auto">
+                  <div className="min-w-[900px]">
+                    <DataTable
+                      columns={paymentHistoryColumns}
+                      data={paymentHistory}
+                    />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

@@ -216,12 +216,12 @@ export default function PriceHistoryPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <TrendingUp className="h-8 w-8 text-green-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
             Portfolio Price History
           </h1>
           <p className="text-muted-foreground">
@@ -232,6 +232,7 @@ export default function PriceHistoryPage() {
           onClick={loadPriceHistory} 
           disabled={isLoading || !selectedPortfolio}
           variant="outline"
+          className="w-full sm:w-auto"
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           Refresh Data
@@ -240,8 +241,8 @@ export default function PriceHistoryPage() {
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex gap-4 flex-1">
-          <div className="flex-1 max-w-xs">
+        <div className="flex flex-col sm:flex-row gap-4 flex-1 w-full">
+          <div className="flex-1 min-w-[220px]">
             <label className="text-sm font-medium mb-2 block">Portfolio</label>
             <Select value={selectedPortfolio} onValueChange={setSelectedPortfolio}>
               <SelectTrigger>
@@ -257,7 +258,7 @@ export default function PriceHistoryPage() {
             </Select>
           </div>
           
-          <div className="flex-1 max-w-xs">
+          <div className="flex-1 min-w-[180px]">
             <label className="text-sm font-medium mb-2 block">Time Period</label>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
               <SelectTrigger>
@@ -362,6 +363,8 @@ export default function PriceHistoryPage() {
                   </Badge>
                 </div>
                 
+                <div className="w-full overflow-x-auto">
+                  <div className="min-w-[840px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -422,6 +425,8 @@ export default function PriceHistoryPage() {
                     })}
                   </TableBody>
                 </Table>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
