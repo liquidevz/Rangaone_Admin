@@ -278,11 +278,9 @@ export function PortfolioFormDialog({
    * @returns {object} Object containing the base amount and context information
    */
   const getWeightageCalculationBase = () => {
-    // Check if this is first-time creation by looking at actual holdings count
-    // This handles both new portfolios and old portfolios without holdings
     const isFirstTimeCreation = holdings.length === 0;
     const minInvestmentAmount = Number(minInvestment || 0);
-    const currentPortfolioValue = holdingsValue + Math.max(0, cashBalance);
+    const currentPortfolioValue = holdingsValue + cashBalance;
     
     return {
       baseAmount: isFirstTimeCreation ? minInvestmentAmount : currentPortfolioValue,
@@ -1093,7 +1091,7 @@ export function PortfolioFormDialog({
      * Always use current portfolio value as base since we're modifying an existing portfolio
      * This ensures weightage adjustments reflect the current market state of the portfolio
      */
-    const editBase = holdingsValue + Math.max(0, cashBalance);
+    const editBase = holdingsValue + cashBalance;
     const recomputed = calculateInvestmentDetails(
       newWeight,
       investmentPrice,
@@ -2476,7 +2474,7 @@ export function PortfolioFormDialog({
                       {(() => {
                         const investmentPrice = editingHolding.latestPrice || editingHolding.originalHolding.buyPrice;
                         // For editing, always use current portfolio value as base
-                        const previewBase = holdingsValue + Math.max(0, cashBalance);
+                        const previewBase = holdingsValue + cashBalance;
                         const baseDetails = calculateInvestmentDetails(
                           editingHolding.newWeight,
                           investmentPrice,
