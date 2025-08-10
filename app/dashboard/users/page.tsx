@@ -29,6 +29,18 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { usePageState } from "@/hooks/use-page-state";
+import { useCache } from "@/components/cache-provider";
+import { CACHE_KEYS } from "@/lib/cache";
+import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
+
+interface UsersPageState {
+  searchQuery: string;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+  selectedRole: string;
+  selectedStatus: string;
+}
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -42,18 +54,56 @@ export default function UsersPage() {
   const [userToUnban, setUserToUnban] = useState<User | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const { cacheData, getCachedData, invalidateCache } = useCache();
+  
+  // Use page state for filters and search
+  const { state: pageState, updateState: updatePageState } = usePageState<UsersPageState>({
+    pageName: 'users',
+    defaultState: {
+      searchQuery: '',
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+      selectedRole: 'all',
+      selectedStatus: 'all'
+    },
+    syncWithUrl: true
+  });
+  
+  // Scroll restoration
+  const { containerRef } = useScrollRestoration({
+    key: 'users_page',
+    enabled: true
+  });
 
   console.log("UsersPage component rendered", users);
 
-  // Load users data
-  const loadUsers = async () => {
+  // Load users data with caching
+  const loadUsers = async (useCache = true) => {
     try {
       setLoading(true);
       setError(null);
 
+      // Try to get cached data first
+      if (useCache) {
+        const cachedUsers = getCachedData<User[]>(CACHE_KEYS.USERS_DATA);
+        if (cachedUsers) {
+          setUsers(cachedUsers);
+          setLoading(false);
+          // Still fetch fresh data in background
+          fetchUsers().then(freshData => {
+            setUsers(freshData);
+            cacheData(CACHE_KEYS.USERS_DATA, freshData, 10 * 60 * 1000); // Cache for 10 minutes
+          }).catch(console.error);
+          return;
+        }
+      }
+
       console.log("Loading users...");
       const data = await fetchUsers();
       setUsers(data);
+      
+      // Cache the fresh data
+      cacheData(CACHE_KEYS.USERS_DATA, data, 10 * 60 * 1000); // Cache for 10 minutes
     } catch (err) {
       console.error("Error loading users:", err);
       setError(err instanceof Error ? err.message : "Failed to load users");
@@ -70,7 +120,12 @@ export default function UsersPage() {
   const handleCreateUser = async (userData: any) => {
     try {
       const newUser = await createUser(userData);
-      setUsers((prev) => [...prev, newUser]);
+      const updatedUsers = [...users, newUser];
+      setUsers(updatedUsers);
+      
+      // Update cache
+      cacheData(CACHE_KEYS.USERS_DATA, updatedUsers, 10 * 60 * 1000);
+      
       toast({
         title: "User created successfully",
       });
@@ -92,9 +147,12 @@ export default function UsersPage() {
 
     try {
       const updatedUser = await updateUser(userToEdit._id, userData);
-      setUsers((prev) =>
-        prev.map((user) => (user._id === userToEdit._id ? updatedUser : user))
-      );
+      const updatedUsers = users.map((user) => (user._id === userToEdit._id ? updatedUser : user));
+      setUsers(updatedUsers);
+      
+      // Update cache
+      cacheData(CACHE_KEYS.USERS_DATA, updatedUsers, 10 * 60 * 1000);
+      
       toast({
         title: "User updated successfully",
       });
@@ -116,7 +174,12 @@ export default function UsersPage() {
 
     try {
       await deleteUser(userToDelete._id);
-      setUsers((prev) => prev.filter((user) => user._id !== userToDelete._id));
+      const updatedUsers = users.filter((user) => user._id !== userToDelete._id);
+      setUsers(updatedUsers);
+      
+      // Update cache
+      cacheData(CACHE_KEYS.USERS_DATA, updatedUsers, 10 * 60 * 1000);
+      
       toast({
         title: "User deleted successfully",
       });
@@ -139,9 +202,11 @@ export default function UsersPage() {
 
     try {
       await banUser(userToBan._id);
-      // Update the user status in the local state
-
-      await loadUsers();
+      
+      // Invalidate cache and reload fresh data
+      invalidateCache(CACHE_KEYS.USERS_DATA);
+      await loadUsers(false); // Force fresh load
+      
       toast({
         title: "User banned successfully",
       });
@@ -164,8 +229,11 @@ export default function UsersPage() {
 
     try {
       await unbanUser(userToUnban._id);
-
-      await loadUsers();
+      
+      // Invalidate cache and reload fresh data
+      invalidateCache(CACHE_KEYS.USERS_DATA);
+      await loadUsers(false); // Force fresh load
+      
       toast({
         title: "User unbanned successfully",
       });
@@ -324,7 +392,10 @@ export default function UsersPage() {
   ];
 
   return (
-    <div className="w-full min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:px-8 space-y-4 sm:space-y-6">
+    <div 
+      ref={containerRef as React.RefObject<HTMLDivElement>}
+      className="w-full min-h-screen px-4 py-4 sm:px-6 sm:py-6 lg:px-8 space-y-4 sm:space-y-6 overflow-auto"
+    >
       <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Users</h1>
@@ -336,7 +407,10 @@ export default function UsersPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadUsers}
+            onClick={() => {
+              invalidateCache(CACHE_KEYS.USERS_DATA);
+              loadUsers(false);
+            }}
             disabled={loading}
             className="w-full sm:w-auto"
           >

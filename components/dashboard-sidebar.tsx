@@ -2,13 +2,15 @@
 "use client"
 
 import type React from "react"
-import { useState, createContext, useContext } from "react"
+import { useState, createContext, useContext, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { BarChart, FileText, Home, Menu, Settings, Users, X, Lightbulb, Briefcase, CreditCard, Package, ChevronLeft, Bot, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Logo } from "@/components/logo"
+import { useCache } from "@/components/cache-provider"
 
 // Context for sidebar state
 const SidebarContext = createContext<{
@@ -82,8 +84,24 @@ const sidebarItems: SidebarItem[] = [
 
 export function DashboardSidebar() {
   const pathname = usePathname()
+  const { saveSidebarState, getSidebarState } = useCache()
   const [open, setOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+
+  // Load sidebar state from cache on mount
+  useEffect(() => {
+    const cachedState = getSidebarState()
+    if (cachedState !== null) {
+      setIsCollapsed(cachedState)
+    }
+  }, [getSidebarState])
+
+  // Save sidebar state when it changes
+  const handleToggleCollapse = () => {
+    const newState = !isCollapsed
+    setIsCollapsed(newState)
+    saveSidebarState(newState)
+  }
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
@@ -104,8 +122,7 @@ export function DashboardSidebar() {
                   className="flex items-center gap-2 font-semibold text-sidebar-foreground"
                   onClick={() => setOpen(false)}
                 >
-                  <FileText className="h-6 w-6" />
-                  <span>Ranga One</span>
+                  <Logo width={120} height={32} showText={false} className="text-sidebar-foreground" />
                 </Link>
                 <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground" onClick={() => setOpen(false)}>
                   <X className="h-5 w-5" />
@@ -142,7 +159,7 @@ export function DashboardSidebar() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-sidebar-foreground">Admin</p>
-                    <p className="text-xs text-sidebar-foreground/60">admin@rangaone.com</p>
+                    <p className="text-xs text-sidebar-foreground/60">admin@rangaone.finance</p>
                   </div>
                 </div>
               </div>
@@ -150,8 +167,7 @@ export function DashboardSidebar() {
           </SheetContent>
         </Sheet>
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-foreground">
-          <FileText className="h-6 w-6" />
-          <span>Ranga One</span>
+          <Logo width={120} height={32} showText={false} />
         </Link>
       </header>
 
@@ -167,20 +183,15 @@ export function DashboardSidebar() {
               "flex items-center gap-2 font-semibold transition-all",
               isCollapsed ? "justify-center" : "px-2"
             )}>
-              <FileText className="h-6 w-6 shrink-0 text-sidebar-foreground" />
-              {!isCollapsed && <span className="text-sidebar-foreground">Ranga One</span>}
+              <Logo 
+                width={isCollapsed ? 32 : 120} 
+                height={32} 
+                showText={false} 
+                collapsed={isCollapsed}
+                className="text-sidebar-foreground" 
+              />
             </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className={cn(
-                "h-8 w-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground ml-auto",
-                isCollapsed && "ml-0"
-              )}
-            >
-              <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsed && "rotate-180")} />
-            </Button>
+
           </div>
 
           <nav className="flex-1 overflow-auto py-4">
@@ -218,11 +229,19 @@ export function DashboardSidebar() {
                 <Users className="h-5 w-5 text-sidebar-accent-foreground" />
               </div>
               {!isCollapsed && (
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-medium text-sidebar-foreground">Admin</p>
                   <p className="text-xs text-sidebar-foreground/60">admin@rangaone.com</p>
                 </div>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleToggleCollapse}
+                className="h-6 w-6 rounded hover:bg-sidebar-accent text-sidebar-foreground"
+              >
+                <ChevronLeft className={cn("h-3 w-3 transition-transform", isCollapsed && "rotate-180")} />
+              </Button>
             </div>
           </div>
         </div>

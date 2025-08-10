@@ -33,6 +33,7 @@ export interface Tip {
   stopLoss?: string;
   horizon?: string;
   analysistConfidence?: number;
+  mpWeightage?: string;
   downloadLinks?: Array<{
     _id?: string;
     name: string;
@@ -64,6 +65,7 @@ export interface CreateTipRequest {
   stopLoss?: string;
   horizon?: string;
   analysistConfidence?: number;
+  mpWeightage?: string;
   downloadLinks?: Array<{
     name: string;
     url: string;

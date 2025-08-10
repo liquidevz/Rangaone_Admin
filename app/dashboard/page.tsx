@@ -1,9 +1,29 @@
 // app\dashboard\page.tsx  
+"use client"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, Briefcase, CreditCard, ArrowUpRight, ArrowDownRight, Lightbulb } from "lucide-react"
+import { useCache } from "@/components/cache-provider"
+import { useEffect, useState } from "react"
 
 export default function DashboardPage() {
+  const { saveActiveTab, getActiveTab } = useCache()
+  const [activeTab, setActiveTab] = useState("overview")
+
+  // Load active tab from cache on mount
+  useEffect(() => {
+    const cachedTab = getActiveTab("dashboard")
+    if (cachedTab) {
+      setActiveTab(cachedTab)
+    }
+  }, [getActiveTab])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    saveActiveTab("dashboard", value)
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="space-y-2">
@@ -11,7 +31,7 @@ export default function DashboardPage() {
         <p className="text-sm sm:text-base text-muted-foreground">Welcome to Ranga One Wealth admin dashboard.</p>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:grid-cols-none sm:inline-flex">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>

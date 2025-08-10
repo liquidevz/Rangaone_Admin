@@ -4,6 +4,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -73,6 +74,7 @@ export interface Tip {
   buyRange?: string;
   addMoreAt?: string;
   weightage?: string;
+  mpWeightage?: string;
   description: string;
   pdfLink?: string;
   createdAt: string;
@@ -95,6 +97,7 @@ export interface CreateTipRequest {
   stockSymbol?: string; // Add stockSymbol to CreateTipRequest
   analysistConfidence?: number;
   tipUrl?: string;
+  mpWeightage?: string;
 }
 
 // Validation schema
@@ -110,7 +113,7 @@ const tipSchema = z.object({
   buyRange: z.string().optional(),
   addMoreAt: z.string().optional(),
   exitPrice: z.string().optional(),
-  weightage: z.string().optional(),
+  mpWeightage: z.number().min(0, "MP Weightage must be at least 0").max(100, "MP Weightage cannot exceed 100").optional(),
   description: z.string().min(1, "Description is required"),
   pdfLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
@@ -153,6 +156,8 @@ export function PortfolioTipDialog({
     }
   }, [open, portfolio, onOpenChange]);
   const { toast } = useToast();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [selectedStockDetails, setSelectedStockDetails] = React.useState<StockSymbol | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [searchResults, setSearchResults] = React.useState<StockSymbol[]>([]);
@@ -175,7 +180,7 @@ export function PortfolioTipDialog({
       buyRange: "",
       addMoreAt: "",
       exitPrice: "",
-      weightage: "",
+      mpWeightage: 0,
       description: "",
       pdfLink: "",
     },
@@ -290,11 +295,11 @@ export function PortfolioTipDialog({
           buyRange: initialData.buyRange || "",
           addMoreAt: initialData.addMoreAt || "",
           exitPrice: (initialData as any).exitPrice || "",
-          weightage: initialData.weightage || "",
+          mpWeightage: parseFloat(initialData.mpWeightage || initialData.weightage || "0") || 0,
           description: initialData.description || ((initialData as any).content?.[0]?.value ?? ""),
           pdfLink: (initialData as any).tipUrl || "",
         } as TipFormValues);
-        setWeightageValue(initialData.weightage || "");
+        setWeightageValue(initialData.mpWeightage || initialData.weightage || "");
         
         // Always fetch and set stock details by stockId if present
         if (initialData.stockId) {
@@ -320,7 +325,7 @@ export function PortfolioTipDialog({
           buyRange: "",
           addMoreAt: "",
           exitPrice: "",
-          weightage: "",
+          mpWeightage: 0,
           description: "",
           pdfLink: "",
         });
@@ -397,7 +402,7 @@ export function PortfolioTipDialog({
       buyRange: "",
       addMoreAt: "",
       exitPrice: "",
-      weightage: "",
+      mpWeightage: 0,
       description: "",
       pdfLink: "",
     });
@@ -480,21 +485,21 @@ export function PortfolioTipDialog({
     const currentValue = parseFloat(weightageValue) || 0;
     const newValue = Math.min(currentValue + 1, 100);
     setWeightageValue(newValue.toString());
-    form.setValue("weightage", newValue.toString());
+    form.setValue("mpWeightage", newValue);
   };
 
   const decrementWeightage = () => {
     const currentValue = parseFloat(weightageValue) || 0;
     const newValue = Math.max(currentValue - 1, 0);
     setWeightageValue(newValue.toString());
-    form.setValue("weightage", newValue.toString());
+    form.setValue("mpWeightage", newValue);
   };
 
   const handleWeightageChange = (value: string) => {
     const numValue = parseFloat(value) || 0;
     const clampedValue = Math.max(0, Math.min(100, numValue));
     setWeightageValue(clampedValue.toString());
-    form.setValue("weightage", clampedValue.toString());
+    form.setValue("mpWeightage", clampedValue);
   };
   
   // Get portfolio invested value (currentValue - cashBalance)
@@ -554,10 +559,10 @@ export function PortfolioTipDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900 text-white border-gray-700">
+      <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
         <DialogHeader>
-          <DialogTitle className="text-white">{title}</DialogTitle>
-          <DialogDescription className="text-gray-300">{description}</DialogDescription>
+          <DialogTitle className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{title}</DialogTitle>
+          <DialogDescription className={isDark ? 'text-gray-300' : 'text-gray-600'}>{description}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -587,6 +592,7 @@ export function PortfolioTipDialog({
                 tipUrl: data.pdfLink,
                 analysistConfidence: 5, // Default confidence score
                 downloadLinks: data.pdfLink ? [{ name: "Analysis Report", url: data.pdfLink }] : undefined,
+                mpWeightage: data.mpWeightage?.toString(),
               };
               
               // Ensure content is properly formatted
@@ -630,44 +636,27 @@ export function PortfolioTipDialog({
 
             {/* Stock Symbol Display */}
             {selectedStockDetails && (
-              <div className="p-4 bg-gray-800 rounded-lg border border-gray-600">
+              <div className={`p-3 rounded border ${isDark ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm ${isDark ? 'bg-gray-700' : 'bg-gray-600'}`}>
                       {selectedStockDetails.symbol.charAt(0)}
                     </div>
                     <div>
-                      <div className="font-semibold text-white">{selectedStockDetails.symbol}</div>
-                      <div className="text-sm text-gray-300">{selectedStockDetails.name}</div>
+                      <div className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{selectedStockDetails.symbol}</div>
+                      <div className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{selectedStockDetails.name}</div>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleStockClear}
-                    className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white"
+                    className={`p-1 rounded ${isDark ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'}`}
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="text-gray-300 text-sm mb-3">
-                  <div className="flex justify-between">
-                    <span>Price: ₹{parseFloat(selectedStockDetails.currentPrice || "0").toLocaleString()}</span>
-                    <span>Weight: {weightageValue || "0"}%</span>
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span>Shares: {calculateNumberOfShares(selectedStockDetails.currentPrice || "0", weightageValue)}</span>
-                    <span className="font-medium text-green-400">
-                      Value: ₹{calculateInvestmentValue(selectedStockDetails.currentPrice || "0", weightageValue)}
-                    </span>
-                  </div>
-                  {portfolio && (
-                    <div className="mt-1 text-xs text-gray-400">
-                      Portfolio: ₹{portfolio.currentValue?.toLocaleString() || '0'} 
-                      {portfolio.cashBalance ? ` (Cash: ₹${portfolio.cashBalance.toLocaleString()})` : ''}
-                      {portfolio.minInvestmentValue && getPortfolioInvestedValue() === portfolio.minInvestmentValue ? 
-                        ` (Using min: ₹${portfolio.minInvestmentValue.toLocaleString()})` : ''}
-                    </div>
-                  )}
+                <div className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Price: ₹{parseFloat(selectedStockDetails.currentPrice || "0").toLocaleString()} • Weight: {weightageValue || "0"}%
                 </div>
               </div>
             )}
@@ -679,14 +668,14 @@ export function PortfolioTipDialog({
                 name="stockSymbol"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Stock Symbol</FormLabel>
+                    <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Stock Symbol *</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                           <Input
                             ref={inputRef}
-                            placeholder="Search for stock symbol..."
+                            placeholder="Search for stocks..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onKeyDown={handleKeyDown}
@@ -696,7 +685,7 @@ export function PortfolioTipDialog({
                               }
                             }}
                             disabled={isSubmitting}
-                            className="pl-10 pr-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                            className="pl-10 pr-10 bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                             autoComplete="off"
                           />
                           {searchTerm && (
@@ -707,9 +696,9 @@ export function PortfolioTipDialog({
                                 setShowResults(false);
                                 inputRef.current?.focus();
                               }}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-700 rounded"
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
                             >
-                              <X className="h-3 w-3 text-gray-400" />
+                              <X className="h-4 w-4 text-gray-400" />
                             </button>
                           )}
                         </div>
@@ -718,24 +707,26 @@ export function PortfolioTipDialog({
                         {showResults && searchResults.length > 0 && (
                           <div
                             ref={resultsRef}
-                            className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
+                            className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-60 overflow-y-auto"
                           >
                             {searchResults.map((stock, index) => (
                               <div
                                 key={stock._id}
-                                className={`p-3 cursor-pointer hover:bg-gray-700 ${
-                                  index === focusedIndex ? "bg-gray-700" : ""
+                                className={`p-3 cursor-pointer border-b last:border-b-0 ${
+                                  isDark 
+                                    ? `hover:bg-gray-700 border-gray-600 ${index === focusedIndex ? 'bg-gray-700' : ''}` 
+                                    : `hover:bg-gray-50 border-gray-100 ${index === focusedIndex ? 'bg-gray-100' : ''}`
                                 }`}
                                 onClick={() => handleStockSelect(stock)}
                               >
                                 <div className="flex items-center justify-between">
                                   <div>
-                                    <div className="font-medium text-white">{stock.symbol}</div>
-                                    <div className="text-sm text-gray-300">{stock.name}</div>
+                                    <div className="font-medium text-gray-900">{stock.symbol}</div>
+                                    <div className="text-sm text-gray-600">{stock.name}</div>
                                   </div>
                                   {stock.currentPrice && stock.previousPrice && (
                                     <div className="text-right">
-                                      <div className="font-medium text-white">
+                                      <div className="font-medium text-gray-900">
                                         ₹{parseFloat(stock.currentPrice).toLocaleString()}
                                       </div>
                                       <div className={`text-sm ${getPriceChangeColor(stock.currentPrice, stock.previousPrice)}`}>
@@ -750,8 +741,8 @@ export function PortfolioTipDialog({
                         )}
 
                         {isSearching && (
-                          <div className="absolute top-full left-0 right-0 mt-1 p-3 bg-gray-800 border border-gray-600 rounded-lg">
-                            <div className="text-gray-400 text-center">Searching...</div>
+                          <div className="absolute top-full left-0 right-0 mt-1 p-3 bg-white border border-gray-200 rounded shadow-lg">
+                            <div className="text-gray-500 text-center">Searching...</div>
                           </div>
                         )}
                       </div>
@@ -762,203 +753,174 @@ export function PortfolioTipDialog({
               />
             )}
 
-            {/* Title Field */}
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Title *</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter tip title (min 5 chars)"
-                      {...field}
-                      disabled={isSubmitting}
-                      className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Category Field */}
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Category *</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600">
-                        <SelectItem value="basic" className="text-white hover:bg-gray-700">Basic</SelectItem>
-                        <SelectItem value="premium" className="text-white hover:bg-gray-700">Premium</SelectItem>
-                        <SelectItem value="social_media" className="text-white hover:bg-gray-700">Social Media</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Action Field */}
-            <FormField
-              control={form.control}
-              name="action"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Edit Action</FormLabel>
-                  <div className="text-gray-400 text-sm mb-2">
-                    Drop down of the action will decide the expression of weightage & buy range or exit price
-                  </div>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
-                        <SelectValue placeholder="Select action" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600">
-                        <SelectItem value="PARTIAL SELL" className="text-white hover:bg-gray-700">PARTIAL SELL</SelectItem>
-                        <SelectItem value="BUY" className="text-white hover:bg-gray-700">BUY</SelectItem>
-                        <SelectItem value="SELL" className="text-white hover:bg-gray-700">SELL</SelectItem>
-                        <SelectItem value="HOLD" className="text-white hover:bg-gray-700">HOLD</SelectItem>
-                        <SelectItem value="ADD MORE" className="text-white hover:bg-gray-700">ADD MORE</SelectItem>
-                        <SelectItem value="PARTIAL PROFIT" className="text-white hover:bg-gray-700">PARTIAL PROFIT</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Dynamic Fields Based on Action */}
-            {activeFields.includes("buyRange") && (
+            <div className="grid grid-cols-3 gap-4">
+              {/* Title Field */}
               <FormField
                 control={form.control}
-                name="buyRange"
+                name="title"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">
-                      {watchedAction === "PARTIAL SELL" ? "Buy Range (₹)" : "Buy Range (₹)"}
-                    </FormLabel>
+                  <FormItem className="col-span-2">
+                    <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Title *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder={watchedAction === "PARTIAL SELL" ? "7400" : "Enter buy range"}
+                        placeholder="Enter tip title (min 5 chars)"
                         {...field}
                         disabled={isSubmitting}
-                        className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                        className="bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
 
-            {activeFields.includes("addMoreAt") && (
-              <FormField
-                control={form.control}
-                name="addMoreAt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Add More At (₹)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter additional buy price"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {activeFields.includes("exitPrice") && (
-              <FormField
-                control={form.control}
-                name="exitPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Exit Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="This will appear when selected sell option"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Weightage with + and - buttons */}
-            {activeFields.includes("weightage") && (
-              <FormField
-                control={form.control}
-                name="weightage"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Weightage</FormLabel>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={decrementWeightage}
-                        disabled={isSubmitting}
-                        className="bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
+              {/* MP Weightage */}
+              {activeFields.includes("weightage") && (
+                <FormField
+                  control={form.control}
+                  name="mpWeightage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>MP Weightage (%)</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Add Weightage"
+                          type="number"
+                          min="0"
+                          max="100"
+                          placeholder="Enter weightage"
                           value={weightageValue}
                           onChange={(e) => handleWeightageChange(e.target.value)}
                           disabled={isSubmitting}
-                          className="bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-center"
+                          className="bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                         />
                       </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={incrementWeightage}
-                        disabled={isSubmitting}
-                        className="bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {selectedStockDetails && weightageValue && (
-                      <div className="mt-2 text-sm">
-                        <div className="text-gray-400">
-                          Based on {portfolio ? 
-                            `₹${getPortfolioInvestedValue().toLocaleString()} ${getPortfolioInvestedValue() === (portfolio.minInvestmentValue || 100000) ? '(min value)' : 'invested value'}` : 
-                            `₹1,00,000 portfolio`}:
-                        </div>
-                        <div className="flex justify-between text-gray-300">
-                          <span>Shares: {calculateNumberOfShares(selectedStockDetails.currentPrice || "0", weightageValue)}</span>
-                          <span className="text-green-400">Value: ₹{calculateInvestmentValue(selectedStockDetails.currentPrice || "0", weightageValue)}</span>
-                        </div>
-                      </div>
-                    )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Category Field */}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Category *</FormLabel>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="basic" className="text-gray-900 hover:bg-gray-50">Basic</SelectItem>
+                          <SelectItem value="premium" className="text-gray-900 hover:bg-gray-50">Premium</SelectItem>
+                          <SelectItem value="social_media" className="text-gray-900 hover:bg-gray-50">Social Media</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
+
+              {/* Action Field */}
+              <FormField
+                control={form.control}
+                name="action"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Action *</FormLabel>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectValue placeholder="Select action" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="BUY" className="text-gray-900 hover:bg-gray-50">BUY</SelectItem>
+                          <SelectItem value="SELL" className="text-gray-900 hover:bg-gray-50">SELL</SelectItem>
+                          <SelectItem value="HOLD" className="text-gray-900 hover:bg-gray-50">HOLD</SelectItem>
+                          <SelectItem value="ADD MORE" className="text-gray-900 hover:bg-gray-50">ADD MORE</SelectItem>
+                          <SelectItem value="PARTIAL SELL" className="text-gray-900 hover:bg-gray-50">PARTIAL SELL</SelectItem>
+                          <SelectItem value="PARTIAL PROFIT" className="text-gray-900 hover:bg-gray-50">PARTIAL PROFIT</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Buy Range */}
+              {activeFields.includes("buyRange") && (
+                <FormField
+                  control={form.control}
+                  name="buyRange"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Buy Range (₹)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., 7400-7500"
+                          {...field}
+                          disabled={isSubmitting}
+                          className="bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Add More At */}
+              {activeFields.includes("addMoreAt") && (
+                <FormField
+                  control={form.control}
+                  name="addMoreAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Add More At (₹)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Additional buy price"
+                          {...field}
+                          disabled={isSubmitting}
+                          className="bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Exit Price */}
+              {activeFields.includes("exitPrice") && (
+                <FormField
+                  control={form.control}
+                  name="exitPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Exit Price (₹)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Target exit price"
+                          {...field}
+                          disabled={isSubmitting}
+                          className="bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
 
             {/* Description */}
             <FormField
@@ -966,16 +928,17 @@ export function PortfolioTipDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">Description</FormLabel>
+                  <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>Description *</FormLabel>
                   <FormControl>
                     <RichTextEditor
                       value={field.value}
                       onChange={field.onChange}
                       disabled={isSubmitting}
                       placeholder="WHY BUY THIS / Summary"
-                      height={200} // Add height
-                      className="bg-gray-800 border-gray-600 text-white placeholder-gray-400" // Add className
-                      id={field.name} // Add id
+                      height={150}
+                      className="bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                      id={field.name}
+                      theme={isDark ? 'dark' : 'light'}
                     />
                   </FormControl>
                   <FormMessage />
@@ -989,13 +952,13 @@ export function PortfolioTipDialog({
               name="pdfLink"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">PDF Link</FormLabel>
+                  <FormLabel className={isDark ? 'text-white' : 'text-gray-900'}>PDF Link</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Paste Link here"
+                      placeholder="Paste link here"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                      className="bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                     />
                   </FormControl>
                   <FormMessage />
@@ -1010,14 +973,14 @@ export function PortfolioTipDialog({
                 variant="outline"
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="min-w-[100px] bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
+                className={`min-w-[100px] ${isDark ? 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
-                className="min-w-[100px] bg-white text-black hover:bg-gray-100"
+                className={`min-w-[100px] text-white ${isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-900 hover:bg-gray-800'}`}
               >
                 {isSubmitting ? "Saving..." : "Save"}
               </Button>

@@ -228,7 +228,7 @@ export function StockSearch({
     setShowResults(false);
     setFocusedIndex(-1);
     onClear?.();
-    inputRef.current?.focus();
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const refreshStockDetails = async () => {
@@ -481,6 +481,27 @@ export function StockSearch({
               </div>
             </CardContent>
           </Card>
+        ) : selectedStock && !showDetails ? (
+          // Show selected stock/index with better UI when showDetails is false
+          <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-200 dark:border-blue-800 rounded-md">
+            <div className="flex items-center gap-2 flex-1">
+              <Check className="h-4 w-4 text-blue-600" />
+              <span className="font-medium text-blue-800 dark:text-blue-200">{selectedStock.symbol}</span>
+              <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700">
+                {selectedStock.exchange}
+              </Badge>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleClear}
+              disabled={disabled}
+              className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+            >
+              Change
+            </Button>
+          </div>
         ) : (
           // Simple search input when no stock selected
           <div className="relative">

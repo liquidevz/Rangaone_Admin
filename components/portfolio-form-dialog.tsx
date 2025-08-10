@@ -1638,16 +1638,7 @@ export function PortfolioFormDialog({
                           disabled={isSubmitting}
                         />
                       </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="index">Compared to Benchmark Index</Label>
-                        <Input
-                          id="index"
-                          value={index}
-                          onChange={(e) => setIndex(e.target.value)}
-                          placeholder="e.g., NIFTY 50"
-                          disabled={isSubmitting}
-                        />
-                      </div>
+
                       <div className="grid gap-2">
                         <Label htmlFor="monthly-gains">Monthly Gains (%)</Label>
                         <Input
@@ -1680,12 +1671,13 @@ export function PortfolioFormDialog({
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="compare-with">Compare With</Label>
-                        <Input
-                          id="compare-with"
+                        <StockSearch
                           value={compareWith}
-                          onChange={(e) => setCompareWith(e.target.value)}
-                          placeholder="e.g., NIFTY 50 Index"
+                          onSelect={(symbol, stockDetails) => setCompareWith(symbol)}
+                          onClear={() => setCompareWith("")}
+                          placeholder="Search for benchmark stock/index..."
                           disabled={isSubmitting}
+                          showDetails={false}
                         />
                       </div>
                     </div>
@@ -1733,25 +1725,25 @@ export function PortfolioFormDialog({
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Total Investment Pool</p>
-                            <p className="font-semibold text-lg">₹{Number(minInvestment || 0).toLocaleString()}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                            <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Portfolio Value</p>
+                            <p className="text-xl font-bold text-blue-800 dark:text-blue-200">₹{(holdingsValue + cashBalance).toLocaleString()}</p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Holdings Value</p>
-                            <p className="font-semibold">₹{holdingsValue.toLocaleString()}</p>
+                          <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                            <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Holdings Value</p>
+                            <p className="text-xl font-bold text-purple-800 dark:text-purple-200">₹{holdingsValue.toLocaleString()}</p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Cash Balance</p>
-                            <p className={`font-semibold ${cashBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                          <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                            <p className="text-sm text-green-600 dark:text-green-400 font-medium">Cash Balance</p>
+                            <p className={`text-xl font-bold ${cashBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-800 dark:text-green-200'}`}>
                               ₹{cashBalance.toLocaleString()}
                             </p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Weight Used</p>
-                            <p className={`font-semibold ${totalWeightUsed > 100 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                              {totalWeightUsed.toFixed(2)}% / 100%
+                          <div className="text-center p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
+                            <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Weight Used</p>
+                            <p className={`text-xl font-bold ${totalWeightUsed > 100 ? 'text-red-600 dark:text-red-400' : 'text-orange-800 dark:text-orange-200'}`}>
+                              {totalWeightUsed.toFixed(2)}%
                             </p>
                           </div>
                         </div>
@@ -1983,47 +1975,7 @@ export function PortfolioFormDialog({
                   </Card>
 
                   <div>
-                    {/* Portfolio Summary Section */}
-                    {holdings.length > 0 && (
-                      <Card className="border-2 border-blue-200 bg-blue-50 mb-4">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Calculator className="h-5 w-5 text-blue-600" />
-                            <h4 className="font-medium text-blue-800">Portfolio Summary</h4>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div className="text-center">
-                              <p className="text-blue-600 font-medium">Total Investment</p>
-                              <p className="text-lg font-bold">₹{formatCurrency(totalActualInvestment)}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-blue-600 font-medium">Current Min Investment</p>
-                              <p className="text-lg font-bold">₹{formatCurrency(Number(minInvestment || 0))}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-blue-600 font-medium">Recommended Min</p>
-                              <p className="text-lg font-bold">₹{formatCurrency(adjustedMinInvestment)}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-blue-600 font-medium">Cash Balance</p>
-                              <p className={`text-lg font-bold ${cashBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                ₹{formatCurrency(cashBalance)}
-                              </p>
-                            </div>
-                          </div>
-                          {needsMinInvestmentAdjustment && (
-                            <div className="mt-3 p-2 bg-amber-100 border border-amber-300 rounded-md">
-                              <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                                <span className="text-sm text-amber-800 font-medium">
-                                  Minimum investment needs adjustment to accommodate all holdings
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
+
 
                     <h4 className="font-medium mb-3">Current Holdings ({holdings.length})</h4>
                     {holdings.length === 0 ? (

@@ -4,10 +4,12 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, Edit, Trash2, Plus, RefreshCw, LogIn } from "lucide-react"
+import { Eye, Edit, Trash2, Plus, RefreshCw, LogIn, TrendingUp, DollarSign, BarChart3 } from "lucide-react"
 import { DataTable } from "@/components/ui/data-table"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useToast } from "@/hooks/use-toast"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog"
 import { PortfolioDetailsDialog } from "@/components/portfolio-details-dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -34,6 +36,7 @@ export default function PortfoliosPage() {
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(true) // Renamed to avoid confusion
   const { toast } = useToast()
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [error, setError] = useState<string | null>(null)
 
   // Check authentication on component mount
@@ -244,10 +247,11 @@ export default function PortfoliosPage() {
   const columns: ColumnDef<Portfolio>[] = [
     {
       accessorKey: "name",
-      header: "Name",
+      header: "Portfolio Name",
+      size: isMobile ? 150 : 200,
       cell: ({ row }) => (
         <button 
-          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+          className={`font-medium text-blue-600 hover:text-blue-800 hover:underline text-left transition-all duration-200 ${isMobile ? 'text-sm' : 'text-base'}`}
           onClick={() => {
             console.log(`Opening details for portfolio: ${row.original.name} (ID: ${row.original.id || row.original._id})`);
             console.log("Portfolio data:", row.original);
@@ -298,10 +302,11 @@ export default function PortfoliosPage() {
     {
       accessorKey: "PortfolioCategory",
       header: "Category",
+      size: isMobile ? 80 : 120,
       cell: ({ row }) => (
         <div className="font-medium">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            {row.original.PortfolioCategory || "Basic"}
+          <span className={`inline-flex items-center px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-800 ${isMobile ? 'text-xs px-1.5 py-0.5' : 'text-xs px-2.5 py-0.5'}`}>
+            {isMobile ? (row.original.PortfolioCategory || "Basic").slice(0, 4) : (row.original.PortfolioCategory || "Basic")}
           </span>
         </div>
       ),
@@ -316,15 +321,17 @@ export default function PortfoliosPage() {
     // },
     {
       accessorKey: "minInvestment",
-      header: "Min. Investment",
+      header: isMobile ? "Min. Inv." : "Min. Investment",
+      size: isMobile ? 80 : 120,
       cell: ({ row }) => {
         const minInvestment = row.original.minInvestment;
         return minInvestment ? (
-          <div className="font-medium text-green-600">
-            ₹{minInvestment.toLocaleString("en-IN")}
+          <div className={`font-medium text-green-600 flex items-center gap-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+            <DollarSign className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
+            ₹{isMobile ? `${(minInvestment/1000).toFixed(0)}K` : minInvestment.toLocaleString("en-IN")}
           </div>
         ) : (
-          <div>-</div>
+          <div className="text-muted-foreground">-</div>
         );
       },
     },
@@ -362,6 +369,7 @@ export default function PortfoliosPage() {
     {
       accessorKey: "holdings",
       header: "Holdings",
+      size: isMobile ? 70 : 100,
       cell: ({ row }) => {
         const holdings = row.original.holdings;
         const count = holdings ? holdings.length : 0;
@@ -369,19 +377,23 @@ export default function PortfoliosPage() {
         
         return (
           <div className="font-medium">
-            <div>{count} stocks</div>
+            <div className={`flex items-center gap-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+              <BarChart3 className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
+              {count} {isMobile ? '' : 'stocks'}
+            </div>
             {count > 0 && (
-              <div className={`text-xs ${totalWeight > 100 ? 'text-red-600' : totalWeight === 100 ? 'text-green-600' : 'text-orange-600'} pt-1`}>
-                {totalWeight.toFixed(1)}% allocated
+              <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} ${totalWeight > 100 ? 'text-red-600' : totalWeight === 100 ? 'text-green-600' : 'text-orange-600'} pt-1`}>
+                {totalWeight.toFixed(1)}%
               </div>
             )}
           </div>
         );
       },
     },
-    {
+    ...(!isMobile ? [{
       accessorKey: "performance",
       header: "Performance",
+      size: 120,
       cell: ({ row }) => {
         const portfolio = row.original;
         const cagr = portfolio.CAGRSinceInception;
@@ -390,7 +402,8 @@ export default function PortfoliosPage() {
         return (
           <div className="text-sm">
             {cagr && (
-              <div className="font-medium text-blue-600">
+              <div className="font-medium text-blue-600 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
                 CAGR: {cagr.endsWith('%') ? cagr : `${cagr}%`}
               </div>
             )}
@@ -403,7 +416,7 @@ export default function PortfoliosPage() {
           </div>
         );
       },
-    },
+    }] : []),
     // {
     //   accessorKey: "timeHorizon",
     //   header: "Time Horizon",
@@ -413,130 +426,188 @@ export default function PortfoliosPage() {
     // },
     {
       id: "actions",
-      header: "Actions",
+      header: "",
+      size: isMobile ? 100 : 120,
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" title="View" onClick={() => handleViewPortfolio(row.original)}>
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Edit"
-            onClick={() => {
-              // Use either id or _id, whichever is available
-              const portfolioId = row.original.id || row.original._id;
+        <TooltipProvider>
+          <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size={isMobile ? "sm" : "icon"} 
+                  className={`${isMobile ? 'h-7 w-7 p-0' : ''} hover:bg-blue-100 hover:text-blue-600 transition-colors duration-200`}
+                  onClick={() => handleViewPortfolio(row.original)}
+                >
+                  <Eye className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View portfolio tips and details</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size={isMobile ? "sm" : "icon"}
+                  className={`${isMobile ? 'h-7 w-7 p-0' : ''} hover:bg-orange-100 hover:text-orange-600 transition-colors duration-200`}
+                  onClick={() => {
+                    // Use either id or _id, whichever is available
+                    const portfolioId = row.original.id || row.original._id;
 
-              if (!portfolioId) {
-                toast({
-                  title: "Error",
-                  description: "Cannot edit portfolio: Missing portfolio ID",
-                  variant: "destructive",
-                });
-                return;
-              }
-              setSelectedPortfolio(row.original);
-              setIsEditDialogOpen(true);
-            }}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Delete"
-            onClick={() => {
-              // Use either id or _id, whichever is available
-              const portfolioId = row.original.id || row.original._id;
+                    if (!portfolioId) {
+                      toast({
+                        title: "Error",
+                        description: "Cannot edit portfolio: Missing portfolio ID",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setSelectedPortfolio(row.original);
+                    setIsEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Edit portfolio settings and holdings</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size={isMobile ? "sm" : "icon"}
+                  className={`${isMobile ? 'h-7 w-7 p-0' : ''} hover:bg-red-100 hover:text-red-600 transition-colors duration-200`}
+                  onClick={() => {
+                    // Use either id or _id, whichever is available
+                    const portfolioId = row.original.id || row.original._id;
 
-              if (!portfolioId) {
-                toast({
-                  title: "Error",
-                  description: "Cannot delete portfolio: Missing portfolio ID",
-                  variant: "destructive",
-                });
-                return;
-              }
-              setSelectedPortfolio(row.original);
-              setIsDeleteDialogOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+                    if (!portfolioId) {
+                      toast({
+                        title: "Error",
+                        description: "Cannot delete portfolio: Missing portfolio ID",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setSelectedPortfolio(row.original);
+                    setIsDeleteDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Delete portfolio permanently</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       ),
     },
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Portfolios</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">Manage investment portfolios</p>
-        </div>
-        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:gap-2">
-          {!isUserAuthenticated && (
-            <Button size="sm" onClick={handleLogin} className="w-full sm:w-auto">
-              <LogIn className="mr-2 h-4 w-4" />
-              Log In
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={loadPortfolios} disabled={isLoading} className="w-full sm:w-auto">
-            {isLoading ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh
-              </>
-            )}
-          </Button>
-          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} disabled={!isUserAuthenticated} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Portfolio
-          </Button>
-        </div>
-      </div>
-
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription className="text-sm">{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {!isUserAuthenticated && (
-        <Alert variant="warning" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription className="text-sm">
-            You need to be logged in to view and manage portfolios.
-            <Button variant="link" className="p-0 h-auto font-normal text-sm" onClick={handleLogin}>
-              Click here to log in
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg sm:text-xl">All Portfolios</CardTitle>
-          <CardDescription className="text-sm">View and manage all investment portfolios</CardDescription>
-        </CardHeader>
-        <CardContent className="px-3 sm:px-6">
-          {/* Mobile: Add horizontal scroll wrapper for table */}
-          <div className="w-full overflow-x-auto">
-            <div className="min-w-[600px]">
-              <DataTable columns={columns} data={portfolios} searchColumn="name" isLoading={isLoading} />
+    <div className="min-h-screen w-full">
+      <div className="container mx-auto p-0">
+        <div className="space-y-4 sm:space-y-6 px-4 py-4">
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1.5">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Investment Portfolios</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                {portfolios.length} portfolio{portfolios.length !== 1 ? 's' : ''} • Manage your investment strategies
+              </p>
+            </div>
+            
+            <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:gap-2">
+              {!isUserAuthenticated && (
+                <Button size="sm" onClick={handleLogin} className="w-full sm:w-auto">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Log In
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={loadPortfolios} 
+                disabled={isLoading} 
+                className="w-full sm:w-auto"
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    {isMobile ? 'Loading...' : 'Refreshing...'}
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => setIsAddDialogOpen(true)} 
+                disabled={!isUserAuthenticated} 
+                className="w-full sm:w-auto"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {isMobile ? 'Add' : 'Add Portfolio'}
+              </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription className="text-sm">{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {!isUserAuthenticated && (
+            <Alert variant="warning" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Authentication Required</AlertTitle>
+              <AlertDescription className="text-sm">
+                You need to be logged in to view and manage portfolios.
+                <Button variant="link" className="p-0 h-auto font-normal text-sm" onClick={handleLogin}>
+                  Click here to log in
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                All Portfolios
+              </CardTitle>
+              <CardDescription className="text-sm">
+                {isMobile ? 'Tap portfolio names for details • Use action buttons to manage' : 'Click portfolio names to view details • Hover over action buttons for help'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-6">
+              <div className="w-full overflow-x-auto">
+                <div className={`${isMobile ? 'min-w-[500px]' : 'min-w-[700px]'} w-full`}>
+                  <DataTable 
+                    columns={columns} 
+                    data={portfolios} 
+                    searchColumn="name" 
+                    isLoading={isLoading} 
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Add Portfolio Dialog */}
       <PortfolioFormDialog

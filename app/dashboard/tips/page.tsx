@@ -29,7 +29,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { fetchPortfolios, Portfolio } from "@/lib/api";
 import {
   createGeneralTip,
@@ -53,6 +56,11 @@ import {
   ExternalLink,
   Building2,
   TrendingUp,
+  Search,
+  X,
+  ChevronDown,
+  SlidersHorizontal,
+  MoreVertical,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -61,6 +69,7 @@ import { useEffect, useState } from "react";
 function StockDetailsCell({ tip }: { tip: Tip }) {
   const [stockDetails, setStockDetails] = useState<StockSymbol | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isMobile = useIsMobile();
   
   useEffect(() => {
     const getStockDetails = async () => {
@@ -92,15 +101,19 @@ function StockDetailsCell({ tip }: { tip: Tip }) {
   }, [tip.stockId, tip.id]);
   
   if (isLoading) {
-    return <div className="text-muted-foreground text-sm">Loading...</div>;
+    return <div className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>Loading...</div>;
   }
   
   return (
-    <div className="text-sm space-y-1">
+    <div className={`${isMobile ? 'text-xs' : 'text-sm'} space-y-1`}>
       {stockDetails ? (
         <>
-          <div className="font-medium line-clamp-1">{stockDetails.name}</div>
-          <div className="text-green-600 font-mono">₹{parseFloat(stockDetails.currentPrice).toLocaleString()}</div>
+          <div className={`font-medium line-clamp-1 ${isMobile ? 'text-xs' : ''}`}>
+            {isMobile ? stockDetails.symbol : stockDetails.name}
+          </div>
+          <div className={`text-green-600 font-mono ${isMobile ? 'text-[10px]' : ''}`}>
+            ₹{parseFloat(stockDetails.currentPrice).toLocaleString()}
+          </div>
         </>
       ) : (
         <div className="text-muted-foreground">{tip.stockSymbol || tip.stockId}</div>
@@ -115,6 +128,7 @@ const stockDetailsCache = new Map<string, StockSymbol>();
 export default function TipsManagementPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [allTips, setAllTips] = useState<Tip[]>([]);
   const [filteredTips, setFilteredTips] = useState<Tip[]>([]);
@@ -130,6 +144,8 @@ export default function TipsManagementPage() {
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
 
   const loadPortfolios = async () => {
     try {
@@ -216,6 +232,14 @@ export default function TipsManagementPage() {
     }
 
     setFilteredTips(filtered);
+    
+    // Update active filters count
+    let count = 0;
+    if (portfolioFilter !== "all") count++;
+    if (statusFilter !== "all") count++;
+    if (actionFilter !== "all") count++;
+    if (searchQuery) count++;
+    setActiveFiltersCount(count);
   }, [allTips, portfolioFilter, statusFilter, actionFilter, searchQuery]);
 
   const handleCreateTip = async (tipData: CreateTipRequest) => {
@@ -426,12 +450,20 @@ export default function TipsManagementPage() {
     return portfolio.id || portfolio._id || "no-id";
   };
 
+  // Clear all filters
+  const clearAllFilters = () => {
+    setPortfolioFilter("all");
+    setStatusFilter("all");
+    setActionFilter("all");
+    setSearchQuery("");
+  };
+
   // Mobile-optimized columns configuration
   const columns: ColumnDef<Tip>[] = [
     {
       accessorKey: "title",
       header: "Title",
-      size: 250,
+      size: isMobile ? 200 : 250,
       cell: ({ row }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
@@ -454,10 +486,10 @@ export default function TipsManagementPage() {
           return () => { isMounted = false; };
         }, [tip.stockId]);
         return (
-          <div className="min-w-[200px] space-y-2">
+          <div className={`${isMobile ? 'min-w-[180px]' : 'min-w-[200px]'} space-y-2`}>
             <button
               onClick={() => handleTitleClick(tip)}
-              className={`font-medium text-left hover:underline transition-colors block w-full text-sm ${
+              className={`font-medium text-left hover:underline transition-colors block w-full ${isMobile ? 'text-xs' : 'text-sm'} ${
                 isGeneral 
                   ? 'text-purple-600 hover:text-purple-800' 
                   : 'text-blue-600 hover:text-blue-800'
@@ -471,13 +503,13 @@ export default function TipsManagementPage() {
             <div className="flex items-center gap-1">
               {isGeneral ? (
                 <>
-                  <TrendingUp className="h-3 w-3 text-purple-600 shrink-0" />
-                  <span className="text-xs text-purple-600">General</span>
+                  <TrendingUp className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'} text-purple-600 shrink-0`} />
+                  <span className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-purple-600`}>General</span>
                 </>
               ) : (
                 <>
-                  <Building2 className="h-3 w-3 text-blue-600 shrink-0" />
-                  <span className="text-xs text-blue-600">Portfolio</span>
+                  <Building2 className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'} text-blue-600 shrink-0`} />
+                  <span className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-blue-600`}>Portfolio</span>
                 </>
               )}
             </div>
@@ -487,8 +519,8 @@ export default function TipsManagementPage() {
     },
     {
       accessorKey: "stockId",
-      header: "Stock Details",
-      size: 180,
+      header: "Stock",
+      size: isMobile ? 120 : 180,
       cell: ({ row }) => {
         return <StockDetailsCell tip={row.original} />;
       },
@@ -496,34 +528,34 @@ export default function TipsManagementPage() {
     {
       accessorKey: "action",
       header: "Action",
-      size: 120,
+      size: isMobile ? 80 : 120,
       cell: ({ row }) => {
         const action = row.getValue("action") as string;
         return action ? (
-          <Badge className={getActionColor(action)} variant="secondary">
-            {action.charAt(0).toUpperCase() + action.slice(1)}
+          <Badge className={`${getActionColor(action)} ${isMobile ? 'text-[10px] px-1.5 py-0.5' : ''}`} variant="secondary">
+            {isMobile ? action.charAt(0).toUpperCase() + action.slice(1, 3) : action.charAt(0).toUpperCase() + action.slice(1)}
           </Badge>
         ) : (
-          <span className="text-muted-foreground text-sm">-</span>
+          <span className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>-</span>
         );
       },
     },
     {
       accessorKey: "status",
       header: "Status",
-      size: 100,
+      size: isMobile ? 70 : 100,
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return status ? (
-          <Badge className={getStatusColor(status)} variant="outline">
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+          <Badge className={`${getStatusColor(status)} ${isMobile ? 'text-[10px] px-1.5 py-0.5' : ''}`} variant="outline">
+            {isMobile ? status.charAt(0).toUpperCase() : status.charAt(0).toUpperCase() + status.slice(1)}
           </Badge>
         ) : (
-          <span className="text-muted-foreground text-sm">-</span>
+          <span className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>-</span>
         );
       },
     },
-    {
+    ...(!isMobile ? [{
       accessorKey: "targetPrice",
       header: "Target",
       size: 120,
@@ -545,8 +577,8 @@ export default function TipsManagementPage() {
           </div>
         );
       },
-    },
-    {
+    }] : []),
+    ...(!isMobile ? [{
       accessorKey: "content",
       header: "Details",
       size: 200,
@@ -562,37 +594,36 @@ export default function TipsManagementPage() {
           </div>
         );
       },
-    },
+    }] : []),
     {
       accessorKey: "createdAt",
-      header: "Created",
-      size: 100,
+      header: "Date",
+      size: isMobile ? 60 : 100,
       cell: ({ row }) => {
         const date = row.original.createdAt as string;
         const formattedDate = new Date(date).toLocaleDateString('en-IN', {
           day: '2-digit',
-          month: 'short',
-          year: '2-digit'
+          month: isMobile ? 'numeric' : 'short',
+          year: isMobile ? '2-digit' : '2-digit'
         });
-        return <div className="text-sm text-muted-foreground font-mono">{formattedDate}</div>;
+        return <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-muted-foreground font-mono`}>{formattedDate}</div>;
       },
     },
     {
       id: "actions",
-      header: "Actions",
-      size: 120,
+      header: "",
+      size: isMobile ? 40 : 120,
       cell: ({ row }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
 
         return (
           <div className="flex items-center justify-end">
-            {/* Simplified actions for all screen sizes */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} p-0`}>
                   <span className="sr-only">Open menu</span>
-                  <Filter className="h-4 w-4" />
+                  <MoreVertical className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[160px]">
@@ -621,39 +652,267 @@ export default function TipsManagementPage() {
     },
   ];
 
+  // Filter component for mobile
+  const FilterSheet = () => (
+    <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+      <SheetTrigger asChild>
+        <Button variant="outline" size="sm" className="relative">
+          <SlidersHorizontal className="mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">Filters</span>
+          <span className="sm:hidden">Filter</span>
+          {activeFiltersCount > 0 && (
+            <Badge className="ml-1 sm:ml-2 h-4 w-4 sm:h-5 sm:w-5 rounded-full p-0 text-[10px] sm:text-xs" variant="destructive">
+              {activeFiltersCount}
+            </Badge>
+          )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-[85vw] max-w-[400px] sm:w-[400px]">
+        <SheetHeader>
+          <SheetTitle>Filter Tips</SheetTitle>
+        </SheetHeader>
+        <div className="space-y-4 py-4">
+          {/* Search */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Search</label>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tips..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 text-sm"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1 h-7 w-7 p-0"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Portfolio Filter */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Portfolio</label>
+            <Select value={portfolioFilter} onValueChange={setPortfolioFilter}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Select portfolio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tips</SelectItem>
+                <SelectItem value="general">General Tips</SelectItem>
+                {portfolios.map((portfolio) => (
+                  <SelectItem key={getPortfolioId(portfolio)} value={getPortfolioId(portfolio)}>
+                    {portfolio.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Status</label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Action Filter */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Action</label>
+            <Select value={actionFilter} onValueChange={setActionFilter}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Select action" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Actions</SelectItem>
+                <SelectItem value="buy">Buy</SelectItem>
+                <SelectItem value="sell">Sell</SelectItem>
+                <SelectItem value="partial sell">Partial Sell</SelectItem>
+                <SelectItem value="partial profit">Partial Profit</SelectItem>
+                <SelectItem value="hold">Hold</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Clear Filters */}
+          {activeFiltersCount > 0 && (
+            <div className="pt-2">
+              <Button 
+                variant="outline" 
+                onClick={clearAllFilters}
+                className="w-full text-sm"
+                size="sm"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Clear All Filters
+              </Button>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+
+  // Desktop filters component
+  const DesktopFilters = () => (
+    <Collapsible>
+      <CollapsibleTrigger asChild>
+        <Button variant="outline" size="sm" className="relative">
+          <SlidersHorizontal className="mr-2 h-4 w-4" />
+          Filters
+          <ChevronDown className="ml-2 h-4 w-4" />
+          {activeFiltersCount > 0 && (
+            <Badge className="ml-2 h-5 w-5 rounded-full p-0 text-xs" variant="destructive">
+              {activeFiltersCount}
+            </Badge>
+          )}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-4">
+        <Card className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Search</label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search tips..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            {/* Portfolio Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Portfolio</label>
+              <Select value={portfolioFilter} onValueChange={setPortfolioFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select portfolio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tips</SelectItem>
+                  <SelectItem value="general">General Tips</SelectItem>
+                  {portfolios.map((portfolio) => (
+                    <SelectItem key={getPortfolioId(portfolio)} value={getPortfolioId(portfolio)}>
+                      {portfolio.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Action Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Action</label>
+              <Select value={actionFilter} onValueChange={setActionFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Actions</SelectItem>
+                  <SelectItem value="buy">Buy</SelectItem>
+                  <SelectItem value="sell">Sell</SelectItem>
+                  <SelectItem value="partial sell">Partial Sell</SelectItem>
+                  <SelectItem value="partial profit">Partial Profit</SelectItem>
+                  <SelectItem value="hold">Hold</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Clear Filters */}
+          {activeFiltersCount > 0 && (
+            <div className="flex justify-end mt-4 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={clearAllFilters}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Clear All Filters
+              </Button>
+            </div>
+          )}
+        </Card>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+
   return (
     <div className="min-h-screen w-full">
       <div className="container mx-auto p-0">
         {/* Header Section */}
         <div className="flex flex-col space-y-4 px-4 py-4">
-          <div className="space-y-1.5">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-              Investment Tips
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              {filteredTips.length} tips found
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="space-y-1.5">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
+                Investment Tips
+              </h1>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                {filteredTips.length} of {allTips.length} tips
+                {activeFiltersCount > 0 && (
+                  <span className="ml-2 text-blue-600">({activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active)</span>
+                )}
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto">
+              <Button
+                onClick={() => setCreateDialogOpen(true)}
+                size="sm"
+                className="w-full sm:w-auto"
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create General Tip
+              </Button>
+              <Button
+                onClick={() => loadAllTips()}
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={isLoading}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              onClick={() => setCreateDialogOpen(true)}
-              size="sm"
-              className="w-full sm:w-auto order-1 sm:order-2"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create General Tip
-            </Button>
-            <Button
-              onClick={() => loadAllTips()}
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto order-2 sm:order-1"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
+          {/* Filter Controls */}
+          <div className="w-full">
+            {isMobile ? <FilterSheet /> : <DesktopFilters />}
           </div>
         </div>
 
@@ -665,38 +924,33 @@ export default function TipsManagementPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-
-        {/* Search Input */}
-        <div className="px-4 mb-4">
-                <Input
-                  placeholder="Search tips..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-sm"
-                />
-              </div>
               
         {/* Tips Table */}
-        <div className="rounded-md border w-full overflow-x-auto">
-          <div className="min-w-[900px]">
-            <DataTable 
-              columns={columns} 
-              data={filteredTips} 
-              isLoading={isLoading}
-              searchColumn="title"
-            />
-          </div>
+        <div className="px-4">
+          <Card>
+            <CardContent className="p-0">
+              <div className="w-full overflow-x-auto">
+                <div className={`${isMobile ? 'min-w-[600px]' : 'min-w-[900px]'} w-full`}>
+                  <DataTable 
+                    columns={columns} 
+                    data={filteredTips} 
+                    isLoading={isLoading}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-                  </div>
+      </div>
 
       {/* Dialogs */}
-        <TipFormDialog
-          open={createDialogOpen}
-          onOpenChange={setCreateDialogOpen}
-          onSubmit={handleCreateTip}
+      <TipFormDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSubmit={handleCreateTip}
         title="Create General Tip"
         description="Add a new general investment tip visible to all users"
-        />
+      />
 
       {selectedTip && (
         <>
@@ -709,19 +963,19 @@ export default function TipsManagementPage() {
             description="Modify an existing investment tip"
           />
 
-        <ConfirmDialog
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
+          <ConfirmDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
             title="Delete Tip"
             description="Are you sure you want to delete this tip? This action cannot be undone."
-          onConfirm={handleDeleteTip}
-        />
+            onConfirm={handleDeleteTip}
+          />
 
-        <TipDetailsModal
-          open={viewModalOpen}
-          onOpenChange={setViewModalOpen}
-          tip={selectedTip}
-        />
+          <TipDetailsModal
+            open={viewModalOpen}
+            onOpenChange={setViewModalOpen}
+            tip={selectedTip}
+          />
         </>
       )}
     </div>

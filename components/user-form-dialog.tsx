@@ -33,9 +33,12 @@ import type {
   User,
 } from "@/lib/api-users";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { useFormDraft } from "@/hooks/use-form-draft";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Save } from "lucide-react";
 
 // Form schema with validation
 const formSchema = z.object({
@@ -63,6 +66,14 @@ export function UserFormDialog({
 }: UserFormDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  
+  // Form draft management
+  const formType = user ? `user_edit_${user._id}` : 'user_create';
+  const { draft, saveDraft, clearDraft, hasDraft, isAutoSaving } = useFormDraft({
+    formType,
+    autoSave: true,
+    autoSaveDelay: 1000
+  });
 
   // Initialize form with react-hook-form
   const form = useForm<z.infer<typeof formSchema>>({
@@ -75,6 +86,31 @@ export function UserFormDialog({
       emailVerified: user?.emailVerified ?? true,
     },
   });
+  
+  // Load draft data when dialog opens
+  useEffect(() => {
+    if (open && !user && draft) {
+      // Only restore draft for new users, not edits
+      Object.entries(draft).forEach(([key, value]) => {
+        if (key !== 'password') { // Don't restore password
+          form.setValue(key as keyof z.infer<typeof formSchema>, value);
+        }
+      });
+    }
+  }, [open, draft, user, form]);
+  
+  // Auto-save form data as user types
+  useEffect(() => {
+    if (!open || user) return; // Only auto-save for new users
+    
+    const subscription = form.watch((data) => {
+      if (data.username || data.email) {
+        saveDraft(data);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form, saveDraft, open, user]);
 
   // Handle form submission
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -89,6 +125,8 @@ export function UserFormDialog({
         await onSubmit(values);
       }
 
+      // Clear draft on successful submission
+      clearDraft();
       form.reset();
       onOpenChange(false);
       toast({
@@ -109,13 +147,42 @@ export function UserFormDialog({
       setIsSubmitting(false);
     }
   };
+  
+  // Handle dialog close
+  const handleClose = () => {
+    if (!user && hasDraft) {
+      // Keep draft for new user forms
+      toast({
+        title: "Draft saved",
+        description: "Your form data has been saved and will be restored when you return.",
+      });
+    }
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {title}
+            {isAutoSaving && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Save className="h-3 w-3" />
+                Saving...
+              </div>
+            )}
+          </DialogTitle>
         </DialogHeader>
+        
+        {/* Draft notification */}
+        {!user && hasDraft && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              A draft of this form was restored. You can continue where you left off.
+            </AlertDescription>
+          </Alert>
+        )}
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
@@ -213,11 +280,28 @@ export function UserFormDialog({
                 </FormItem>
               )}
             />
-            <DialogFooter>
+            <DialogFooter className="gap-2">
+              {!user && hasDraft && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    clearDraft();
+                    form.reset();
+                    toast({
+                      title: "Draft cleared",
+                      description: "Form has been reset to default values.",
+                    });
+                  }}
+                  className="mr-auto"
+                >
+                  Clear Draft
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={handleClose}
               >
                 Cancel
               </Button>
