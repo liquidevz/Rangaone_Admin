@@ -394,7 +394,7 @@ export default function PortfoliosPage() {
       accessorKey: "performance",
       header: "Performance",
       size: 120,
-      cell: ({ row }) => {
+      cell: ({ row }: { row: any }) => {
         const portfolio = row.original;
         const cagr = portfolio.CAGRSinceInception;
         const oneYear = portfolio.oneYearGains;
