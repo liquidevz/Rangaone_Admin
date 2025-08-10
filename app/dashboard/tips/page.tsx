@@ -44,7 +44,7 @@ import {
   type Tip,
 } from "@/lib/api-tips";
 import { fetchStockSymbolById, type StockSymbol } from "@/lib/api-stock-symbols";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, Row } from "@tanstack/react-table";
 import {
   AlertCircle,
   Filter,
@@ -142,6 +142,7 @@ export default function TipsManagementPage() {
   const [portfolioFilter, setPortfolioFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -201,7 +202,7 @@ export default function TipsManagementPage() {
     // Filter by portfolio
     if (portfolioFilter !== "all") {
       if (portfolioFilter === "general") {
-        // Show only general tips (no portfolio)
+        // Show only RangaOne Wealth (no portfolio)
         filtered = filtered.filter((tip) => !tip.portfolio);
       } else {
         // Show tips for specific portfolio
@@ -217,6 +218,11 @@ export default function TipsManagementPage() {
     // Filter by action
     if (actionFilter !== "all") {
       filtered = filtered.filter((tip) => tip.action?.toLowerCase() === actionFilter.toLowerCase());
+    }
+
+    // Filter by category
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((tip) => tip.category === categoryFilter);
     }
 
     // Filter by search query
@@ -238,9 +244,10 @@ export default function TipsManagementPage() {
     if (portfolioFilter !== "all") count++;
     if (statusFilter !== "all") count++;
     if (actionFilter !== "all") count++;
+    if (categoryFilter !== "all") count++;
     if (searchQuery) count++;
     setActiveFiltersCount(count);
-  }, [allTips, portfolioFilter, statusFilter, actionFilter, searchQuery]);
+  }, [allTips, portfolioFilter, statusFilter, actionFilter, categoryFilter, searchQuery]);
 
   const handleCreateTip = async (tipData: CreateTipRequest) => {
     try {
@@ -382,7 +389,7 @@ export default function TipsManagementPage() {
       // For portfolio tips, redirect to portfolio page
       router.push(`/dashboard/portfolios/${tip.portfolio}/tips`);
     } else {
-      // For general tips, open the details modal
+      // For RangaOne Wealth, open the details modal
       setViewModalOpen(true);
     }
   };
@@ -442,7 +449,7 @@ export default function TipsManagementPage() {
     return "No content";
   };
 
-  // Check if tip can be edited (only general tips can be edited from this page)
+  // Check if tip can be edited (only RangaOne Wealth can be edited from this page)
   const canEditTip = (tip: Tip) => !tip.portfolio;
 
   // Helper function to get portfolio ID
@@ -455,6 +462,7 @@ export default function TipsManagementPage() {
     setPortfolioFilter("all");
     setStatusFilter("all");
     setActionFilter("all");
+    setCategoryFilter("all");
     setSearchQuery("");
   };
 
@@ -486,7 +494,7 @@ export default function TipsManagementPage() {
           return () => { isMounted = false; };
         }, [tip.stockId]);
         return (
-          <div className={`${isMobile ? 'min-w-[180px]' : 'min-w-[200px]'} space-y-2`}>
+          <div className="space-y-2">
             <button
               onClick={() => handleTitleClick(tip)}
               className={`font-medium text-left hover:underline transition-colors block w-full ${isMobile ? 'text-xs' : 'text-sm'} ${
@@ -526,6 +534,33 @@ export default function TipsManagementPage() {
       },
     },
     {
+      accessorKey: "category",
+      header: "Category",
+      size: isMobile ? 70 : 100,
+      cell: ({ row }: { row: Row<Tip> }) => {
+        const category = row.getValue("category") as string;
+        const getCategoryColor = (cat: string) => {
+          switch (cat) {
+            case "premium":
+              return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+            case "basic":
+              return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+            case "social_media":
+              return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
+            default:
+              return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+          }
+        };
+        return category ? (
+          <Badge className={`${getCategoryColor(category)} ${isMobile ? 'text-[10px] px-1.5 py-0.5' : ''}`} variant="secondary">
+            {category === "social_media" ? "Social" : category.charAt(0).toUpperCase() + category.slice(1)}
+          </Badge>
+        ) : (
+          <span className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>-</span>
+        );
+      },
+    },
+    {
       accessorKey: "action",
       header: "Action",
       size: isMobile ? 80 : 120,
@@ -559,7 +594,7 @@ export default function TipsManagementPage() {
       accessorKey: "targetPrice",
       header: "Target",
       size: 120,
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Tip> }) => {
         const targetPrice = row.getValue("targetPrice") as string;
         const targetPercentage = row.original.targetPercentage;
         
@@ -582,7 +617,7 @@ export default function TipsManagementPage() {
       accessorKey: "content",
       header: "Details",
       size: 200,
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Tip> }) => {
         const content = row.getValue("content");
         const preview = formatContentPreview(content);
         return (
@@ -613,7 +648,7 @@ export default function TipsManagementPage() {
       id: "actions",
       header: "",
       size: isMobile ? 40 : 120,
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Tip> }) => {
         const tip = row.original;
         const isGeneral = !tip.portfolio;
 
@@ -705,7 +740,7 @@ export default function TipsManagementPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tips</SelectItem>
-                <SelectItem value="general">General Tips</SelectItem>
+                <SelectItem value="general">RangaOne Wealth</SelectItem>
                 {portfolios.map((portfolio) => (
                   <SelectItem key={getPortfolioId(portfolio)} value={getPortfolioId(portfolio)}>
                     {portfolio.name}
@@ -748,6 +783,22 @@ export default function TipsManagementPage() {
             </Select>
           </div>
 
+          {/* Category Filter */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Category</label>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="basic">Basic</SelectItem>
+                <SelectItem value="premium">Premium</SelectItem>
+                <SelectItem value="social_media">Social Media</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Clear Filters */}
           {activeFiltersCount > 0 && (
             <div className="pt-2">
@@ -784,7 +835,7 @@ export default function TipsManagementPage() {
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-4">
         <Card className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
             {/* Search */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Search</label>
@@ -808,7 +859,7 @@ export default function TipsManagementPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Tips</SelectItem>
-                  <SelectItem value="general">General Tips</SelectItem>
+                  <SelectItem value="general">RangaOne Wealth</SelectItem>
                   {portfolios.map((portfolio) => (
                     <SelectItem key={getPortfolioId(portfolio)} value={getPortfolioId(portfolio)}>
                       {portfolio.name}
@@ -847,6 +898,22 @@ export default function TipsManagementPage() {
                   <SelectItem value="partial sell">Partial Sell</SelectItem>
                   <SelectItem value="partial profit">Partial Profit</SelectItem>
                   <SelectItem value="hold">Hold</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Category Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Category</label>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="basic">Basic</SelectItem>
+                  <SelectItem value="premium">Premium</SelectItem>
+                  <SelectItem value="social_media">Social Media</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -929,15 +996,11 @@ export default function TipsManagementPage() {
         <div className="px-4">
           <Card>
             <CardContent className="p-0">
-              <div className="w-full overflow-x-auto">
-                <div className={`${isMobile ? 'min-w-[600px]' : 'min-w-[900px]'} w-full`}>
-                  <DataTable 
-                    columns={columns} 
-                    data={filteredTips} 
-                    isLoading={isLoading}
-                  />
-                </div>
-              </div>
+              <DataTable 
+                columns={columns} 
+                data={filteredTips} 
+                isLoading={isLoading}
+              />
             </CardContent>
           </Card>
         </div>

@@ -76,6 +76,11 @@ const sidebarItems: SidebarItem[] = [
     icon: Bot,
   },
   {
+    title: "FAQs",
+    href: "/dashboard/faqs",
+    icon: FileText,
+  },
+  {
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
@@ -95,6 +100,14 @@ export function DashboardSidebar() {
       setIsCollapsed(cachedState)
     }
   }, [getSidebarState])
+
+  // Reflect sidebar width as a CSS variable for layouts to consume
+  useEffect(() => {
+    const width = isCollapsed ? '72px' : '240px'
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--sidebar-width', width)
+    }
+  }, [isCollapsed])
 
   // Save sidebar state when it changes
   const handleToggleCollapse = () => {

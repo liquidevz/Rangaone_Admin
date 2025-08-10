@@ -309,7 +309,7 @@ export const fetchAllTips = async (): Promise<Tip[]> => {
     return tips.map((tip: any) => ({
       ...tip,
       id: tip._id || tip.id,
-      // Handle portfolio field (could be ObjectId or undefined for general tips)
+      // Handle portfolio field (could be ObjectId or undefined for RangaOne Wealth)
       portfolio: tip.portfolio || undefined,
       content: Array.isArray(tip.content) ? tip.content : 
                typeof tip.content === 'string' ? [{ key: "Content", value: tip.content }] : [],
@@ -321,14 +321,14 @@ export const fetchAllTips = async (): Promise<Tip[]> => {
   }
 };
 
-// Create a general tip (not tied to a portfolio) - ENHANCED FOR GENERAL TIPS
+// Create a general tip (not tied to a portfolio) - ENHANCED FOR RangaOne Wealth
 export const createGeneralTip = async (
   tipData: CreateTipRequest
 ): Promise<Tip> => {
   try {
     console.log('Creating general tip with data:', JSON.stringify(tipData, null, 2));
 
-    // Validate required fields for general tips
+    // Validate required fields for RangaOne Wealth
     if (!tipData.title?.trim()) {
       throw new Error("Title is required");
     }
@@ -361,7 +361,7 @@ export const createGeneralTip = async (
       throw new Error("Description is required");
     }
 
-    // Ensure default values for general tips
+    // Ensure default values for RangaOne Wealth
     const processedTipData = {
       ...tipData,
       status: tipData.status || "Active",
@@ -442,7 +442,7 @@ export const validateTipData = (data: any): string[] => {
   return errors;
 };
 
-// Additional utility functions for general tips management
+// Additional utility functions for RangaOne Wealth management
 
 // Filter tips by various criteria
 export const filterTips = (
