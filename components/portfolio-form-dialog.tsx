@@ -225,9 +225,20 @@ export function PortfolioFormDialog({
 
   const calculateInvestmentDetails = (weightPercent: number, buyPrice: number, totalInvestment: number) => {
     const allocatedAmount = (weightPercent / 100) * totalInvestment;
-    const quantity = Math.floor(allocatedAmount / buyPrice);
-    const actualInvestmentAmount = quantity * buyPrice;
-    const leftoverAmount = allocatedAmount - actualInvestmentAmount;
+    let quantity = Math.floor(allocatedAmount / buyPrice);
+    let actualInvestmentAmount = quantity * buyPrice;
+    let leftoverAmount = allocatedAmount - actualInvestmentAmount;
+
+    // Tolerance: if the gap to the next share is within 10% of the share price, buy 1 extra share
+    // gap = buyPrice - leftover; when leftover is positive after flooring
+    if (buyPrice > 0 && leftoverAmount >= 0) {
+      const gapToNextShare = buyPrice - leftoverAmount;
+      if (gapToNextShare <= buyPrice * 0.1) {
+        quantity = quantity + 1;
+        actualInvestmentAmount = quantity * buyPrice;
+        leftoverAmount = allocatedAmount - actualInvestmentAmount; // becomes negative equal to -gapToNextShare
+      }
+    }
     
     return {
       allocatedAmount,
@@ -243,7 +254,12 @@ export function PortfolioFormDialog({
   const totalAllocated = holdings.reduce((sum, holding) => sum + holding.allocatedAmount, 0);
   const cashBalance = Number(minInvestment || 0) - totalActualInvestment;
   const currentValue = Number(minInvestment || 0);
-  const holdingsValue = totalActualInvestment;
+  // Use latest market prices where available for holdings value
+  const holdingsValue = holdings.reduce((sum, holding) => {
+    const livePrice = (holding.currentMarketPrice ?? holding.buyPrice) || 0;
+    const qty = holding.quantity || 0;
+    return sum + livePrice * qty;
+  }, 0);
   const remainingWeight = 100 - totalWeightUsed;
 
   // Auto-adjust minimum investment based on total investment
@@ -807,14 +823,17 @@ export function PortfolioFormDialog({
     }
 
     // Calculate proper investment amounts
+    // For existing portfolio, base allocation on current portfolio base (holdingsValue + cashBalance)
+    const portfolioBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
     const investmentDetails = calculateInvestmentDetails(
-      newHolding.weight, 
-      newHolding.buyPrice, 
-      Number(minInvestment)
+      newHolding.weight,
+      newHolding.buyPrice,
+      portfolioBase
     );
 
     // Recompute accurate weight based on integer quantity actual investment
-    const accurateWeight = Number(((investmentDetails.actualInvestmentAmount / Number(minInvestment)) * 100).toFixed(2));
+    const accurateWeightBase = initialData ? portfolioBase : Number(minInvestment);
+    const accurateWeight = Number(((investmentDetails.actualInvestmentAmount / accurateWeightBase) * 100).toFixed(2));
 
     const holdingToAdd: ExtendedHolding = {
       symbol: newHolding.symbol,
@@ -1037,10 +1056,11 @@ export function PortfolioFormDialog({
 
     // Calculate new investment amounts
     const investmentPrice = editingHolding.latestPrice || originalHolding.buyPrice;
+    const editBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
     const recomputed = calculateInvestmentDetails(
       newWeight,
       investmentPrice,
-      Number(minInvestment)
+      editBase
     );
 
     // For sell/partial-sell, enforce integer-share logic using pnlPreview quantities
@@ -1048,11 +1068,11 @@ export function PortfolioFormDialog({
     const applyPreview = isSellOperation && pnlPreview;
     const nextQuantity = applyPreview ? pnlPreview!.remainingQuantity : recomputed.quantity;
     const nextActualInvestment = applyPreview ? nextQuantity * investmentPrice : recomputed.actualInvestmentAmount;
-    const nextAllocated = (newWeight / 100) * Number(minInvestment);
+    const nextAllocated = (newWeight / 100) * editBase;
     const nextLeftover = Math.max(0, nextAllocated - nextActualInvestment);
 
     // Recalculate accurate weight based on actual integer quantity investment
-    const accurateWeight = Number(((nextActualInvestment / Number(minInvestment)) * 100).toFixed(2));
+    const accurateWeight = Number(((nextActualInvestment / editBase) * 100).toFixed(2));
 
     const updatedHolding: ExtendedHolding = {
       ...originalHolding,
@@ -1818,14 +1838,16 @@ export function PortfolioFormDialog({
                           </div>
                         </div>
 
-                        {newHolding.weight > 0 && newHolding.buyPrice > 0 && Number(minInvestment) > 0 && (
+                        {newHolding.weight > 0 && newHolding.buyPrice > 0 && (
                           <div className="mt-4 p-4 bg-muted rounded-md">
                             <h5 className="font-medium mb-3">Calculation Preview:</h5>
                             {(() => {
+                              const calcBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
+                              if (!calcBase || calcBase <= 0) return null;
                               const details = calculateInvestmentDetails(
-                                newHolding.weight, 
-                                newHolding.buyPrice, 
-                                Number(minInvestment)
+                                newHolding.weight,
+                                newHolding.buyPrice,
+                                calcBase
                               );
                               return (
                                 <div className="space-y-3">
@@ -1844,17 +1866,14 @@ export function PortfolioFormDialog({
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Leftover:</span>
-                                      <p className={`font-medium ${details.leftoverAmount > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                      <p className={`font-medium ${details.leftoverAmount >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
                                         ₹{details.leftoverAmount.toFixed(2)}
                                       </p>
                                     </div>
                                   </div>
-                                  {details.leftoverAmount > 0 && (
-                                    <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
-                                      <strong>Note:</strong> ₹{details.leftoverAmount.toFixed(2)} will be credited back to your cash balance 
-                                      due to share quantity rounding.
-                                    </div>
-                                  )}
+                                  <div className={`text-sm p-2 rounded ${details.leftoverAmount >= 0 ? 'text-orange-600 bg-orange-50' : 'text-green-700 bg-green-50'}`}>
+                                    <strong>Note:</strong> ₹{details.leftoverAmount.toFixed(2)} {details.leftoverAmount >= 0 ? 'will be credited back to your cash balance' : 'will be drawn from cash balance'} due to share quantity rounding.
+                                  </div>
                                 </div>
                               );
                             })()}
@@ -2366,15 +2385,16 @@ export function PortfolioFormDialog({
                       </h5>
                       {(() => {
                         const investmentPrice = editingHolding.latestPrice || editingHolding.originalHolding.buyPrice;
+                        const previewBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
                         const baseDetails = calculateInvestmentDetails(
                           editingHolding.newWeight,
                           investmentPrice,
-                          Number(minInvestment)
+                          previewBase
                         );
                         const usePreview = (editingHolding.action === 'sell' || editingHolding.action === 'partial-sell') && editingHolding.pnlPreview;
                         const newQty = usePreview ? editingHolding.pnlPreview!.remainingQuantity : baseDetails.quantity;
                         const newActualInvestment = newQty * investmentPrice;
-                        const newAllocated = (editingHolding.newWeight / 100) * Number(minInvestment);
+                        const newAllocated = (editingHolding.newWeight / 100) * previewBase;
                         const currentInvestment = editingHolding.originalHolding.minimumInvestmentValueStock;
                         const investmentChange = newActualInvestment - currentInvestment;
                         const newLeftover = Math.max(0, newAllocated - newActualInvestment);
