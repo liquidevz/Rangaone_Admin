@@ -278,7 +278,9 @@ export function PortfolioFormDialog({
    * @returns {object} Object containing the base amount and context information
    */
   const getWeightageCalculationBase = () => {
-    const isFirstTimeCreation = !initialData || holdings.length === 0;
+    // Check if this is first-time creation by looking at actual holdings count
+    // This handles both new portfolios and old portfolios without holdings
+    const isFirstTimeCreation = holdings.length === 0;
     const minInvestmentAmount = Number(minInvestment || 0);
     const currentPortfolioValue = holdingsValue + Math.max(0, cashBalance);
     
@@ -506,7 +508,13 @@ export function PortfolioFormDialog({
           console.log("Processing holdings from initialData:", initialData.holdings);
           
           const convertedHoldings: ExtendedHolding[] = initialData.holdings.map(h => {
-            const allocatedAmount = (h.weight / 100) * (initialData.minInvestment || 0);
+            // For old portfolios, recalculate allocation based on current logic
+            // This ensures old portfolios also follow the new weightage calculation rules
+            const baseForCalculation = initialData.holdings!.length === 0 ? 
+              (initialData.minInvestment || 0) : 
+              (initialData.minInvestment || 0); // For existing old portfolios, use minInvestment initially
+            
+            const allocatedAmount = (h.weight / 100) * baseForCalculation;
             const actualInvestmentAmount = h.quantity * h.buyPrice;
             const leftoverAmount = allocatedAmount - actualInvestmentAmount;
             
@@ -529,7 +537,8 @@ export function PortfolioFormDialog({
             };
           });
           
-          console.log("Converted holdings:", convertedHoldings);
+          console.log("Converted holdings for old portfolio:", convertedHoldings);
+          console.log(`Old portfolio will use ${convertedHoldings.length === 0 ? 'minimum investment' : 'current portfolio value'} for future weightage calculations`);
           setHoldings(convertedHoldings);
           
           // Load stock details for existing holdings
@@ -846,6 +855,8 @@ export function PortfolioFormDialog({
     const { baseAmount: portfolioBase, context } = getWeightageCalculationBase();
     
     console.log(`Adding holding with weightage calculation context: ${context}`);
+    console.log(`Portfolio base amount: ₹${portfolioBase.toLocaleString()}`);
+    console.log(`Holdings count before addition: ${holdings.length}`);
     
     const investmentDetails = calculateInvestmentDetails(
       newHolding.weight,
@@ -1766,10 +1777,12 @@ export function PortfolioFormDialog({
                                 {isFirstTimeCreation ? (
                                   <>
                                     <strong>First-time creation:</strong> Using minimum investment amount (₹{Number(minInvestment || 0).toLocaleString()}) as base for weightage calculations
+                                    <br /><small className="text-xs opacity-75">This applies to new portfolios and old portfolios without holdings</small>
                                   </>
                                 ) : (
                                   <>
                                     <strong>Existing portfolio:</strong> Using current portfolio value (₹{baseAmount.toLocaleString()}) as base for weightage calculations
+                                    <br /><small className="text-xs opacity-75">This applies to portfolios with existing holdings</small>
                                   </>
                                 )}
                               </div>
