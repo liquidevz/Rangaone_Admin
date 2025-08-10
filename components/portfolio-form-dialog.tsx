@@ -272,6 +272,26 @@ export function PortfolioFormDialog({
     return Number(minInvestment || 0);
   };
 
+  /**
+   * Helper function to determine the correct base amount for weightage calculations
+   * 
+   * @returns {object} Object containing the base amount and context information
+   */
+  const getWeightageCalculationBase = () => {
+    const isFirstTimeCreation = !initialData || holdings.length === 0;
+    const minInvestmentAmount = Number(minInvestment || 0);
+    const currentPortfolioValue = holdingsValue + Math.max(0, cashBalance);
+    
+    return {
+      baseAmount: isFirstTimeCreation ? minInvestmentAmount : currentPortfolioValue,
+      isFirstTimeCreation,
+      context: isFirstTimeCreation ? 'First-time portfolio creation' : 'Existing portfolio modification',
+      description: isFirstTimeCreation 
+        ? `Using minimum investment (₹${minInvestmentAmount.toLocaleString()}) as weightage base`
+        : `Using current portfolio value (₹${currentPortfolioValue.toLocaleString()}) as weightage base`
+    };
+  };
+
   const adjustedMinInvestment = calculateAdjustedMinInvestment();
   const needsMinInvestmentAdjustment = adjustedMinInvestment > Number(minInvestment || 0);
 
@@ -822,9 +842,11 @@ export function PortfolioFormDialog({
       return;
     }
 
-    // Calculate proper investment amounts
-    // For existing portfolio, base allocation on current portfolio base (holdingsValue + cashBalance)
-    const portfolioBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
+    // Get the appropriate weightage calculation base using centralized logic
+    const { baseAmount: portfolioBase, context } = getWeightageCalculationBase();
+    
+    console.log(`Adding holding with weightage calculation context: ${context}`);
+    
     const investmentDetails = calculateInvestmentDetails(
       newHolding.weight,
       newHolding.buyPrice,
@@ -832,8 +854,7 @@ export function PortfolioFormDialog({
     );
 
     // Recompute accurate weight based on integer quantity actual investment
-    const accurateWeightBase = initialData ? portfolioBase : Number(minInvestment);
-    const accurateWeight = Number(((investmentDetails.actualInvestmentAmount / accurateWeightBase) * 100).toFixed(2));
+    const accurateWeight = Number(((investmentDetails.actualInvestmentAmount / portfolioBase) * 100).toFixed(2));
 
     const holdingToAdd: ExtendedHolding = {
       symbol: newHolding.symbol,
@@ -1056,7 +1077,12 @@ export function PortfolioFormDialog({
 
     // Calculate new investment amounts
     const investmentPrice = editingHolding.latestPrice || originalHolding.buyPrice;
-    const editBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
+    /**
+     * EDITING EXISTING HOLDINGS:
+     * Always use current portfolio value as base since we're modifying an existing portfolio
+     * This ensures weightage adjustments reflect the current market state of the portfolio
+     */
+    const editBase = holdingsValue + Math.max(0, cashBalance);
     const recomputed = calculateInvestmentDetails(
       newWeight,
       investmentPrice,
@@ -1697,35 +1723,67 @@ export function PortfolioFormDialog({
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Total Investment Pool</p>
-                          <p className="font-semibold text-lg">₹{Number(minInvestment || 0).toLocaleString()}</p>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Total Investment Pool</p>
+                            <p className="font-semibold text-lg">₹{Number(minInvestment || 0).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Holdings Value</p>
+                            <p className="font-semibold">₹{holdingsValue.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Cash Balance</p>
+                            <p className={`font-semibold ${cashBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                              ₹{cashBalance.toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Weight Used</p>
+                            <p className={`font-semibold ${totalWeightUsed > 100 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                              {totalWeightUsed.toFixed(2)}% / 100%
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Holdings Value</p>
-                          <p className="font-semibold">₹{holdingsValue.toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Cash Balance</p>
-                          <p className={`font-semibold ${cashBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                            ₹{cashBalance.toLocaleString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Weight Used</p>
-                          <p className={`font-semibold ${totalWeightUsed > 100 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                            {totalWeightUsed.toFixed(2)}% / 100%
-                          </p>
-                        </div>
+                        
+                        {/* Weightage Calculation Context */}
+                        {(() => {
+                          const { baseAmount, isFirstTimeCreation, description } = getWeightageCalculationBase();
+                          return (
+                            <div className={`p-3 rounded-md border-l-4 ${
+                              isFirstTimeCreation 
+                                ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-400 dark:border-blue-600' 
+                                : 'bg-green-50 dark:bg-green-950/30 border-green-400 dark:border-green-600'
+                            }`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <Calculator className="h-4 w-4" />
+                                <span className="font-medium text-sm">
+                                  Weightage Calculation Base
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {isFirstTimeCreation ? (
+                                  <>
+                                    <strong>First-time creation:</strong> Using minimum investment amount (₹{Number(minInvestment || 0).toLocaleString()}) as base for weightage calculations
+                                  </>
+                                ) : (
+                                  <>
+                                    <strong>Existing portfolio:</strong> Using current portfolio value (₹{baseAmount.toLocaleString()}) as base for weightage calculations
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
-                      {/* NEW: Total Unrealized P&L Display */}
+                      {/* Total Unrealized P&L Display */}
                       {totalUnrealizedPnL !== 0 && (
-                        <div className="mt-4 p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
+                        <div className="p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Calculator className="h-4 w-4 text-blue-600" />
+                              <TrendingUp className="h-4 w-4 text-blue-600" />
                               <span className="font-medium">Total Unrealized P&L</span>
                             </div>
                             <div className={`font-bold text-lg ${totalUnrealizedPnL >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1736,7 +1794,7 @@ export function PortfolioFormDialog({
                       )}
                       
                       {totalLeftover > 0 && (
-                        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-800 rounded">
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-800 rounded">
                           <div className="flex items-center gap-2">
                             <AlertCircle className="h-4 w-4 text-blue-600" />
                             <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
@@ -1759,6 +1817,17 @@ export function PortfolioFormDialog({
                       <p className="text-sm text-muted-foreground">
                         Search and select stocks to add to your portfolio
                       </p>
+                      {(() => {
+                        const { baseAmount, isFirstTimeCreation, description } = getWeightageCalculationBase();
+                        return (
+                          <div className={`mt-2 p-2 rounded-md text-xs ${
+                            isFirstTimeCreation ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300'
+                          }`}>
+                            <strong>Weightage Base:</strong> {isFirstTimeCreation ? 'Minimum Investment' : 'Current Portfolio Value'} 
+                            (₹{baseAmount.toLocaleString()})
+                          </div>
+                        );
+                      })()}
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-4">
@@ -1842,7 +1911,8 @@ export function PortfolioFormDialog({
                           <div className="mt-4 p-4 bg-muted rounded-md">
                             <h5 className="font-medium mb-3">Calculation Preview:</h5>
                             {(() => {
-                              const calcBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
+                              // Use centralized logic for consistency
+                              const { baseAmount: calcBase } = getWeightageCalculationBase();
                               if (!calcBase || calcBase <= 0) return null;
                               const details = calculateInvestmentDetails(
                                 newHolding.weight,
@@ -1870,6 +1940,13 @@ export function PortfolioFormDialog({
                                         ₹{details.leftoverAmount.toFixed(2)}
                                       </p>
                                     </div>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                                    <strong>Calculation Base:</strong> ₹{calcBase.toLocaleString()} 
+                                    ({(() => {
+                                      const { isFirstTimeCreation } = getWeightageCalculationBase();
+                                      return isFirstTimeCreation ? 'Minimum Investment - First Time Creation' : 'Current Portfolio Value - Existing Portfolio';
+                                    })()})
                                   </div>
                                   <div className={`text-sm p-2 rounded ${details.leftoverAmount >= 0 ? 'text-orange-600 bg-orange-50' : 'text-green-700 bg-green-50'}`}>
                                     <strong>Note:</strong> ₹{details.leftoverAmount.toFixed(2)} {details.leftoverAmount >= 0 ? 'will be credited back to your cash balance' : 'will be drawn from cash balance'} due to share quantity rounding.
@@ -2385,7 +2462,8 @@ export function PortfolioFormDialog({
                       </h5>
                       {(() => {
                         const investmentPrice = editingHolding.latestPrice || editingHolding.originalHolding.buyPrice;
-                        const previewBase = initialData ? (holdingsValue + Math.max(0, cashBalance)) : Number(minInvestment);
+                        // For editing, always use current portfolio value as base
+                        const previewBase = holdingsValue + Math.max(0, cashBalance);
                         const baseDetails = calculateInvestmentDetails(
                           editingHolding.newWeight,
                           investmentPrice,
