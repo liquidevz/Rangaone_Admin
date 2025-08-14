@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { useToast } from "@/hooks/use-toast";
 import type { CreateFAQRequest, FAQ } from "@/lib/api-faqs";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -125,10 +126,12 @@ export function FAQFormDialog({
                 <FormItem>
                   <FormLabel>Answer</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Enter the FAQ answer" 
-                      className="min-h-[120px]"
-                      {...field} 
+                    <RichTextEditor
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Enter the FAQ answer with formatting..."
+                      height={150}
+                      disabled={false}
                     />
                   </FormControl>
                   <FormMessage />

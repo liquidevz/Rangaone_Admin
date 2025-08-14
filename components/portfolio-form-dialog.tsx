@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { QuillEditor } from "@/components/quill-editor";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import type {
   CreatePortfolioRequest,
   Portfolio,
@@ -1367,7 +1367,7 @@ export function PortfolioFormDialog({
                         </Label>
                         {desc.key === "portfolio card" || desc.key === "checkout card" ? (
                           <div className="space-y-2">
-                            <QuillEditor
+                            <RichTextEditor
                               id={`desc-${index}`}
                               value={desc.value}
                               onChange={(content: string) => {
@@ -1382,16 +1382,16 @@ export function PortfolioFormDialog({
                             />
                           </div>
                         ) : (
-                        <Textarea
+                        <RichTextEditor
                           id={`desc-${index}`}
                           value={desc.value}
-                          onChange={(e) => {
+                          onChange={(content: string) => {
                             const updated = [...descriptions];
-                            updated[index].value = e.target.value;
+                            updated[index].value = content;
                             setDescriptions(updated);
                           }}
                           placeholder={`Enter ${desc.key} description`}
-                          className="min-h-[80px]"
+                          height={120}
                           disabled={isSubmitting}
                         />
                         )}

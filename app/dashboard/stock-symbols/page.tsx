@@ -11,6 +11,10 @@ import {
   deleteStockSymbol,
   searchStockSymbols,
   updateStockPrices,
+  initializeRealtimeConnection,
+  closeRealtimeConnection,
+  subscribeToRealtimeUpdates,
+  getConnectionStatus,
   type StockSymbol,
   type CreateStockSymbolRequest,
   type StockSymbolsResponse,
@@ -100,7 +104,11 @@ export default function StockSymbolsPage() {
   
   // Refs for real-time functionality
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const unsubscribeRef = useRef<null | (() => void)>(null);
   const lastUpdateRef = useRef<Date | null>(null);
+  const isFetchingRef = useRef<boolean>(false);
+  const marketStatusRef = useRef<string | null>(null);
 
   // Check authentication on component mount
   useEffect(() => {
@@ -133,20 +141,84 @@ export default function StockSymbolsPage() {
     return () => stopRealTimeUpdates();
   }, [isRealTimeEnabled, refreshInterval, isUserAuthenticated]);
 
+  // Pause polling when tab hidden or offline; resume when visible/online
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopRealTimeUpdates();
+      } else if (isRealTimeEnabled) {
+        startRealTimeUpdates();
+      }
+    };
+    const onOnline = () => {
+      setIsConnected(true);
+      if (isRealTimeEnabled) startRealTimeUpdates();
+    };
+    const onOffline = () => {
+      setIsConnected(false);
+      stopRealTimeUpdates();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [isRealTimeEnabled]);
+
   const startRealTimeUpdates = () => {
     stopRealTimeUpdates(); // Clear any existing interval
     
     const interval = REFRESH_INTERVALS[refreshInterval].value;
-    intervalRef.current = setInterval(async () => {
-      try {
-        await refreshStockData();
+    // Start WebSocket realtime connection with fallback to polling
+    try {
+      // Merge incoming updates by symbol into current list
+      const applyUpdates = (updates: StockSymbol[]) => {
+        if (!Array.isArray(updates) || updates.length === 0) return;
+        setStockSymbols(prev => {
+          const map = new Map(prev.map(s => [s.symbol, s] as const));
+          for (const upd of updates) {
+            map.set(upd.symbol, { ...(map.get(upd.symbol) || upd), ...upd });
+          }
+          return Array.from(map.values());
+        });
+        const now = new Date();
+        setLastUpdateTime(now);
+        lastUpdateRef.current = now;
+        setUpdateCounter(prev => prev + 1);
         setIsConnected(true);
-      } catch (error) {
-        console.error("Real-time update failed:", error);
-        setIsConnected(false);
-        // Continue trying to update, don't disable real-time mode
-      }
-    }, interval);
+      };
+
+      initializeRealtimeConnection(applyUpdates);
+      unsubscribeRef.current = subscribeToRealtimeUpdates(applyUpdates);
+      // Also keep a lightweight polling as secondary safety net
+    } catch (e) {
+      // If WS init throws, we'll rely on polling below
+      setIsConnected(getConnectionStatus().isConnected);
+    }
+
+    const scheduleNext = () => {
+      const base = interval;
+      const marketFactor = marketStatusRef.current && marketStatusRef.current !== 'OPEN' ? 3 : 1;
+      const jitter = 0.9 + Math.random() * 0.2; // +/-10%
+      const delay = Math.max(2000, Math.floor(base * marketFactor * jitter));
+      timeoutRef.current = setTimeout(async () => {
+        try {
+          await refreshStockData();
+          setIsConnected(true);
+        } catch (error) {
+          console.error("Real-time update failed:", error);
+          setIsConnected(false);
+        } finally {
+          if (isRealTimeEnabled && !document.hidden && navigator.onLine) {
+            scheduleNext();
+          }
+        }
+      }, delay);
+    };
+    scheduleNext();
   };
 
   const stopRealTimeUpdates = () => {
@@ -154,10 +226,22 @@ export default function StockSymbolsPage() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (unsubscribeRef.current) {
+      try { unsubscribeRef.current(); } catch {}
+      unsubscribeRef.current = null;
+    }
+    closeRealtimeConnection();
   };
 
   const refreshStockData = async () => {
     try {
+      if (isFetchingRef.current) return;
+      if (document.hidden || !navigator.onLine) return;
+      isFetchingRef.current = true;
       const now = new Date();
       const response: StockSymbolsResponse = await fetchStockSymbols(pagination.page, pagination.limit);
       
@@ -165,22 +249,18 @@ export default function StockSymbolsPage() {
       if (response.pagination) {
         setPagination(response.pagination);
       }
+      if (response.marketStatus) {
+        marketStatusRef.current = response.marketStatus as string;
+      }
       
       setLastUpdateTime(now);
       lastUpdateRef.current = now;
       setUpdateCounter(prev => prev + 1);
-      
-      // Show subtle update indicator
-      if (updateCounter > 0) {
-        toast({
-          title: "Data Updated",
-          description: `Stock prices refreshed at ${now.toLocaleTimeString()}`,
-          duration: 2000,
-        });
-      }
     } catch (error) {
       console.error("Error refreshing stock data:", error);
       throw error;
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 

@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { RichTextEditor } from "@/components/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -174,11 +175,12 @@ export function ConfigFormDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="config-description">Description</Label>
-              <Input
+              <RichTextEditor
                 id="config-description"
                 value={configDescription}
-                onChange={(e) => setConfigDescription(e.target.value)}
-                placeholder="Enter configuration description"
+                onChange={setConfigDescription}
+                placeholder="Enter configuration description with formatting..."
+                height={100}
                 disabled={isSubmitting}
               />
             </div>

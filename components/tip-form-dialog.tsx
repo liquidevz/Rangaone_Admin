@@ -43,7 +43,7 @@ import type { CreateTipRequest, Tip } from "@/lib/api-tips";
 import { updateTip } from "@/lib/api-tips";
 import { searchStockSymbols, type StockSymbol } from "@/lib/api-stock-symbols";
 import { Badge } from "@/components/ui/badge";
-import { QuillEditor } from "@/components/quill-editor";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 // Updated validation schema with all fields required
 const tipSchema = z.object({
@@ -770,7 +770,7 @@ export function TipFormDialog({
                   <FormItem>
                     <FormLabel className="text-white text-sm">Description *</FormLabel>
                     <FormControl>
-                      <QuillEditor
+                      <RichTextEditor
                         value={field.value}
                         onChange={field.onChange}
                         placeholder="Enter detailed tip description with formatting (min 10 chars)..."
@@ -778,6 +778,7 @@ export function TipFormDialog({
                         disabled={isSubmitting}
                         className="bg-zinc-800 border-zinc-700"
                         id="description-editor"
+                        theme="dark"
                       />
                     </FormControl>
                     <FormMessage />
