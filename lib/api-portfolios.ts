@@ -21,6 +21,11 @@ export interface PortfolioHolding {
   buyPrice: number
   quantity: number
   minimumInvestmentValueStock: number
+  // Additional fields for P&L tracking
+  originalBuyPrice?: number
+  totalQuantityOwned?: number
+  realizedPnL?: number
+  soldDate?: string // Track when stock was sold for 10-day display
 }
 
 export interface DownloadLink {
@@ -369,8 +374,21 @@ export const updatePortfolio = async (id: string, portfolioData: CreatePortfolio
     console.log(`Using admin token: ${adminToken.substring(0, 10)}...`)
     console.log("Portfolio data being sent:", JSON.stringify(portfolioData, null, 2))
 
-    // Validate and format the data before sending
-    const formattedData = formatPortfolioData(portfolioData)
+    // Send complete portfolio data, excluding only minInvestment for existing portfolios
+    const { minInvestment, ...dataToUpdate } = portfolioData
+    console.log("Complete portfolio data to update:", dataToUpdate)
+    
+    // Ensure all financial fields are included and properly formatted
+    const completeData = {
+      ...dataToUpdate,
+      // Preserve all financial calculations
+      cashBalance: dataToUpdate.cashBalance || 0,
+      currentValue: dataToUpdate.currentValue || 0,
+      // Ensure holdings are properly formatted
+      holdings: dataToUpdate.holdings || []
+    }
+    
+    const formattedData = formatPortfolioData(completeData as CreatePortfolioRequest)
 
     // Make the request with the admin token in the Authorization header
     const headers: HeadersInit = {
@@ -381,7 +399,7 @@ export const updatePortfolio = async (id: string, portfolioData: CreatePortfolio
     console.log("Formatted data being sent:", JSON.stringify(formattedData, null, 2))
 
     const response = await fetch(`${API_BASE_URL}/api/portfolios/${id}`, {
-      method: "PUT",
+      method: "PATCH",
       headers,
       body: JSON.stringify(formattedData),
     })
@@ -400,9 +418,11 @@ export const updatePortfolio = async (id: string, portfolioData: CreatePortfolio
 
       try {
         const errorData = JSON.parse(responseText)
+        console.error("400 Error details:", errorData)
         throw new Error(errorData.message || errorData.error || "Failed to update portfolio")
       } catch (jsonError) {
-        throw new Error(`Failed to update portfolio: Server returned ${response.status}`)
+        console.error("400 Error (raw):", responseText)
+        throw new Error(`Validation error: ${responseText || 'Invalid request data'}`)
       }
     }
 
@@ -532,18 +552,39 @@ const formatPortfolioData = (data: CreatePortfolioRequest) => {
   // Format holdings
   if (formattedData.holdings && Array.isArray(formattedData.holdings)) {
     formattedData.holdings = formattedData.holdings.map(holding => {
+      // Map frontend status values to backend enum values
+      let status = (holding as any).status
+      if (status === "Buy-More") {
+        status = "addon-buy"
+      }
+      // Map other frontend values if needed
+      if (status === "Fresh-Buy") {
+        status = "Fresh-Buy" // Keep as is
+      }
+      if (status === "Hold Position") {
+        status = "Hold"
+      }
+      if (status === "Complete Sell") {
+        status = "Sell"
+      }
+      
       // Pick only the fields accepted by backend schema
       const cleanedHolding: PortfolioHolding = {
         symbol: holding.symbol,
         weight: typeof (holding as any).weight === "string" ? Number.parseFloat((holding as any).weight) : (holding as any).weight,
         sector: (holding as any).sector,
         stockCapType: (holding as any).stockCapType,
-        status: (holding as any).status,
+        status: status,
         buyPrice: typeof (holding as any).buyPrice === "string" ? Number.parseFloat((holding as any).buyPrice) : (holding as any).buyPrice,
         quantity: typeof (holding as any).quantity === "string" ? Number.parseInt((holding as any).quantity, 10) : (holding as any).quantity,
         minimumInvestmentValueStock: typeof (holding as any).minimumInvestmentValueStock === "string"
           ? Number.parseFloat((holding as any).minimumInvestmentValueStock)
           : (holding as any).minimumInvestmentValueStock,
+        // Include P&L tracking fields if present
+        ...(((holding as any).originalBuyPrice !== undefined) && { originalBuyPrice: (holding as any).originalBuyPrice }),
+        ...(((holding as any).totalQuantityOwned !== undefined) && { totalQuantityOwned: (holding as any).totalQuantityOwned }),
+        ...(((holding as any).realizedPnL !== undefined) && { realizedPnL: (holding as any).realizedPnL }),
+        ...(((holding as any).soldDate !== undefined) && { soldDate: (holding as any).soldDate }),
       }
       return cleanedHolding
     })
@@ -566,12 +607,20 @@ const formatPortfolioData = (data: CreatePortfolioRequest) => {
   }
 
   // Clean up undefined or null values to avoid sending them to the API
+  // But preserve important financial fields even if they're 0
   Object.keys(formattedData).forEach((key) => {
     const value = formattedData[key as keyof CreatePortfolioRequest]
     if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
-      delete formattedData[key as keyof CreatePortfolioRequest]
+      // Don't delete important financial fields even if they're 0
+      if (!['cashBalance', 'currentValue'].includes(key)) {
+        delete formattedData[key as keyof CreatePortfolioRequest]
+      }
     }
   })
+  
+  console.log("Final formatted data with all financial fields:", formattedData)
+  console.log("CashBalance in formatted data:", formattedData.cashBalance)
+  console.log("CurrentValue in formatted data:", formattedData.currentValue)
 
   return formattedData
 }
@@ -683,6 +732,79 @@ export const removeDownloadLink = async (portfolioId: string, linkId: string): P
     return await response.json()
   } catch (error) {
     console.error("Error removing download link:", error)
+    throw error
+  }
+}
+
+// Specific function for updating portfolio holdings with different actions
+export const updatePortfolioHoldings = async (
+  id: string, 
+  holdings: PortfolioHolding[], 
+  action: 'update' | 'add' | 'delete' | 'replace' = 'update'
+): Promise<Portfolio> => {
+  try {
+    if (!id || id === "undefined") {
+      throw new Error("Invalid portfolio ID")
+    }
+
+    const adminToken = getAdminAccessToken()
+    if (!adminToken) {
+      throw new Error("Admin authentication required to update portfolio holdings")
+    }
+
+    console.log(`Updating portfolio holdings with ID: ${id}, action: ${action}`)
+    console.log("Holdings data:", JSON.stringify(holdings, null, 2))
+
+    const requestBody = {
+      holdings,
+      action // Include action for flexible stock management
+    }
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/portfolios/${id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(requestBody),
+    })
+
+    console.log(`Holdings update response status: ${response.status}`)
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`Portfolio with ID ${id} not found. It may have been deleted or the ID is incorrect.`)
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error("Server returned HTML instead of JSON for holdings update")
+      }
+
+      const responseText = await response.text()
+      console.error("Error response from server:", responseText)
+
+      try {
+        const errorData = JSON.parse(responseText)
+        throw new Error(errorData.message || errorData.error || "Failed to update portfolio holdings")
+      } catch (jsonError) {
+        throw new Error(`Failed to update portfolio holdings: Server returned ${response.status}`)
+      }
+    }
+
+    const updatedPortfolio = await response.json()
+    console.log("Successfully updated portfolio holdings")
+
+    // Ensure the portfolio has an id property
+    if (updatedPortfolio._id && !updatedPortfolio.id) {
+      updatedPortfolio.id = updatedPortfolio._id
+    }
+
+    return updatedPortfolio
+  } catch (error) {
+    console.error(`Error updating portfolio holdings with id ${id}:`, error)
     throw error
   }
 }

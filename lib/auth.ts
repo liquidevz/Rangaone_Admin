@@ -201,8 +201,11 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
 
   if (accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`
+    console.log("Using access token for request to:", url)
   } else {
-    console.log("No access token available for request to:", url)
+    console.error("No access token available for request to:", url)
+    console.error("Available localStorage keys:", typeof window !== "undefined" ? Object.keys(localStorage) : "server-side")
+    throw new Error("Authentication required. Please login again.")
   }
 
   // Log the request for debugging (without sensitive headers)

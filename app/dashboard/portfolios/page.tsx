@@ -15,6 +15,7 @@ import { PortfolioDetailsDialog } from "@/components/portfolio-details-dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   fetchPortfolios,
+  fetchPortfolioById,
   deletePortfolio,
   createPortfolio,
   updatePortfolio,
@@ -25,6 +26,7 @@ import { isAuthenticated } from "@/lib/auth" // Import the isAuthenticated funct
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+
 
 export default function PortfoliosPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -168,6 +170,12 @@ export default function PortfoliosPage() {
 
       // Reload the list to get the updated data
       await loadPortfolios()
+      
+      // Also update the selected portfolio with fresh data
+      if (selectedPortfolio) {
+        const refreshedPortfolio = await fetchPortfolioById(portfolioId)
+        setSelectedPortfolio(refreshedPortfolio)
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
       toast({
@@ -514,8 +522,8 @@ export default function PortfoliosPage() {
 
   return (
     <div className="min-h-screen w-full">
-      <div className="container mx-auto p-0">
-        <div className="space-y-4 sm:space-y-6 px-4 py-4">
+        <div className="container mx-auto p-0">
+          <div className="space-y-4 sm:space-y-6 px-4 py-4">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1.5">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Investment Portfolios</h1>
@@ -606,10 +614,10 @@ export default function PortfoliosPage() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
-      </div>
 
-      {/* Add Portfolio Dialog */}
+        {/* Add Portfolio Dialog */}
       <PortfolioFormDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}

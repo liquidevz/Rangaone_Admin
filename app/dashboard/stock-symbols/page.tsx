@@ -11,10 +11,6 @@ import {
   deleteStockSymbol,
   searchStockSymbols,
   updateStockPrices,
-  initializeRealtimeConnection,
-  closeRealtimeConnection,
-  subscribeToRealtimeUpdates,
-  getConnectionStatus,
   type StockSymbol,
   type CreateStockSymbolRequest,
   type StockSymbolsResponse,
@@ -93,6 +89,7 @@ export default function StockSymbolsPage() {
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
+  const [autoRefreshFromUpdateButton, setAutoRefreshFromUpdateButton] = useState(false);
 
   // Real-time update states
   const [isRealTimeEnabled, setIsRealTimeEnabled] = useState(false);
@@ -173,31 +170,7 @@ export default function StockSymbolsPage() {
     
     const interval = REFRESH_INTERVALS[refreshInterval].value;
     // Start WebSocket realtime connection with fallback to polling
-    try {
-      // Merge incoming updates by symbol into current list
-      const applyUpdates = (updates: StockSymbol[]) => {
-        if (!Array.isArray(updates) || updates.length === 0) return;
-        setStockSymbols(prev => {
-          const map = new Map(prev.map(s => [s.symbol, s] as const));
-          for (const upd of updates) {
-            map.set(upd.symbol, { ...(map.get(upd.symbol) || upd), ...upd });
-          }
-          return Array.from(map.values());
-        });
-        const now = new Date();
-        setLastUpdateTime(now);
-        lastUpdateRef.current = now;
-        setUpdateCounter(prev => prev + 1);
-        setIsConnected(true);
-      };
-
-      initializeRealtimeConnection(applyUpdates);
-      unsubscribeRef.current = subscribeToRealtimeUpdates(applyUpdates);
-      // Also keep a lightweight polling as secondary safety net
-    } catch (e) {
-      // If WS init throws, we'll rely on polling below
-      setIsConnected(getConnectionStatus().isConnected);
-    }
+    // No WebSocket backend: rely purely on polling (update endpoint + fetch)
 
     const scheduleNext = () => {
       const base = interval;
@@ -234,7 +207,6 @@ export default function StockSymbolsPage() {
       try { unsubscribeRef.current(); } catch {}
       unsubscribeRef.current = null;
     }
-    closeRealtimeConnection();
   };
 
   const refreshStockData = async () => {
@@ -243,6 +215,9 @@ export default function StockSymbolsPage() {
       if (document.hidden || !navigator.onLine) return;
       isFetchingRef.current = true;
       const now = new Date();
+      if (autoRefreshFromUpdateButton) {
+        try { await updateStockPrices(); } catch (e) { console.error('updateStockPrices failed during auto-refresh:', e); }
+      }
       const response: StockSymbolsResponse = await fetchStockSymbols(pagination.page, pagination.limit);
       
       setStockSymbols(response.data);
@@ -442,27 +417,28 @@ export default function StockSymbolsPage() {
   };
 
   const handleUpdateAllPrices = async () => {
-    setIsUpdatingPrices(true);
-    try {
-      const result = await updateStockPrices();
-      
-      toast({
-        title: "Price Update Complete",
-        description: `Updated ${result.updated} symbols, ${result.failed} failed`,
-        variant: result.failed > 0 ? "default" : "default",
-      });
-
-      // Reload the list to show updated prices
-      await loadStockSymbols(pagination.page, pagination.limit);
-    } catch (error) {
-      console.error("Error updating prices:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update stock prices",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUpdatingPrices(false);
+    // Toggle constant refresh polling driven by this button
+    if (!autoRefreshFromUpdateButton) {
+      setAutoRefreshFromUpdateButton(true);
+      setIsRealTimeEnabled(true);
+      try {
+        setIsUpdatingPrices(true);
+        const result = await updateStockPrices();
+        toast({
+          title: "Auto Refresh Started",
+          description: `Initial update completed: ${result.updated} updated, ${result.failed} failed. Auto-refresh is now running.`,
+        });
+        await loadStockSymbols(pagination.page, pagination.limit);
+      } catch (error) {
+        console.error("Initial auto-refresh update failed:", error);
+        toast({ title: "Auto Refresh Error", description: "Starting auto-refresh failed." , variant: 'destructive'});
+      } finally {
+        setIsUpdatingPrices(false);
+      }
+    } else {
+      setAutoRefreshFromUpdateButton(false);
+      setIsRealTimeEnabled(false);
+      toast({ title: "Auto Refresh Stopped" });
     }
   };
 

@@ -268,6 +268,7 @@ export interface PortfolioHolding {
   originalBuyPrice?: number;
   totalQuantityOwned?: number;
   realizedPnL?: number;
+  soldDate?: string; // Track when stock was sold for 10-day display
 }
 
 export interface DownloadLink {
@@ -571,12 +572,25 @@ export const updatePortfolio = async (
     console.log(`Updating portfolio with ID: ${id}`);
     console.log("Update data:", JSON.stringify(portfolioData, null, 2));
 
+    // For PATCH requests, send complete portfolio data structure
+    const updateData = portfolioData;
+    
+    console.log("Sending complete portfolio update data:", updateData);
+
+    console.log("Formatted update data:", JSON.stringify(updateData, null, 2));
+
+    // Use PATCH method as per API documentation for flexible stock management
     const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(portfolioData),
+      method: "PATCH",
+      body: JSON.stringify(updateData),
     });
 
     if (!response.ok) {
+      // Handle 404 specifically - portfolio not found
+      if (response.status === 404) {
+        throw new Error(`Portfolio with ID ${id} not found. It may have been deleted or the ID is incorrect. Please refresh the page and try again.`);
+      }
+
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("text/html")) {
         throw new Error(
@@ -585,14 +599,19 @@ export const updatePortfolio = async (
       }
 
       try {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || errorData.error || "Failed to update portfolio"
-        );
-      } catch (jsonError) {
-        throw new Error(
-          `Failed to update portfolio: Server returned ${response.status}`
-        );
+        const errorText = await response.text();
+        console.error("400 Error response:", errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(
+            errorData.message || errorData.error || "Failed to update portfolio"
+          );
+        } catch (parseError) {
+          throw new Error(`Validation error: ${errorText || 'Invalid request data'}`);
+        }
+      } catch (readError) {
+        throw new Error(`Failed to update portfolio: Server returned ${response.status}`);
       }
     }
 
@@ -645,6 +664,76 @@ export const deletePortfolio = async (id: string): Promise<void> => {
     }
   } catch (error) {
     console.error(`Error deleting portfolio with id ${id}:`, error);
+    throw error;
+  }
+};
+
+// Utility function to verify portfolio exists
+export const verifyPortfolioExists = async (id: string): Promise<boolean> => {
+  try {
+    await fetchPortfolioById(id);
+    return true;
+  } catch (error) {
+    console.log(`Portfolio ${id} does not exist:`, error);
+    return false;
+  }
+};
+
+// Specific function for updating portfolio holdings with different actions
+export const updatePortfolioHoldings = async (
+  id: string, 
+  holdings: PortfolioHolding[], 
+  action: 'update' | 'add' | 'delete' | 'replace' = 'update'
+): Promise<Portfolio> => {
+  try {
+    if (!id || id === "undefined") {
+      throw new Error("Invalid portfolio ID");
+    }
+
+    console.log(`Updating portfolio holdings with ID: ${id}, action: ${action}`);
+    console.log("Holdings data:", JSON.stringify(holdings, null, 2));
+
+    const requestBody = {
+      holdings,
+      action // Include action for flexible stock management
+    };
+
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log(`Holdings update response status: ${response.status}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`Portfolio with ID ${id} not found. It may have been deleted or the ID is incorrect.`);
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error("Server returned HTML instead of JSON for holdings update");
+      }
+
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || "Failed to update portfolio holdings");
+      } catch (jsonError) {
+        throw new Error(`Failed to update portfolio holdings: Server returned ${response.status}`);
+      }
+    }
+
+    const updatedPortfolio = await response.json();
+    console.log("Successfully updated portfolio holdings");
+
+    // Ensure the portfolio has an id property
+    if (updatedPortfolio._id && !updatedPortfolio.id) {
+      updatedPortfolio.id = updatedPortfolio._id;
+    }
+
+    return updatedPortfolio;
+  } catch (error) {
+    console.error(`Error updating portfolio holdings with id ${id}:`, error);
     throw error;
   }
 };

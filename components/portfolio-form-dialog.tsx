@@ -47,6 +47,7 @@ import {
   updateStockPrices, 
   type StockSymbol 
 } from "@/lib/api-stock-symbols";
+import { updatePortfolioHoldings } from "@/lib/api";
 import { 
   Plus, 
   Trash2, 
@@ -85,6 +86,7 @@ interface ExtendedHolding extends PortfolioHolding {
   originalBuyPrice?: number; // NEW: Track original purchase price for P&L
   totalQuantityOwned?: number; // NEW: Track total quantity for partial sells
   realizedPnL?: number; // NEW: Track realized profit/loss
+  soldDate?: string; // NEW: Track when stock was sold for 10-day display
 }
 
 interface PnLCalculation {
@@ -248,19 +250,31 @@ export function PortfolioFormDialog({
     };
   };
 
-  const totalWeightUsed = holdings.reduce((sum, holding) => sum + holding.weight, 0);
-  const totalActualInvestment = holdings.reduce((sum, holding) => sum + holding.minimumInvestmentValueStock, 0);
-  const totalLeftover = holdings.reduce((sum, holding) => sum + holding.leftoverAmount, 0);
-  const totalAllocated = holdings.reduce((sum, holding) => sum + holding.allocatedAmount, 0);
+  const totalWeightUsed = holdings.reduce((sum, holding) => {
+    return holding.status === 'Sell' ? sum : sum + holding.weight;
+  }, 0);
+  const totalActualInvestment = holdings.reduce((sum, holding) => {
+    return holding.status === 'Sell' ? sum : sum + holding.minimumInvestmentValueStock;
+  }, 0);
+  const totalLeftover = holdings.reduce((sum, holding) => {
+    return holding.status === 'Sell' ? sum : sum + holding.leftoverAmount;
+  }, 0);
+  const totalAllocated = holdings.reduce((sum, holding) => {
+    return holding.status === 'Sell' ? sum : sum + holding.allocatedAmount;
+  }, 0);
   const cashBalance = Number(minInvestment || 0) - totalActualInvestment;
-  const currentValue = Number(minInvestment || 0);
-  // Use latest market prices where available for holdings value
   const holdingsValue = holdings.reduce((sum, holding) => {
+    if (holding.status === 'Sell') return sum;
     const livePrice = (holding.currentMarketPrice ?? holding.buyPrice) || 0;
     const qty = holding.quantity || 0;
     return sum + livePrice * qty;
   }, 0);
   const remainingWeight = 100 - totalWeightUsed;
+  
+  // Calculate total realized P&L from sold stocks
+  const totalRealizedPnL = holdings.reduce((sum, holding) => {
+    return sum + (holding.realizedPnL || 0);
+  }, 0);
 
   // Auto-adjust minimum investment based on total investment
   const calculateAdjustedMinInvestment = () => {
@@ -295,8 +309,8 @@ export function PortfolioFormDialog({
   const adjustedMinInvestment = calculateAdjustedMinInvestment();
   const needsMinInvestmentAdjustment = adjustedMinInvestment > Number(minInvestment || 0);
 
-  // NEW: Calculate total unrealized P&L for portfolio
   const totalUnrealizedPnL = holdings.reduce((sum, holding) => {
+    if (holding.status === 'Sell') return sum;
     if (holding.currentMarketPrice && holding.originalBuyPrice) {
       const currentValue = holding.quantity * holding.currentMarketPrice;
       const originalCost = holding.quantity * holding.originalBuyPrice;
@@ -312,6 +326,29 @@ export function PortfolioFormDialog({
       toast({
         title: "Minimum Investment Adjusted",
         description: `Minimum investment has been automatically adjusted from ₹${formatCurrency(Number(minInvestment || 0))} to ₹${formatCurrency(adjustedMinInvestment)} to accommodate all holdings with a 10% buffer.`,
+        variant: "default",
+      });
+    }
+  };
+
+  // Clean up sold stocks that are older than 10 days
+  const cleanupOldSoldStocks = () => {
+    const now = Date.now();
+    const updatedHoldings = holdings.filter(holding => {
+      if (holding.status === 'Sell' && holding.soldDate) {
+        const soldDate = new Date(holding.soldDate);
+        const daysSinceSold = Math.floor((now - soldDate.getTime()) / (1000 * 60 * 60 * 24));
+        return daysSinceSold <= 10; // Keep stocks sold within 10 days
+      }
+      return true; // Keep all non-sold stocks
+    });
+    
+    if (updatedHoldings.length !== holdings.length) {
+      setHoldings(updatedHoldings);
+      const removedCount = holdings.length - updatedHoldings.length;
+      toast({
+        title: "Cleanup Complete",
+        description: `Removed ${removedCount} sold stock${removedCount > 1 ? 's' : ''} that were sold more than 10 days ago.`,
         variant: "default",
       });
     }
@@ -401,8 +438,13 @@ export function PortfolioFormDialog({
     });
   };
 
+  // Auto-cleanup old sold stocks when dialog opens
   useEffect(() => {
     if (open) {
+      // Clean up old sold stocks first
+      if (holdings.length > 0) {
+        cleanupOldSoldStocks();
+      }
       if (initialData) {
         console.log("Initializing form with data:", initialData);
 
@@ -512,27 +554,50 @@ export function PortfolioFormDialog({
               (initialData.minInvestment || 0) : 
               (initialData.minInvestment || 0); // For existing old portfolios, use minInvestment initially
             
-            const allocatedAmount = (h.weight / 100) * baseForCalculation;
-            const actualInvestmentAmount = h.quantity * h.buyPrice;
-            const leftoverAmount = allocatedAmount - actualInvestmentAmount;
-            
-            // Preserve all original fields and add calculated ones
-            return {
-              ...h,
-              buyPrice: h.buyPrice || 0,
-              quantity: h.quantity || 0,
-              minimumInvestmentValueStock: h.minimumInvestmentValueStock || actualInvestmentAmount,
-              allocatedAmount: allocatedAmount,
-              leftoverAmount: Math.max(0, leftoverAmount),
-              stockCapType: h.stockCapType || undefined,
-              originalWeight: h.weight,
-              // Enhanced P&L tracking fields - preserve existing values if present
-              originalBuyPrice: h.originalBuyPrice || h.buyPrice,
-              totalQuantityOwned: h.totalQuantityOwned || h.quantity,
-              realizedPnL: h.realizedPnL || 0,
-              status: h.status || 'Hold',
-              sector: h.sector || '',
-            };
+            // Handle sold stocks properly
+            if (h.status === 'Sell') {
+              // For sold stocks, use the preserved data and set display values
+              return {
+                ...h,
+                buyPrice: h.buyPrice || 0,
+                quantity: 0, // Display quantity as 0 for sold stocks
+                minimumInvestmentValueStock: 0, // Display investment as 0 for sold stocks
+                allocatedAmount: 0,
+                leftoverAmount: 0,
+                stockCapType: h.stockCapType || undefined,
+                originalWeight: h.weight,
+                weight: 0, // Display weight as 0 for sold stocks
+                // Enhanced P&L tracking fields - preserve existing values if present
+                originalBuyPrice: h.originalBuyPrice || h.buyPrice,
+                totalQuantityOwned: h.totalQuantityOwned || 0, // Use preserved actual quantity
+                realizedPnL: h.realizedPnL || 0,
+                status: h.status,
+                sector: h.sector || '',
+                soldDate: h.soldDate, // Preserve sold date
+              };
+            } else {
+              // For active holdings, calculate normally
+              const allocatedAmount = (h.weight / 100) * baseForCalculation;
+              const actualInvestmentAmount = h.quantity * h.buyPrice;
+              const leftoverAmount = allocatedAmount - actualInvestmentAmount;
+              
+              return {
+                ...h,
+                buyPrice: h.buyPrice || 0,
+                quantity: h.quantity || 0,
+                minimumInvestmentValueStock: h.minimumInvestmentValueStock || actualInvestmentAmount,
+                allocatedAmount: allocatedAmount,
+                leftoverAmount: Math.max(0, leftoverAmount),
+                stockCapType: h.stockCapType || undefined,
+                originalWeight: h.weight,
+                // Enhanced P&L tracking fields - preserve existing values if present
+                originalBuyPrice: h.originalBuyPrice || h.buyPrice,
+                totalQuantityOwned: h.totalQuantityOwned || h.quantity,
+                realizedPnL: h.realizedPnL || 0,
+                status: h.status || 'Hold',
+                sector: h.sector || '',
+              };
+            }
           });
           
           console.log("Converted holdings for old portfolio:", convertedHoldings);
@@ -590,7 +655,7 @@ export function PortfolioFormDialog({
       resetNewHolding();
       setEditingHolding(null);
     }
-  }, [open, initialData]);
+  }, [open, initialData, holdings.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -708,21 +773,44 @@ export function PortfolioFormDialog({
       }
 
       // Convert ExtendedHolding back to PortfolioHolding for submission
-      // Make a deep copy to ensure we don't lose any data
-      const portfolioHoldings: PortfolioHolding[] = holdings.map(holding => ({
-        symbol: holding.symbol,
-        weight: holding.weight,
-        sector: holding.sector,
-        stockCapType: holding.stockCapType,
-        status: holding.status,
-        buyPrice: holding.buyPrice,
-        quantity: holding.quantity,
-        minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
-        // Preserve these fields to ensure P&L tracking works correctly
-        originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
-        totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
-        realizedPnL: holding.realizedPnL || 0,
-      }));
+      // For sold stocks, set minimum values to pass backend validation while preserving sold status
+      const portfolioHoldings: PortfolioHolding[] = holdings
+        .map(holding => {
+          if (holding.status === 'Sell') {
+            // For sold stocks, use minimum values that pass backend validation
+            // but preserve the sold status and date for frontend display
+            return {
+              symbol: holding.symbol,
+              weight: 0,
+              sector: holding.sector,
+              stockCapType: holding.stockCapType,
+              status: holding.status,
+              buyPrice: holding.buyPrice,
+              quantity: 1, // Minimum value for backend validation
+              minimumInvestmentValueStock: 1, // Minimum value for backend validation
+              originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
+              totalQuantityOwned: 0, // Actual sold quantity
+              realizedPnL: holding.realizedPnL || 0,
+              soldDate: holding.soldDate, // Preserve sold date
+            };
+          } else {
+            return {
+              symbol: holding.symbol,
+              weight: holding.weight,
+              sector: holding.sector,
+              stockCapType: holding.stockCapType,
+              status: holding.status,
+              buyPrice: holding.buyPrice,
+              quantity: holding.quantity,
+              minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
+              originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
+              totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
+              realizedPnL: holding.realizedPnL || 0,
+            };
+          }
+        });
+
+
 
       // Create a deep copy of the portfolio data to ensure we don't lose any fields
       const portfolioData: CreatePortfolioRequest = {
@@ -747,6 +835,7 @@ export function PortfolioFormDialog({
         CAGRSinceInception: cagrSinceInception,
         oneYearGains,
         compareWith,
+        // Include all calculated financial values
         cashBalance: cashBalance,
         currentValue: currentValue,
       };
@@ -888,17 +977,19 @@ export function PortfolioFormDialog({
     setHoldings([...holdings, holdingToAdd]);
     resetNewHolding();
 
-    // Auto-adjust minimum investment if needed
-    const newTotalInvestment = totalActualInvestment + investmentDetails.actualInvestmentAmount;
-    const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
-    
-    if (newAdjustedMinInvestment > Number(minInvestment || 0)) {
-      setMinInvestment(newAdjustedMinInvestment.toString());
-      toast({
-        title: "Minimum Investment Auto-Adjusted",
-        description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} to accommodate the new holding with a 10% buffer.`,
-        variant: "default",
-      });
+    // Only auto-adjust minimum investment for new portfolios
+    if (!initialData) {
+      const newTotalInvestment = totalActualInvestment + investmentDetails.actualInvestmentAmount;
+      const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
+      
+      if (newAdjustedMinInvestment > Number(minInvestment || 0)) {
+        setMinInvestment(newAdjustedMinInvestment.toString());
+        toast({
+          title: "Minimum Investment Auto-Adjusted",
+          description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} to accommodate the new holding with a 10% buffer.`,
+          variant: "default",
+        });
+      }
     }
 
     // Show notification about leftover amount if any
@@ -916,19 +1007,7 @@ export function PortfolioFormDialog({
     updated.splice(index, 1);
     setHoldings(updated);
 
-    // Auto-adjust minimum investment if needed after removal
-    const newTotalInvestment = totalActualInvestment - removedHolding.minimumInvestmentValueStock;
-    if (newTotalInvestment > 0) {
-      const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
-      if (newAdjustedMinInvestment < Number(minInvestment || 0)) {
-        setMinInvestment(newAdjustedMinInvestment.toString());
-        toast({
-          title: "Minimum Investment Auto-Adjusted",
-          description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} after removing the holding.`,
-          variant: "default",
-        });
-      }
-    }
+    // Don't auto-adjust minimum investment when removing holdings
   };
   
   const startEditHolding = async (index: number) => {
@@ -1036,6 +1115,7 @@ export function PortfolioFormDialog({
           updated.latestPrice,
           proportionToSell
         );
+        console.log('P&L Preview for', updated.action, ':', updated.pnlPreview);
       }
     } else {
       updated.pnlPreview = undefined;
@@ -1109,72 +1189,89 @@ export function PortfolioFormDialog({
     // Recalculate accurate weight based on actual integer quantity investment
     const accurateWeight = Number(((nextActualInvestment / editBase) * 100).toFixed(2));
 
-    const updatedHolding: ExtendedHolding = {
-      ...originalHolding,
-      weight: accurateWeight,
-      status: status,
-      buyPrice: investmentPrice,
-      quantity: nextQuantity,
-      minimumInvestmentValueStock: nextActualInvestment,
-      allocatedAmount: nextAllocated,
-      leftoverAmount: Number(nextLeftover.toFixed(2)),
-      currentMarketPrice: editingHolding.latestPrice,
-      // Preserve P&L tracking fields
-      originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
-      totalQuantityOwned: nextQuantity,
-      realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
-    };
-
     const updatedHoldings = [...holdings];
     
-    // If it's a complete sell, remove the holding
-    if (status === 'Sell' || newWeight === 0) {
+    // For complete sell, create a sold holding that will be shown for 10 days
+    if (action === 'sell') {
+      const soldHolding: ExtendedHolding = {
+        ...originalHolding,
+        weight: 0,
+        status: 'Sell',
+        quantity: 0,
+        minimumInvestmentValueStock: 0,
+        allocatedAmount: 0,
+        leftoverAmount: 0,
+        realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
+        // Add sold date for 10-day display logic
+        soldDate: new Date().toISOString(),
+        currentMarketPrice: editingHolding.latestPrice,
+        originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
+        totalQuantityOwned: 0,
+      };
+      updatedHoldings[index] = soldHolding;
+    } else if (action === 'partial-sell') {
+      // For partial sell, update the holding with remaining quantity and reduced investment
+      const updatedHolding: ExtendedHolding = {
+        ...originalHolding,
+        weight: accurateWeight,
+        status: 'Hold', // Reset to Hold after partial sell
+        buyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice, // Keep original buy price
+        quantity: nextQuantity,
+        minimumInvestmentValueStock: nextActualInvestment,
+        allocatedAmount: nextAllocated,
+        leftoverAmount: Number(nextLeftover.toFixed(2)),
+        currentMarketPrice: editingHolding.latestPrice,
+        originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
+        totalQuantityOwned: nextQuantity,
+        realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
+      };
+      updatedHoldings[index] = updatedHolding;
+    } else if (nextQuantity <= 0 || nextActualInvestment <= 0) {
       updatedHoldings.splice(index, 1);
     } else {
+      const updatedHolding: ExtendedHolding = {
+        ...originalHolding,
+        weight: accurateWeight,
+        status: status,
+        buyPrice: investmentPrice,
+        quantity: nextQuantity,
+        minimumInvestmentValueStock: nextActualInvestment,
+        allocatedAmount: nextAllocated,
+        leftoverAmount: Number(nextLeftover.toFixed(2)),
+        currentMarketPrice: editingHolding.latestPrice,
+        originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
+        totalQuantityOwned: nextQuantity,
+        realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
+      };
       updatedHoldings[index] = updatedHolding;
     }
 
     setHoldings(updatedHoldings);
 
-    // Auto-adjust minimum investment based on new total investment
-    const newTotalInvestment = updatedHoldings.reduce((sum, holding) => sum + holding.minimumInvestmentValueStock, 0);
-    const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
-    
-    if (newAdjustedMinInvestment !== Number(minInvestment || 0)) {
-      setMinInvestment(newAdjustedMinInvestment.toString());
-      toast({
-        title: "Minimum Investment Auto-Adjusted",
-        description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} to accommodate all holdings with a 10% buffer.`,
-        variant: "default",
-      });
-    }
-
-    // NEW: Handle profit reinvestment for profitable sales
-    if (pnlPreview && pnlPreview.profitLoss > 0 && (action === 'partial-sell' || action === 'sell')) {
-      const currentMin = Number(minInvestment);
-      const newMinInvestment = currentMin + pnlPreview.profitLoss;
-      setMinInvestment(newMinInvestment.toString());
-
-      // Enhanced success notification with P&L details
-      toast({
-        title: "Sale Completed! 📈",
-        description: `Profit: ${formatCurrency(pnlPreview.profitLoss)} added to investment pool. New pool: ${formatCurrency(newMinInvestment)}`,
-        duration: 5000,
-      });
-    } else if (pnlPreview && pnlPreview.profitLoss < 0 && (action === 'partial-sell' || action === 'sell')) {
-      // Loss notification
-      toast({
-        title: "Sale Completed 📉",
-        description: `Loss: ${formatCurrency(Math.abs(pnlPreview.profitLoss))} realized. Continuing with portfolio.`,
-        variant: "destructive",
-        duration: 5000,
-      });
+    // Handle sale proceeds - cash balance increases automatically when holdings investment decreases
+    if (pnlPreview && (action === 'partial-sell' || action === 'sell')) {
+      const saleProceeds = pnlPreview.saleValue;
+      
+      if (pnlPreview.profitLoss >= 0) {
+        toast({
+          title: "Sale Completed! 📈",
+          description: `Sold ${pnlPreview.quantitySold} shares for ${formatCurrency(saleProceeds)}. Profit: ${formatCurrency(pnlPreview.profitLoss)}. Cash balance increased. ${action === 'sell' ? 'Stock will be shown as sold for 10 days.' : ''}`,
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: "Sale Completed 📉",
+          description: `Sold ${pnlPreview.quantitySold} shares for ${formatCurrency(saleProceeds)}. Loss: ${formatCurrency(Math.abs(pnlPreview.profitLoss))}. Cash balance increased. ${action === 'sell' ? 'Stock will be shown as sold for 10 days.' : ''}`,
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
     } else {
       // Regular operation notification
       const actionText = action.charAt(0).toUpperCase() + action.slice(1).replace('-', ' ');
       toast({
         title: "Success",
-        description: `${actionText} completed. ${status === 'Sell' ? 'Position closed.' : `New weight: ${newWeight.toFixed(2)}%`}`,
+        description: `${actionText} completed. ${status === 'Sell' ? 'Position closed and will be shown as sold for 10 days.' : `New weight: ${newWeight.toFixed(2)}%`}`,
       });
     }
 
@@ -1748,6 +1845,21 @@ export function PortfolioFormDialog({
                           </div>
                         </div>
                         
+                        {/* Show realized P&L if there are any sales */}
+                        {totalRealizedPnL !== 0 && (
+                          <div className="mt-4">
+                            <div className="text-center p-3 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                              <p className="text-sm text-yellow-700 dark:text-yellow-300 font-medium">Total Realized P&L</p>
+                              <p className={`text-xl font-bold ${totalRealizedPnL >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                {totalRealizedPnL >= 0 ? '+' : ''}₹{totalRealizedPnL.toLocaleString()}
+                              </p>
+                              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                                From completed stock sales
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
                         {/* Weightage Calculation Context */}
                         {(() => {
                           const { baseAmount, isFirstTimeCreation, description } = getWeightageCalculationBase();
@@ -1793,6 +1905,9 @@ export function PortfolioFormDialog({
                               {totalUnrealizedPnL >= 0 ? '+' : ''}{formatCurrency(totalUnrealizedPnL)}
                             </div>
                           </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            From current holdings at market prices
+                          </p>
                         </div>
                       )}
                       
@@ -1982,13 +2097,25 @@ export function PortfolioFormDialog({
                       <p className="text-sm text-muted-foreground">No holdings added yet.</p>
                     ) : (
                       <div className="space-y-3">
-                        {holdings.map((holding, index) => (
-                          <Card key={index}>
+                        {holdings.map((holding, index) => {
+                          // Check if stock was sold and if it's been more than 10 days
+                          const isSold = holding.status === 'Sell';
+                          const soldDate = holding.soldDate ? new Date(holding.soldDate) : null;
+                          const daysSinceSold = soldDate ? Math.floor((Date.now() - soldDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                          const shouldHideSoldStock = isSold && daysSinceSold > 10;
+                          
+                          // Don't render stocks that have been sold for more than 10 days
+                          if (shouldHideSoldStock) {
+                            return null;
+                          }
+                          
+                          return (
+                          <Card key={index} className={isSold ? 'opacity-60 border-red-200 dark:border-red-800' : ''}>
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between">
                                 <div className="grid gap-2 flex-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-lg">{holding.symbol}</span>
+                                    <span className={`font-semibold text-lg ${isSold ? 'line-through text-red-600 dark:text-red-400' : ''}`}>{holding.symbol}</span>
                                     <span className="text-sm text-muted-foreground">({holding.sector})</span>
                                     {holding.stockCapType && (
                                       <Badge variant="outline" className="text-xs capitalize">
@@ -2002,8 +2129,13 @@ export function PortfolioFormDialog({
                                       holding.status === 'partial-sell' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300' :
                                       'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                                     }`}>
-                                      {holding.status}
+                                      {holding.status === 'addon-buy' ? 'Buy More' : holding.status === 'Sell' ? `SOLD ${daysSinceSold}d ago` : holding.status}
                                     </Badge>
+                                    {isSold && (
+                                      <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400">
+                                        {10 - daysSinceSold} days left
+                                      </Badge>
+                                    )}
                                   </div>
                                   
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
@@ -2064,31 +2196,41 @@ export function PortfolioFormDialog({
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => startEditHolding(index)}
-                                    disabled={isSubmitting}
-                                    title="Edit holding"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => removeHolding(index)}
-                                    disabled={isSubmitting}
-                                    title="Remove holding"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  {!isSold && (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => startEditHolding(index)}
+                                        disabled={isSubmitting}
+                                        title="Edit holding"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeHolding(index)}
+                                        disabled={isSubmitting}
+                                        title="Remove holding"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  {isSold && (
+                                    <div className="text-xs text-muted-foreground">
+                                      Sold on {soldDate?.toLocaleDateString()}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </CardContent>
                           </Card>
-                        ))}
+                          );
+                        }).filter(Boolean)}
                       </div>
                     )}
                   </div>
@@ -2323,10 +2465,10 @@ export function PortfolioFormDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="buy">Fresh Buy</SelectItem>
-                    <SelectItem value="addon">Add-on Buy</SelectItem>
-                    <SelectItem value="hold">Hold Position</SelectItem>
+                    <SelectItem value="addon">Buy More</SelectItem>
+                    <SelectItem value="hold">Hold</SelectItem>
                     <SelectItem value="partial-sell">Partial Sell</SelectItem>
-                    <SelectItem value="sell">Complete Sell</SelectItem>
+                    <SelectItem value="sell">Sell</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
