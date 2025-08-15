@@ -48,6 +48,7 @@ import {
   Download,
   Filter,
   X,
+  Copy,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
@@ -67,7 +68,9 @@ export default function PortfolioTipsPage({ params }: { params: Promise<{ id: st
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
+  const [duplicateTip, setDuplicateTip] = useState<Tip | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Filter states
@@ -339,6 +342,102 @@ export default function PortfolioTipsPage({ params }: { params: Promise<{ id: st
     setDeleteDialogOpen(true);
   };
 
+  const openDuplicateDialog = (tip: Tip) => {
+    setDuplicateTip(tip);
+    setDuplicateDialogOpen(true);
+  };
+
+  const handleDuplicateTip = async (tipData: CreateTipRequest) => {
+    const { id: portfolioId } = await params;
+    if (!portfolioId || portfolioId === "undefined") {
+      toast({
+        title: "Invalid Portfolio",
+        description: "Cannot duplicate a tip for an invalid portfolio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if the tip data is identical to the original
+    if (duplicateTip) {
+      const originalData = {
+        title: duplicateTip.title,
+        category: (duplicateTip as any).category || "basic",
+        action: duplicateTip.action,
+        buyRange: duplicateTip.buyRange,
+        addMoreAt: duplicateTip.addMoreAt,
+        description: duplicateTip.description,
+        mpWeightage: duplicateTip.mpWeightage,
+      };
+
+      const newData = {
+        title: tipData.title,
+        category: tipData.category,
+        action: tipData.action,
+        buyRange: tipData.buyRange,
+        addMoreAt: tipData.addMoreAt,
+        description: tipData.description,
+        mpWeightage: tipData.mpWeightage,
+      };
+
+      // Compare the data field by field (excluding IDs)
+      const isIdentical = (
+        originalData.title === newData.title &&
+        originalData.category === newData.category &&
+        originalData.action === newData.action &&
+        originalData.buyRange === newData.buyRange &&
+        originalData.addMoreAt === newData.addMoreAt &&
+        originalData.description === newData.description &&
+        originalData.mpWeightage === newData.mpWeightage
+      );
+
+      if (isIdentical) {
+        toast({
+          title: "Cannot Save Duplicate",
+          description: "Please modify at least one field before saving. Duplicate tips are not allowed.",
+          variant: "destructive",
+        });
+        throw new Error("Duplicate tip data not allowed");
+      }
+    }
+
+    try {
+      console.log(`Duplicating tip for portfolio ${portfolioId}:`, tipData);
+
+      toast({
+        title: "Creating Duplicate Tip",
+        description: "Please wait while we create your duplicate tip...",
+      });
+
+      const createdTip = await createTip(portfolioId, tipData);
+
+      console.log("Duplicate tip created successfully:", createdTip);
+
+      toast({
+        title: "Tip Duplicated",
+        description: "Portfolio tip has been duplicated successfully",
+      });
+
+      loadData();
+    } catch (error) {
+      console.error("Error duplicating tip:", error);
+
+      if (error instanceof Error && error.message === "Duplicate tip data not allowed") {
+        // Don't show additional error toast for duplicate data
+        throw error;
+      }
+
+      toast({
+        title: "Failed to duplicate tip",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+
+      throw error;
+    }
+  };
+
   const getActionColor = (action?: string) => {
     if (!action) return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     
@@ -516,6 +615,15 @@ export default function PortfolioTipsPage({ params }: { params: Promise<{ id: st
             >
               <Pencil className="h-4 w-4" />
               <span className="sr-only">Edit</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openDuplicateDialog(tip)}
+              title="Duplicate tip"
+            >
+              <Copy className="h-4 w-4" />
+              <span className="sr-only">Duplicate</span>
             </Button>
             <Button
               variant="ghost"
@@ -787,6 +895,20 @@ export default function PortfolioTipsPage({ params }: { params: Promise<{ id: st
           portfolio={portfolio || undefined}
           title="Edit Portfolio Tip"
           description="Modify an existing portfolio tip"
+        />
+      )}
+
+      {/* Duplicate Tip Dialog */}
+      {duplicateTip && (
+        <PortfolioTipDialog
+          open={duplicateDialogOpen}
+          onOpenChange={setDuplicateDialogOpen}
+          onSubmit={handleDuplicateTip}
+          initialData={duplicateTip}
+          portfolio={portfolio || undefined}
+          title="Duplicate Portfolio Tip"
+          description="Create a copy of this tip with modifications"
+          isDuplicate={true}
         />
       )}
 

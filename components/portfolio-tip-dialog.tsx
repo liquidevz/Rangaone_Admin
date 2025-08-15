@@ -128,6 +128,7 @@ interface PortfolioTipDialogProps {
   portfolio?: Portfolio;
   title: string;
   description: string;
+  isDuplicate?: boolean;
 }
 
 // Debounce function
@@ -147,6 +148,7 @@ export function PortfolioTipDialog({
   portfolio,
   title,
   description,
+  isDuplicate = false,
 }: PortfolioTipDialogProps) {
   // Safeguard: Ensure we have a valid portfolio
   React.useEffect(() => {
@@ -165,6 +167,7 @@ export function PortfolioTipDialog({
   const [showResults, setShowResults] = React.useState(false);
   const [focusedIndex, setFocusedIndex] = React.useState(-1);
   const [weightageValue, setWeightageValue] = React.useState("");
+  const [originalData, setOriginalData] = React.useState<any>(null);
   
   const inputRef = React.useRef<HTMLInputElement>(null);
   const resultsRef = React.useRef<HTMLDivElement>(null);
@@ -301,6 +304,23 @@ export function PortfolioTipDialog({
         } as TipFormValues);
         setWeightageValue(initialData.mpWeightage || initialData.weightage || "");
         
+        // Store original data for duplicate comparison (exclude IDs)
+        if (isDuplicate) {
+          const originalDataObj = {
+            title: initialData.title || "",
+            category: (initialData as any).category || "basic",
+            action: initialData.action || "",
+            buyRange: initialData.buyRange || "",
+            addMoreAt: initialData.addMoreAt || "",
+            exitPrice: (initialData as any).exitPrice || "",
+            mpWeightage: parseFloat(initialData.mpWeightage || initialData.weightage || "0") || 0,
+            description: initialData.description || ((initialData as any).content?.[0]?.value ?? ""),
+            pdfLink: (initialData as any).tipUrl || "",
+          };
+          console.log('Storing original data for duplicate check:', originalDataObj);
+          setOriginalData(originalDataObj);
+        }
+        
         // Always fetch and set stock details by stockId if present
         if (initialData.stockId) {
           fetchStockSymbolById(initialData.stockId)
@@ -331,6 +351,7 @@ export function PortfolioTipDialog({
         });
         setSelectedStockDetails(null);
         setWeightageValue("");
+        setOriginalData(null);
       }
     }
   }, [open, initialData, reset]);
@@ -411,6 +432,7 @@ export function PortfolioTipDialog({
     setShowResults(false);
     setWeightageValue("");
     setFocusedIndex(-1);
+    setOriginalData(null);
   };
 
   const handleStockSelect = (stock: StockSymbol) => {
@@ -561,13 +583,57 @@ export function PortfolioTipDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
         <DialogHeader>
-          <DialogTitle className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{title}</DialogTitle>
-          <DialogDescription className={isDark ? 'text-gray-300' : 'text-gray-600'}>{description}</DialogDescription>
+          <DialogTitle className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {title}
+            {isDuplicate && (
+              <span className="ml-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                Duplicate Mode
+              </span>
+            )}
+          </DialogTitle>
+          <DialogDescription className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+            {description}
+            {isDuplicate && (
+              <div className="mt-2 text-sm text-orange-600 dark:text-orange-400">
+                ⚠️ Please modify at least one field to avoid creating an identical tip.
+              </div>
+            )}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(async (data) => {
             console.log('Form submit attempted with data:', data);  // Debug log
+            
+            // Check for duplicate data if in duplicate mode
+            if (isDuplicate && originalData) {
+              console.log('Checking for duplicates:', { originalData, newData: data });
+              
+              const isIdentical = (
+                String(originalData.title || '').trim() === String(data.title || '').trim() &&
+                String(originalData.category || '') === String(data.category || '') &&
+                String(originalData.action || '') === String(data.action || '') &&
+                String(originalData.buyRange || '') === String(data.buyRange || '') &&
+                String(originalData.addMoreAt || '') === String(data.addMoreAt || '') &&
+                String(originalData.exitPrice || '') === String(data.exitPrice || '') &&
+                Number(originalData.mpWeightage || 0) === Number(data.mpWeightage || 0) &&
+                String(originalData.description || '').trim() === String(data.description || '').trim() &&
+                String(originalData.pdfLink || '') === String(data.pdfLink || '')
+              );
+              
+              console.log('Is identical:', isIdentical);
+              
+              if (isIdentical) {
+                console.log('Preventing duplicate submission');
+                toast({
+                  title: "Cannot Save Duplicate",
+                  description: "Please modify at least one field before saving. Duplicate tips are not allowed.",
+                  variant: "destructive",
+                });
+                return; // Stop form submission
+              }
+            }
+            
             try {
               // Ensure we're using the correct portfolio ID
               if (!portfolio || !portfolio._id) {
@@ -612,7 +678,7 @@ export function PortfolioTipDialog({
               }
               
               // Use updateTip API for editing, onSubmit for creating
-              if (initialData && initialData._id) {
+              if (initialData && initialData._id && !isDuplicate) {
                 console.log('Updating existing tip with ID:', initialData._id);
                 await updateTip(initialData._id, tipData);
                 toast({ title: 'Tip updated successfully' });
