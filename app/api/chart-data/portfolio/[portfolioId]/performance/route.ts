@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest, { params }: { params: { portfolioId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ portfolioId: string }> }) {
+  const { portfolioId } = await params
   const mockPerformance = {
     success: true,
-    portfolioId: params.portfolioId,
+    portfolioId,
     totalReturn: 12.5,
     currentValue: 112500,
     benchmarkReturn: 8.3,
