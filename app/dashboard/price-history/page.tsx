@@ -6,56 +6,49 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   TrendingUp,
   RefreshCw,
   Calendar,
-  DollarSign,
+  Plus,
+  Edit,
+  Trash2,
+  Copy,
   BarChart3,
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  Bot,
-  Target,
-  Activity,
+  Trash,
 } from "lucide-react";
-import { API_BASE_URL } from "@/lib/config";
 import { fetchPortfolios, Portfolio } from "@/lib/api-portfolios";
-
-// Types for the price history API
-interface PriceHistoryDataPoint {
-  date: string;
-  value: number;
-  cash: number;
-  change: number;
-  changePercent: number;
-}
-
-interface PriceHistoryResponse {
-  portfolioId: string;
-  period: string;
-  dataPoints: number;
-  data: PriceHistoryDataPoint[];
-}
+import { fetchChartData, createChartData, updateChartData, deleteChartData, fetchPortfolioChartData, createPortfolioChartData, fetchPortfolioPerformance, cleanupDuplicates, ChartDataResponse, ChartDataPoint, CreateChartDataRequest } from "@/lib/api-chart-data";
 
 export default function PriceHistoryPage() {
   const { toast } = useToast();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>("");
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("1m");
-  const [priceHistory, setPriceHistory] = useState<PriceHistoryResponse | null>(null);
-  const [compareData, setCompareData] = useState<PriceHistoryResponse | null>(null);
+  const [chartData, setChartData] = useState<ChartDataResponse | null>(null);
+  const [performanceData, setPerformanceData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<ChartDataPoint | null>(null);
+  const [newEntry, setNewEntry] = useState<CreateChartDataRequest>({
+    portfolio: "",
+    date: new Date().toISOString(),
+    dateOnly: new Date().toISOString().split('T')[0],
+    portfolioValue: 0,
+    cashRemaining: 0,
+    compareIndexValue: 0,
+    compareIndexPriceSource: "closing",
+    usedClosingPrices: true,
+    dataVerified: true,
+    dataQualityIssues: []
+  });
 
-  const periods = [
-    { value: "1w", label: "1 Week" },
-    { value: "1m", label: "1 Month" },
-    { value: "3m", label: "3 Months" },
-    { value: "6m", label: "6 Months" },
-    { value: "1y", label: "1 Year" },
-    { value: "all", label: "All Time" },
-  ];
+
 
   // Load portfolios using the authenticated function
   const loadPortfolios = async () => {
@@ -72,93 +65,151 @@ export default function PriceHistoryPage() {
     }
   };
 
-  // Load price history for portfolio and compare data
-  const loadPriceHistory = async () => {
-    if (!selectedPortfolio) return;
-
+  const loadChartData = async () => {
     setIsLoading(true);
     try {
-      // Load portfolio data
-      const portfolioResponse = await fetch(
-        `${API_BASE_URL}/api/portfolios/${selectedPortfolio}/price-history?period=${selectedPeriod}`
-      );
+      // Check if admin token exists
+      const token = localStorage.getItem("adminAccessToken");
+      if (!token) {
+        throw new Error("No admin token found. Please login first.");
+      }
       
-      if (portfolioResponse.ok) {
-        const portfolioData: PriceHistoryResponse = await portfolioResponse.json();
-        setPriceHistory(portfolioData);
-      } else if (portfolioResponse.status === 404) {
-        toast({
-          title: "No Data",
-          description: "No price history found for this portfolio",
-          variant: "destructive",
-        });
-        setPriceHistory(null);
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to load portfolio price history",
-          variant: "destructive",
-        });
-        setPriceHistory(null);
-      }
-
-      // Load compare data if available
-      const selectedPortfolioData = portfolios.find(p => p.id === selectedPortfolio);
-      if (selectedPortfolioData?.compareWith) {
-        try {
-          const compareResponse = await fetch(
-            `${API_BASE_URL}/api/portfolios/${selectedPortfolioData.compareWith}/price-history?period=${selectedPeriod}`
-          );
-          
-          if (compareResponse.ok) {
-            const compareDataResponse: PriceHistoryResponse = await compareResponse.json();
-            setCompareData(compareDataResponse);
-          } else {
-            console.warn("Failed to load compare data");
-            setCompareData(null);
-          }
-        } catch (error) {
-          console.warn("Error loading compare data:", error);
-          setCompareData(null);
-        }
-      } else {
-        setCompareData(null);
-      }
+      const portfolioFilter = selectedPortfolio && selectedPortfolio !== "all" ? selectedPortfolio : undefined;
+      const data = await fetchChartData(portfolioFilter, undefined, undefined, 100, 1);
+      setChartData(data);
     } catch (error) {
-      console.error("Error loading price history:", error);
+      console.error("Error loading chart data:", error);
+      setChartData(null);
       toast({
         title: "Error",
-        description: "Failed to load price history",
+        description: error instanceof Error ? error.message : "Failed to load chart data",
         variant: "destructive",
       });
-      setPriceHistory(null);
-      setCompareData(null);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleCreateEntry = async () => {
+    try {
+      await createChartData(newEntry);
+      toast({ title: "Success", description: "Chart data entry created successfully" });
+      setShowCreateDialog(false);
+      loadChartData();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to create chart data entry", variant: "destructive" });
+    }
+  };
+
+  const handleEditEntry = (entry: ChartDataPoint) => {
+    setEditingEntry(entry);
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateEntry = async () => {
+    if (!editingEntry?._id && !editingEntry?.id) return;
+    try {
+      await updateChartData(editingEntry._id || editingEntry.id!, {
+        portfolioValue: editingEntry.portfolioValue,
+        cashRemaining: editingEntry.cashRemaining,
+        compareIndexValue: editingEntry.compareIndexValue
+      });
+      toast({ title: "Success", description: "Chart data entry updated successfully" });
+      setShowEditDialog(false);
+      setEditingEntry(null);
+      loadChartData();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update chart data entry", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    try {
+      await deleteChartData(id);
+      toast({ title: "Success", description: "Chart data entry deleted successfully" });
+      loadChartData();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete chart data entry", variant: "destructive" });
+    }
+  };
+
+  const handleDuplicateEntry = (entry: ChartDataPoint) => {
+    const duplicatedEntry = {
+      portfolio: entry.portfolio,
+      date: new Date().toISOString(),
+      dateOnly: new Date().toISOString().split('T')[0],
+      portfolioValue: entry.portfolioValue,
+      cashRemaining: entry.cashRemaining,
+      compareIndexValue: entry.compareIndexValue,
+      compareIndexPriceSource: entry.compareIndexPriceSource,
+      usedClosingPrices: entry.usedClosingPrices,
+      dataVerified: entry.dataVerified,
+      dataQualityIssues: [...entry.dataQualityIssues]
+    };
+    setNewEntry(duplicatedEntry);
+    setShowCreateDialog(true);
+  };
+
+  const loadPortfolioPerformance = async () => {
+    if (!selectedPortfolio || selectedPortfolio === "all") return;
+    
+    setIsLoadingPerformance(true);
+    try {
+      const data = await fetchPortfolioPerformance(selectedPortfolio);
+      setPerformanceData(data);
+    } catch (error) {
+      console.error("Error loading portfolio performance:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load portfolio performance data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingPerformance(false);
+    }
+  };
+
+  const handleCleanupDuplicates = async () => {
+    setIsCleaningUp(true);
+    try {
+      const result = await cleanupDuplicates();
+      toast({
+        title: "Success",
+        description: `Cleanup completed. ${result.deletedCount || 0} duplicates removed.`,
+      });
+      loadChartData();
+    } catch (error) {
+      console.error("Error cleaning up duplicates:", error);
+      toast({
+        title: "Error",
+        description: "Failed to cleanup duplicate entries",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+
+
 
   useEffect(() => {
     loadPortfolios();
   }, []);
 
   useEffect(() => {
-    if (selectedPortfolio) {
-      loadPriceHistory();
+    if (portfolios.length > 0) {
+      loadChartData();
+      loadPortfolioPerformance();
     }
-  }, [selectedPortfolio, selectedPeriod]);
+  }, [selectedPortfolio, portfolios]);
 
-  const getChangeIcon = (change: number) => {
-    if (change > 0) return <ArrowUp className="h-4 w-4 text-green-600" />;
-    if (change < 0) return <ArrowDown className="h-4 w-4 text-red-600" />;
-    return <Minus className="h-4 w-4 text-gray-600" />;
-  };
+  useEffect(() => {
+    if (selectedPortfolio) {
+      setNewEntry(prev => ({ ...prev, portfolio: selectedPortfolio }));
+    }
+  }, [selectedPortfolio]);
 
-  const getChangeColor = (change: number) => {
-    if (change > 0) return "text-green-600";
-    if (change < 0) return "text-red-600";
-    return "text-gray-600";
-  };
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -168,52 +219,7 @@ export default function PriceHistoryPage() {
     }).format(value);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
-  // Calculate meaningful averages
-  const calculatePortfolioAverage = () => {
-    if (!priceHistory?.data.length) return 0;
-    const values = priceHistory.data.map(point => point.cash); // Use cash as portfolio value
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  };
-
-  const calculatePortfolioAverageChange = () => {
-    if (!priceHistory?.data.length) return 0;
-    const changes = priceHistory.data.map(point => point.change);
-    return changes.reduce((sum, change) => sum + change, 0) / changes.length;
-  };
-
-  const calculateCompareAverage = () => {
-    if (!compareData?.data.length) return 0;
-    const values = compareData.data.map(point => point.cash); // Use cash as portfolio value
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  };
-
-  const calculateCompareAverageChange = () => {
-    if (!compareData?.data.length) return 0;
-    const changes = compareData.data.map(point => point.change);
-    return changes.reduce((sum, change) => sum + change, 0) / changes.length;
-  };
-
-  const getSelectedPortfolioName = () => {
-    return portfolios.find(p => p.id === selectedPortfolio)?.name || 'Selected Portfolio';
-  };
-
-  const getComparePortfolioName = () => {
-    const selectedPortfolioData = portfolios.find(p => p.id === selectedPortfolio);
-    if (selectedPortfolioData?.compareWith) {
-      return portfolios.find(p => p.id === selectedPortfolioData.compareWith)?.name || 'Compare Portfolio';
-    }
-    return null;
-  };
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -222,220 +228,326 @@ export default function PriceHistoryPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
             <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-            Portfolio Price History
+            Chart Data Management
           </h1>
           <p className="text-muted-foreground">
-            View historical price data and performance metrics for your portfolios
+            Manage chart data entries with CRUD operations
           </p>
         </div>
-        <Button 
-          onClick={loadPriceHistory} 
-          disabled={isLoading || !selectedPortfolio}
-          variant="outline"
-          className="w-full sm:w-auto"
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh Data
-        </Button>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-4 flex-1 w-full">
-          <div className="flex-1 min-w-[220px]">
-            <label className="text-sm font-medium mb-2 block">Portfolio</label>
-            <Select value={selectedPortfolio} onValueChange={setSelectedPortfolio}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a portfolio" />
-              </SelectTrigger>
-              <SelectContent>
-                {portfolios.map((portfolio) => (
-                  <SelectItem key={portfolio.id} value={portfolio.id || ''}>
-                    {portfolio.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex-1 min-w-[180px]">
-            <label className="text-sm font-medium mb-2 block">Time Period</label>
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((period) => (
-                  <SelectItem key={period.value} value={period.value}>
-                    {period.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      {/* Meaningful Summary Cards */}
-      {priceHistory && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Portfolio Average</CardTitle>
-              <Target className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{formatCurrency(calculatePortfolioAverage())}</div>
-              <p className="text-xs text-muted-foreground">Average portfolio value</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Portfolio Avg Change</CardTitle>
-              <Activity className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${getChangeColor(calculatePortfolioAverageChange())}`}>
-                {formatCurrency(calculatePortfolioAverageChange())}
+        <div className="flex gap-2">
+          <Button 
+            onClick={loadPortfolioPerformance}
+            disabled={isLoadingPerformance || !selectedPortfolio || selectedPortfolio === "all"}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            <BarChart3 className={`mr-2 h-4 w-4 ${isLoadingPerformance ? "animate-spin" : ""}`} />
+            Performance
+          </Button>
+          <Button 
+            onClick={handleCleanupDuplicates}
+            disabled={isCleaningUp}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            <Trash className={`mr-2 h-4 w-4 ${isCleaningUp ? "animate-spin" : ""}`} />
+            Cleanup
+          </Button>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Entry
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create Chart Data Entry</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Portfolio</label>
+                  <Select value={newEntry.portfolio} onValueChange={(value) => setNewEntry({...newEntry, portfolio: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select portfolio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {portfolios.map((p) => (
+                        <SelectItem key={p.id} value={p.id || 'unknown'}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Date (supports backdating/future dating)</label>
+                  <Input 
+                    type="date" 
+                    value={newEntry.dateOnly} 
+                    onChange={(e) => setNewEntry({...newEntry, dateOnly: e.target.value, date: new Date(e.target.value).toISOString()})} 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Portfolio Value</label>
+                  <Input 
+                    type="number" 
+                    value={newEntry.portfolioValue} 
+                    onChange={(e) => setNewEntry({...newEntry, portfolioValue: Number(e.target.value)})} 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Cash Remaining</label>
+                  <Input 
+                    type="number" 
+                    value={newEntry.cashRemaining} 
+                    onChange={(e) => setNewEntry({...newEntry, cashRemaining: Number(e.target.value)})} 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Index Value</label>
+                  <Input 
+                    type="number" 
+                    value={newEntry.compareIndexValue} 
+                    onChange={(e) => setNewEntry({...newEntry, compareIndexValue: Number(e.target.value)})} 
+                  />
+                </div>
+                <Button onClick={handleCreateEntry} className="w-full">
+                  Create Entry
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Average daily change</p>
-            </CardContent>
-          </Card>
+            </DialogContent>
+          </Dialog>
           
-          {compareData && (
-            <>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Compare Average</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-purple-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">{formatCurrency(calculateCompareAverage())}</div>
-                  <p className="text-xs text-muted-foreground">Average compare value</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Compare Avg Change</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-orange-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className={`text-2xl font-bold ${getChangeColor(calculateCompareAverageChange())}`}>
-                    {formatCurrency(calculateCompareAverageChange())}
+          <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Chart Data Entry</DialogTitle>
+              </DialogHeader>
+              {editingEntry && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Date: {editingEntry.dateOnly}</label>
+                    <p className="text-xs text-muted-foreground">Portfolio: {editingEntry.portfolio}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">Average daily change</p>
-                </CardContent>
-              </Card>
-            </>
-          )}
+                  <div>
+                    <label className="text-sm font-medium">Portfolio Value</label>
+                    <Input 
+                      type="number" 
+                      value={editingEntry.portfolioValue} 
+                      onChange={(e) => setEditingEntry({...editingEntry, portfolioValue: Number(e.target.value)})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Cash Remaining</label>
+                    <Input 
+                      type="number" 
+                      value={editingEntry.cashRemaining} 
+                      onChange={(e) => setEditingEntry({...editingEntry, cashRemaining: Number(e.target.value)})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Index Value</label>
+                    <Input 
+                      type="number" 
+                      value={editingEntry.compareIndexValue} 
+                      onChange={(e) => setEditingEntry({...editingEntry, compareIndexValue: Number(e.target.value)})} 
+                    />
+                  </div>
+                  <Button onClick={handleUpdateEntry} className="w-full">
+                    Update Entry
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+          <Button 
+            onClick={loadChartData} 
+            disabled={isLoading}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
-      )}
+      </div>
 
-      {/* Price History Table */}
-      {selectedPortfolio && (
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex-1 min-w-[220px]">
+          <label className="text-sm font-medium mb-2 block">Filter by Portfolio</label>
+          <Select value={selectedPortfolio || "all"} onValueChange={(value) => setSelectedPortfolio(value === "all" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="All portfolios" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All portfolios</SelectItem>
+              {portfolios.map((portfolio) => (
+                <SelectItem key={portfolio.id} value={portfolio.id || 'unknown'}>
+                  {portfolio.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Performance Data Card */}
+      {performanceData && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Price History
+              <BarChart3 className="h-5 w-5" />
+              Portfolio Performance
             </CardTitle>
             <CardDescription>
-              Historical price data for {getSelectedPortfolioName()}
-              {getComparePortfolioName() && ` vs ${getComparePortfolioName()}`}
+              Performance metrics for selected portfolio
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center p-8">
-                <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-                Loading price history...
-              </div>
-            ) : priceHistory && priceHistory.data.length > 0 ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {priceHistory.data.length} data points for {periods.find(p => p.value === selectedPeriod)?.label}
-                  </div>
-                  <Badge variant="outline">
-                    Portfolio ID: {priceHistory.portfolioId}
-                  </Badge>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {performanceData.totalReturn ? `${performanceData.totalReturn.toFixed(2)}%` : 'N/A'}
                 </div>
-                
-                <div className="w-full overflow-x-auto">
-                  <div className="min-w-[840px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date & Time</TableHead>
-                      <TableHead>Portfolio Value</TableHead>
-                      <TableHead>Portfolio Value</TableHead>
-                      <TableHead>Change</TableHead>
-                      <TableHead>Change %</TableHead>
-                      {compareData && <TableHead>Compare Value</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {priceHistory.data.map((point, index) => {
-                      const comparePoint = compareData?.data[index];
-                      return (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              {formatDate(point.date)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{formatCurrency(point.cash)}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-green-600">{formatCurrency(point.value)}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {getChangeIcon(point.change)}
-                              <span className={`font-medium ${getChangeColor(point.change)}`}>
-                                {formatCurrency(point.change)}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={(point.changePercent || 0) > 0 ? "default" : (point.changePercent || 0) < 0 ? "destructive" : "secondary"}
-                              className={(point.changePercent || 0) === 0 ? "bg-gray-100 text-gray-800" : ""}
-                            >
-                              {(point.changePercent || 0) > 0 ? '+' : ''}{(point.changePercent || 0).toFixed(2)}%
-                            </Badge>
-                          </TableCell>
-                          {compareData && (
-                            <TableCell>
-                              {comparePoint ? (
-                                <div className="font-medium text-purple-600">
-                                  {formatCurrency(comparePoint.cash)}
-                                </div>
-                              ) : (
-                                <div className="text-muted-foreground">-</div>
-                              )}
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-                  </div>
+                <div className="text-sm text-muted-foreground">Total Return</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {performanceData.currentValue ? formatCurrency(performanceData.currentValue) : 'N/A'}
                 </div>
+                <div className="text-sm text-muted-foreground">Current Value</div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                {selectedPortfolio ? "No price history data available for this portfolio" : "Please select a portfolio to view price history"}
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {performanceData.benchmarkReturn ? `${performanceData.benchmarkReturn.toFixed(2)}%` : 'N/A'}
+                </div>
+                <div className="text-sm text-muted-foreground">Benchmark Return</div>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Chart Data Entries
+          </CardTitle>
+          <CardDescription>
+            Manage chart data with Create, Read, Update, Delete operations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+              Loading chart data...
+            </div>
+          ) : chartData && chartData.data.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Showing {chartData.data.length} of {chartData.total} entries (includes historical & future dates)
+                </div>
+                <Badge variant="outline">
+                  Total: {chartData.total}
+                </Badge>
+              </div>
+              
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Portfolio</TableHead>
+                      <TableHead>Portfolio Value</TableHead>
+                      <TableHead>Cash Remaining</TableHead>
+                      <TableHead>Index Value</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {chartData.data.map((point) => (
+                      <TableRow key={point._id || `${point.portfolio}-${point.dateOnly}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <div className="font-medium">{point.dateOnly}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(point.date).toLocaleTimeString('en-IN', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {portfolios.find(p => p.id === point.portfolio)?.name || point.portfolio}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium text-blue-600">
+                            {formatCurrency(point.portfolioValue)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium text-green-600">
+                            {formatCurrency(point.cashRemaining)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium text-purple-600">
+                            ₹{point.compareIndexValue.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {point.compareIndexPriceSource}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={point.dataVerified ? "default" : "destructive"}>
+                              {point.dataVerified ? "Verified" : "Unverified"}
+                            </Badge>
+                            {point.dataQualityIssues.length > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                {point.dataQualityIssues.length} issues
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => handleEditEntry(point)}>
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDuplicateEntry(point)}>
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDeleteEntry(point._id || point.id!)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              {portfolios.length === 0 
+                ? "Loading portfolios..."
+                : "No chart data available. The API endpoint may not be implemented yet."
+              }
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 } 

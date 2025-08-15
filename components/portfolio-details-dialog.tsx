@@ -351,8 +351,7 @@ export function PortfolioDetailsDialog({
 
   // Calculate metrics
   const totalWeight = holdingsWithPrices?.reduce((sum, holding) => sum + holding.weight, 0) || 0;
-  const totalHoldingsValue = holdingsWithPrices?.reduce((sum, holding) => 
-    sum + holding.minimumInvestmentValueStock, 0) || 0;
+  const totalHoldingsValue = portfolio.holdingsValue || 0;
   
   const weightUtilization = (totalWeight / 100) * 100;
   const cashUtilization = portfolio.cashBalance ? (portfolio.cashBalance / portfolio.minInvestment) * 100 : 0;

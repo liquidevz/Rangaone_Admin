@@ -48,6 +48,7 @@ import {
   type StockSymbol 
 } from "@/lib/api-stock-symbols";
 import { updatePortfolioHoldings } from "@/lib/api";
+import { getAdminAccessToken } from "@/lib/auth";
 import { 
   Plus, 
   Trash2, 
@@ -262,13 +263,9 @@ export function PortfolioFormDialog({
   const totalAllocated = holdings.reduce((sum, holding) => {
     return holding.status === 'Sell' ? sum : sum + holding.allocatedAmount;
   }, 0);
-  const cashBalance = Number(minInvestment || 0) - totalActualInvestment;
-  const holdingsValue = holdings.reduce((sum, holding) => {
-    if (holding.status === 'Sell') return sum;
-    const livePrice = (holding.currentMarketPrice ?? holding.buyPrice) || 0;
-    const qty = holding.quantity || 0;
-    return sum + livePrice * qty;
-  }, 0);
+  const holdingsValue = initialData?.holdingsValue || 0;
+  const calculatedCashBalance = Number(minInvestment || 0) - totalActualInvestment;
+  const cashBalance = initialData?.cashBalance ?? (isNaN(calculatedCashBalance) ? 0 : calculatedCashBalance);
   const remainingWeight = 100 - totalWeightUsed;
   
   // Calculate total realized P&L from sold stocks
@@ -292,17 +289,35 @@ export function PortfolioFormDialog({
    * @returns {object} Object containing the base amount and context information
    */
   const getWeightageCalculationBase = () => {
-    const isFirstTimeCreation = holdings.length === 0;
     const minInvestmentAmount = Number(minInvestment || 0);
-    const currentPortfolioValue = holdingsValue + cashBalance;
+    const hasInitialData = !!initialData;
+    const hasValidFinancialData = hasInitialData && 
+      typeof initialData.cashBalance === 'number' && 
+      typeof initialData.holdingsValue === 'number';
     
+    // Use minimum investment if:
+    // 1. No initial data (new portfolio)
+    // 2. Initial data exists but no valid financial data
+    // 3. Holdings array is empty
+    const shouldUseMinInvestment = !hasInitialData || !hasValidFinancialData || holdings.length === 0;
+    
+    if (shouldUseMinInvestment) {
+      return {
+        baseAmount: minInvestmentAmount,
+        isFirstTimeCreation: true,
+        context: 'Using minimum investment as base',
+        description: `Using minimum investment (₹${minInvestmentAmount.toLocaleString()}) as weightage base`
+      };
+    }
+    
+    const safeCashBalance = isNaN(initialData.cashBalance || 0) ? 0 : (initialData.cashBalance || 0);
+    const safeHoldingsValue = isNaN(initialData.holdingsValue || 0) ? 0 : (initialData.holdingsValue || 0);
+    const currentPortfolioValue = safeCashBalance + safeHoldingsValue;
     return {
-      baseAmount: isFirstTimeCreation ? minInvestmentAmount : currentPortfolioValue,
-      isFirstTimeCreation,
-      context: isFirstTimeCreation ? 'First-time portfolio creation' : 'Existing portfolio modification',
-      description: isFirstTimeCreation 
-        ? `Using minimum investment (₹${minInvestmentAmount.toLocaleString()}) as weightage base`
-        : `Using current portfolio value (₹${currentPortfolioValue.toLocaleString()}) as weightage base`
+      baseAmount: currentPortfolioValue,
+      isFirstTimeCreation: false,
+      context: 'Using current portfolio value as base',
+      description: `Using current portfolio value (₹${currentPortfolioValue.toLocaleString()}) as weightage base`
     };
   };
 
@@ -740,7 +755,6 @@ export function PortfolioFormDialog({
         description: `Total weight (${totalWeightUsed}%) exceeds 100%`,
         variant: "destructive",
       });
-      setActiveTab("holdings");
       return;
     }
 
@@ -751,7 +765,6 @@ export function PortfolioFormDialog({
         description: `Total investment (₹${totalActualInvestment.toLocaleString()}) exceeds minimum investment (₹${Number(minInvestment).toLocaleString()})`,
         variant: "destructive",
       });
-      setActiveTab("holdings");
       return;
     }
 
@@ -772,43 +785,74 @@ export function PortfolioFormDialog({
         filteredDescriptions.push({ key: "description", value: `Investment portfolio: ${name}` });
       }
 
-      // Convert ExtendedHolding back to PortfolioHolding for submission
-      // For sold stocks, set minimum values to pass backend validation while preserving sold status
-      const portfolioHoldings: PortfolioHolding[] = holdings
-        .map(holding => {
-          if (holding.status === 'Sell') {
-            // For sold stocks, use minimum values that pass backend validation
-            // but preserve the sold status and date for frontend display
-            return {
-              symbol: holding.symbol,
-              weight: 0,
-              sector: holding.sector,
-              stockCapType: holding.stockCapType,
-              status: holding.status,
-              buyPrice: holding.buyPrice,
-              quantity: 1, // Minimum value for backend validation
-              minimumInvestmentValueStock: 1, // Minimum value for backend validation
-              originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
-              totalQuantityOwned: 0, // Actual sold quantity
-              realizedPnL: holding.realizedPnL || 0,
-              soldDate: holding.soldDate, // Preserve sold date
-            };
-          } else {
-            return {
-              symbol: holding.symbol,
-              weight: holding.weight,
-              sector: holding.sector,
-              stockCapType: holding.stockCapType,
-              status: holding.status,
-              buyPrice: holding.buyPrice,
-              quantity: holding.quantity,
-              minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
-              originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
-              totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
-              realizedPnL: holding.realizedPnL || 0,
-            };
+      // For existing portfolios, use replace API to update all holdings
+      if (initialData && initialData.id) {
+        try {
+          const adminToken = getAdminAccessToken();
+          if (!adminToken) {
+            throw new Error('Admin authentication required');
           }
-        });
+          
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${adminToken}`,
+            },
+            body: JSON.stringify({
+              stockAction: "replace",
+              holdings: holdings.filter(h => h.status !== 'Sell').map(holding => ({
+                symbol: holding.symbol,
+                sector: holding.sector,
+                buyPrice: holding.buyPrice,
+                quantity: holding.quantity,
+                minimumInvestmentValueStock: holding.minimumInvestmentValueStock
+              }))
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update portfolio');
+          }
+
+          const result = await response.json();
+          
+          toast({
+            title: "Portfolio Updated",
+            description: "Holdings updated successfully",
+          });
+          
+          onOpenChange(false);
+          return;
+        } catch (error) {
+          console.error("Error updating portfolio:", error);
+          toast({
+            title: "Failed to update portfolio",
+            description: error instanceof Error ? error.message : "An error occurred",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Convert ExtendedHolding back to PortfolioHolding for new portfolio submission
+      const portfolioHoldings: PortfolioHolding[] = holdings
+        .filter(holding => holding.status !== 'Sell')
+        .map(holding => ({
+          symbol: holding.symbol,
+          weight: holding.weight,
+          sector: holding.sector,
+          stockCapType: holding.stockCapType,
+          status: holding.status,
+          buyPrice: holding.buyPrice,
+          quantity: holding.quantity,
+          minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
+          originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
+          totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
+          realizedPnL: holding.realizedPnL || 0,
+        }));
 
 
 
@@ -837,7 +881,7 @@ export function PortfolioFormDialog({
         compareWith,
         // Include all calculated financial values
         cashBalance: cashBalance,
-        currentValue: currentValue,
+        currentValue: cashBalance + holdingsValue,
       };
       
       // If we're updating an existing portfolio, preserve the ID
@@ -882,7 +926,7 @@ export function PortfolioFormDialog({
     });
   };
 
-  const addHolding = () => {
+  const addHolding = async () => {
     if (!newHolding.symbol.trim()) {
       toast({
         title: "Validation Error",
@@ -938,10 +982,10 @@ export function PortfolioFormDialog({
       return;
     }
 
-    // Get the appropriate weightage calculation base using centralized logic
-    const { baseAmount: portfolioBase, context } = getWeightageCalculationBase();
+    // Use the weightage calculation base helper function
+    const { baseAmount: portfolioBase } = getWeightageCalculationBase();
     
-    console.log(`Adding holding with weightage calculation context: ${context}`);
+    console.log(`Adding holding to ${initialData ? 'existing' : 'new'} portfolio`);
     console.log(`Portfolio base amount: ₹${portfolioBase.toLocaleString()}`);
     console.log(`Holdings count before addition: ${holdings.length}`);
     
@@ -974,11 +1018,107 @@ export function PortfolioFormDialog({
       realizedPnL: 0,
     };
 
-    setHoldings([...holdings, holdingToAdd]);
-    resetNewHolding();
+    // For existing portfolios, use PATCH API to add holding
+    if (initialData && initialData.id) {
+      try {
+        const adminToken = getAdminAccessToken();
+        if (!adminToken) {
+          throw new Error('Admin authentication required');
+        }
+        
+        const requestBody = {
+          stockAction: "add",
+          holdings: [{
+            symbol: newHolding.symbol,
+            sector: newHolding.sector || 'Unknown',
+            buyPrice: newHolding.buyPrice,
+            quantity: investmentDetails.quantity,
+            minimumInvestmentValueStock: investmentDetails.actualInvestmentAmount,
+            weight: accurateWeight,
+            stockCapType: newHolding.stockCapType || 'large cap',
+            status: 'Fresh-Buy'
+          }]
+        };
+        
+        console.log('Adding holding - Request body:', JSON.stringify(requestBody, null, 2));
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify(requestBody)
+        });
 
-    // Only auto-adjust minimum investment for new portfolios
-    if (!initialData) {
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Add holding API error:', response.status, errorText);
+          let errorMessage = 'Failed to add holding';
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch (e) {
+            errorMessage = errorText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        console.log('Add holding API response:', result);
+        
+        // Update local state with server response
+        if (result.portfolio && result.portfolio.holdings) {
+          console.log('Updating holdings from API response:', result.portfolio.holdings);
+          const convertedHoldings = result.portfolio.holdings.map((h: any) => ({
+            ...h,
+            buyPrice: h.averagePrice || h.buyPrice,
+            allocatedAmount: (h.weight / 100) * portfolioBase,
+            leftoverAmount: 0,
+            originalWeight: h.weight,
+            originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
+            totalQuantityOwned: h.totalQuantity || h.quantity,
+            quantity: h.totalQuantity || h.quantity,
+            realizedPnL: h.realizedPnL || 0,
+            status: h.status || 'Hold'
+          }));
+          console.log('Converted holdings:', convertedHoldings);
+          setHoldings(convertedHoldings);
+        } else {
+          console.log('No portfolio.holdings in response, refreshing page data');
+          // If no holdings in response, refresh the entire form data
+          window.location.reload();
+        }
+        
+        // Show operation results if available
+        if (result.operationResults && result.operationResults.length > 0) {
+          const operation = result.operationResults[0];
+          if (operation.operation?.type === 'averaged_purchase') {
+            toast({
+              title: "Price Averaged",
+              description: `${operation.operation.symbol}: Previous ₹${operation.operation.previousPrice} → New Average ₹${operation.operation.newAveragePrice}`,
+            });
+          }
+        }
+
+        if (!result.operationResults || result.operationResults.length === 0) {
+          toast({
+            title: "Holding Added Successfully",
+            description: `${newHolding.symbol} added to portfolio`,
+          });
+        }
+      } catch (error) {
+        toast({
+          title: "Failed to Add Holding",
+          description: error instanceof Error ? error.message : "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // For new portfolios, add to local state
+      setHoldings([...holdings, holdingToAdd]);
+      
       const newTotalInvestment = totalActualInvestment + investmentDetails.actualInvestmentAmount;
       const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
       
@@ -992,6 +1132,8 @@ export function PortfolioFormDialog({
       }
     }
 
+    resetNewHolding();
+
     // Show notification about leftover amount if any
     if (investmentDetails.leftoverAmount > 0) {
       toast({
@@ -1001,13 +1143,71 @@ export function PortfolioFormDialog({
     }
   };
 
-  const removeHolding = (index: number) => {
+  const removeHolding = async (index: number) => {
     const removedHolding = holdings[index];
-    const updated = [...holdings];
-    updated.splice(index, 1);
-    setHoldings(updated);
+    
+    // For existing portfolios, use API to delete holding
+    if (initialData && initialData.id) {
+      try {
+        const adminToken = getAdminAccessToken();
+        if (!adminToken) {
+          throw new Error('Admin authentication required');
+        }
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify({
+            stockAction: "delete",
+            holdings: [{
+              symbol: removedHolding.symbol
+            }]
+          })
+        });
 
-    // Don't auto-adjust minimum investment when removing holdings
+        if (!response.ok) {
+          throw new Error('Failed to remove holding');
+        }
+
+        const result = await response.json();
+        
+        // Update local state with server response
+        if (result.portfolio && result.portfolio.holdings) {
+          const convertedHoldings = result.portfolio.holdings.map((h: any) => ({
+            ...h,
+            buyPrice: h.averagePrice || h.buyPrice,
+            allocatedAmount: (h.weight / 100) * (cashBalance + holdingsValue),
+            leftoverAmount: 0,
+            originalWeight: h.weight,
+            originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
+            totalQuantityOwned: h.totalQuantity || h.quantity,
+            quantity: h.totalQuantity || h.quantity,
+            realizedPnL: h.realizedPnL || 0,
+            status: h.status || 'Hold'
+          }));
+          setHoldings(convertedHoldings);
+        }
+
+        toast({
+          title: "Holding Removed",
+          description: `${removedHolding.symbol} removed from portfolio`,
+        });
+      } catch (error) {
+        toast({
+          title: "Failed to Remove Holding",
+          description: error instanceof Error ? error.message : "An error occurred",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // For new portfolios, remove from local state
+      const updated = [...holdings];
+      updated.splice(index, 1);
+      setHoldings(updated);
+    }
   };
   
   const startEditHolding = async (index: number) => {
@@ -1158,122 +1358,172 @@ export function PortfolioFormDialog({
     }
   };
 
-  const saveEditedHolding = () => {
+  const saveEditedHolding = async () => {
     if (!editingHolding) return;
 
     const { index, newWeight, status, action, pnlPreview } = editingHolding;
     const originalHolding = editingHolding.originalHolding;
+    
+    // For existing portfolios, use API for buy/sell operations
+    if (initialData && initialData.id && (action === 'buy' || action === 'addon' || action === 'sell' || action === 'partial-sell')) {
+      try {
+        const adminToken = getAdminAccessToken();
+        if (!adminToken) {
+          throw new Error('Admin authentication required');
+        }
+        
+        let requestBody: any;
+        
+        if (action === 'buy' || action === 'addon') {
+          // Calculate additional quantity to buy
+          const currentInvestment = originalHolding.minimumInvestmentValueStock;
+          const newInvestment = (newWeight / 100) * (cashBalance + holdingsValue);
+          const additionalInvestment = newInvestment - currentInvestment;
+          const additionalQuantity = Math.floor(additionalInvestment / (editingHolding.latestPrice || originalHolding.buyPrice));
+          
+          requestBody = {
+            stockAction: 'buy',
+            holdings: [{
+              symbol: originalHolding.symbol,
+              sector: originalHolding.sector,
+              buyPrice: editingHolding.latestPrice || originalHolding.buyPrice,
+              quantity: additionalQuantity,
+              minimumInvestmentValueStock: additionalQuantity * (editingHolding.latestPrice || originalHolding.buyPrice),
+              stockCapType: originalHolding.stockCapType,
+              status: 'addon-buy'
+            }]
+          };
+        } else {
+          // Sell operations
+          const sellQuantity = action === 'sell' ? 
+            (originalHolding.totalQuantityOwned || originalHolding.quantity) :
+            pnlPreview?.quantitySold || 0;
+          const saleType = action === 'sell' ? 'complete' : 'partial';
+          
+          requestBody = {
+            stockAction: 'sell',
+            holdings: [{
+              symbol: originalHolding.symbol,
+              saleType: saleType
+            }]
+          };
+          
+          // Add quantity only for partial sells
+          if (saleType === 'partial') {
+            requestBody.holdings[0].quantity = sellQuantity;
+          }
+        }
+          
+        console.log('Stock operation - Request body:', JSON.stringify(requestBody, null, 2));
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify(requestBody)
+        });
 
-    // Calculate new investment amounts
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Stock operation API error:', response.status, errorText);
+          let errorMessage = `Failed to ${action} holding`;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch (e) {
+            errorMessage = errorText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        
+        // Update local state with server response
+        if (result.portfolio && result.portfolio.holdings) {
+          const convertedHoldings = result.portfolio.holdings.map((h: any) => ({
+            ...h,
+            buyPrice: h.averagePrice || h.buyPrice,
+            allocatedAmount: (h.weight / 100) * (cashBalance + holdingsValue),
+            leftoverAmount: 0,
+            originalWeight: h.weight,
+            originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
+            totalQuantityOwned: h.totalQuantity || h.quantity,
+            quantity: h.totalQuantity || h.quantity,
+            realizedPnL: h.realizedPnL || 0,
+            status: h.status || 'Hold'
+          }));
+          setHoldings(convertedHoldings);
+        }
+        
+        // Show operation results
+        if (result.operationResults && result.operationResults.length > 0) {
+          const operation = result.operationResults[0];
+          if (operation.success) {
+            if (action === 'buy' || action === 'addon') {
+              if (operation.operation?.type === 'averaged_purchase') {
+                toast({
+                  title: "Purchase Completed with Price Averaging",
+                  description: `${operation.operation.symbol}: Previous ₹${operation.operation.previousPrice} → New Average ₹${operation.operation.newAveragePrice}`,
+                });
+              } else {
+                toast({
+                  title: "Purchase Completed",
+                  description: `${originalHolding.symbol}: Additional shares purchased successfully`,
+                });
+              }
+            } else {
+              toast({
+                title: "Sale Completed! 📈",
+                description: `${originalHolding.symbol}: ${action === 'sell' ? 'Complete position' : 'Partial position'} sold. Cash balance updated.`,
+              });
+            }
+          }
+        }
+        
+        setEditingHolding(null);
+        return;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred";
+        const actionText = action === 'buy' || action === 'addon' ? 'Purchase' : 'Sale';
+        toast({
+          title: `Failed to Complete ${actionText}`,
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // For local operations (non-sell actions or new portfolios)
     const investmentPrice = editingHolding.latestPrice || originalHolding.buyPrice;
-    /**
-     * EDITING EXISTING HOLDINGS:
-     * Always use current portfolio value as base since we're modifying an existing portfolio
-     * This ensures weightage adjustments reflect the current market state of the portfolio
-     */
-    const editBase = holdingsValue + cashBalance;
-    const recomputed = calculateInvestmentDetails(
-      newWeight,
-      investmentPrice,
-      editBase
-    );
-
-    // For sell/partial-sell, enforce integer-share logic using pnlPreview quantities
-    const isSellOperation = action === 'sell' || action === 'partial-sell';
-    const applyPreview = isSellOperation && pnlPreview;
-    const nextQuantity = applyPreview ? pnlPreview!.remainingQuantity : recomputed.quantity;
-    const nextActualInvestment = applyPreview ? nextQuantity * investmentPrice : recomputed.actualInvestmentAmount;
-    const nextAllocated = (newWeight / 100) * editBase;
-    const nextLeftover = Math.max(0, nextAllocated - nextActualInvestment);
-
-    // Recalculate accurate weight based on actual integer quantity investment
-    const accurateWeight = Number(((nextActualInvestment / editBase) * 100).toFixed(2));
+    const editBase = cashBalance + holdingsValue;
+    const recomputed = calculateInvestmentDetails(newWeight, investmentPrice, editBase);
+    const accurateWeight = Number(((recomputed.actualInvestmentAmount / editBase) * 100).toFixed(2));
 
     const updatedHoldings = [...holdings];
-    
-    // For complete sell, create a sold holding that will be shown for 10 days
-    if (action === 'sell') {
-      const soldHolding: ExtendedHolding = {
-        ...originalHolding,
-        weight: 0,
-        status: 'Sell',
-        quantity: 0,
-        minimumInvestmentValueStock: 0,
-        allocatedAmount: 0,
-        leftoverAmount: 0,
-        realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
-        // Add sold date for 10-day display logic
-        soldDate: new Date().toISOString(),
-        currentMarketPrice: editingHolding.latestPrice,
-        originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
-        totalQuantityOwned: 0,
-      };
-      updatedHoldings[index] = soldHolding;
-    } else if (action === 'partial-sell') {
-      // For partial sell, update the holding with remaining quantity and reduced investment
-      const updatedHolding: ExtendedHolding = {
-        ...originalHolding,
-        weight: accurateWeight,
-        status: 'Hold', // Reset to Hold after partial sell
-        buyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice, // Keep original buy price
-        quantity: nextQuantity,
-        minimumInvestmentValueStock: nextActualInvestment,
-        allocatedAmount: nextAllocated,
-        leftoverAmount: Number(nextLeftover.toFixed(2)),
-        currentMarketPrice: editingHolding.latestPrice,
-        originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
-        totalQuantityOwned: nextQuantity,
-        realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
-      };
-      updatedHoldings[index] = updatedHolding;
-    } else if (nextQuantity <= 0 || nextActualInvestment <= 0) {
-      updatedHoldings.splice(index, 1);
-    } else {
-      const updatedHolding: ExtendedHolding = {
-        ...originalHolding,
-        weight: accurateWeight,
-        status: status,
-        buyPrice: investmentPrice,
-        quantity: nextQuantity,
-        minimumInvestmentValueStock: nextActualInvestment,
-        allocatedAmount: nextAllocated,
-        leftoverAmount: Number(nextLeftover.toFixed(2)),
-        currentMarketPrice: editingHolding.latestPrice,
-        originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
-        totalQuantityOwned: nextQuantity,
-        realizedPnL: (originalHolding.realizedPnL || 0) + (pnlPreview?.profitLoss || 0),
-      };
-      updatedHoldings[index] = updatedHolding;
-    }
-
+    const updatedHolding: ExtendedHolding = {
+      ...originalHolding,
+      weight: accurateWeight,
+      status: status,
+      buyPrice: investmentPrice,
+      quantity: recomputed.quantity,
+      minimumInvestmentValueStock: recomputed.actualInvestmentAmount,
+      allocatedAmount: recomputed.allocatedAmount,
+      leftoverAmount: Number(recomputed.leftoverAmount.toFixed(2)),
+      currentMarketPrice: editingHolding.latestPrice,
+      originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
+      totalQuantityOwned: recomputed.quantity,
+    };
+    updatedHoldings[index] = updatedHolding;
     setHoldings(updatedHoldings);
 
-    // Handle sale proceeds - cash balance increases automatically when holdings investment decreases
-    if (pnlPreview && (action === 'partial-sell' || action === 'sell')) {
-      const saleProceeds = pnlPreview.saleValue;
-      
-      if (pnlPreview.profitLoss >= 0) {
-        toast({
-          title: "Sale Completed! 📈",
-          description: `Sold ${pnlPreview.quantitySold} shares for ${formatCurrency(saleProceeds)}. Profit: ${formatCurrency(pnlPreview.profitLoss)}. Cash balance increased. ${action === 'sell' ? 'Stock will be shown as sold for 10 days.' : ''}`,
-          duration: 5000,
-        });
-      } else {
-        toast({
-          title: "Sale Completed 📉",
-          description: `Sold ${pnlPreview.quantitySold} shares for ${formatCurrency(saleProceeds)}. Loss: ${formatCurrency(Math.abs(pnlPreview.profitLoss))}. Cash balance increased. ${action === 'sell' ? 'Stock will be shown as sold for 10 days.' : ''}`,
-          variant: "destructive",
-          duration: 5000,
-        });
-      }
-    } else {
-      // Regular operation notification
-      const actionText = action.charAt(0).toUpperCase() + action.slice(1).replace('-', ' ');
-      toast({
-        title: "Success",
-        description: `${actionText} completed. ${status === 'Sell' ? 'Position closed and will be shown as sold for 10 days.' : `New weight: ${newWeight.toFixed(2)}%`}`,
-      });
-    }
+    const actionText = action.charAt(0).toUpperCase() + action.slice(1).replace('-', ' ');
+    toast({
+      title: "Success",
+      description: `${actionText} completed. New weight: ${newWeight.toFixed(2)}%`,
+    });
 
     setEditingHolding(null);
   };
@@ -1825,17 +2075,19 @@ export function PortfolioFormDialog({
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                             <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Portfolio Value</p>
-                            <p className="text-xl font-bold text-blue-800 dark:text-blue-200">₹{(holdingsValue + cashBalance).toLocaleString()}</p>
+                            <p className="text-xl font-bold text-blue-800 dark:text-blue-200">₹{((initialData?.cashBalance || 0) + (initialData?.holdingsValue || 0)).toLocaleString()}</p>
                           </div>
                           <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
                             <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Holdings Value</p>
-                            <p className="text-xl font-bold text-purple-800 dark:text-purple-200">₹{holdingsValue.toLocaleString()}</p>
+                            <p className="text-xl font-bold text-purple-800 dark:text-purple-200">₹{(initialData?.holdingsValue || 0).toLocaleString()}</p>
+                            <p className="text-xs text-purple-600 dark:text-purple-400 opacity-75">From Database</p>
                           </div>
                           <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                             <p className="text-sm text-green-600 dark:text-green-400 font-medium">Cash Balance</p>
-                            <p className={`text-xl font-bold ${cashBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-800 dark:text-green-200'}`}>
-                              ₹{cashBalance.toLocaleString()}
+                            <p className={`text-xl font-bold ${(initialData?.cashBalance || 0) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-800 dark:text-green-200'}`}>
+                              ₹{(initialData?.cashBalance || 0).toLocaleString()}
                             </p>
+                            <p className="text-xs text-green-600 dark:text-green-400 opacity-75">From Database</p>
                           </div>
                           <div className="text-center p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
                             <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Weight Used</p>
@@ -1859,6 +2111,22 @@ export function PortfolioFormDialog({
                             </div>
                           </div>
                         )}
+                        
+                        {/* Holdings Value Database Notice */}
+                        <div className="mt-4">
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              <span className="font-medium text-sm text-blue-800 dark:text-blue-300">
+                                Holdings Value Information
+                              </span>
+                            </div>
+                            <div className="text-xs text-blue-700 dark:text-blue-300">
+                              <p>Holdings Value (₹{(initialData?.holdingsValue || 0).toLocaleString()}) and Cash Balance (₹{(initialData?.cashBalance || 0).toLocaleString()}) are calculated by the database.</p>
+                              <p className="mt-1">After sell operations, save the portfolio to see updated values from the database.</p>
+                            </div>
+                          </div>
+                        </div>
                         
                         {/* Weightage Calculation Context */}
                         {(() => {
@@ -2029,7 +2297,7 @@ export function PortfolioFormDialog({
                           <div className="mt-4 p-4 bg-muted rounded-md">
                             <h5 className="font-medium mb-3">Calculation Preview:</h5>
                             {(() => {
-                              // Use centralized logic for consistency
+                              // Use the weightage calculation base helper function
                               const { baseAmount: calcBase } = getWeightageCalculationBase();
                               if (!calcBase || calcBase <= 0) return null;
                               const details = calculateInvestmentDetails(
@@ -2061,10 +2329,7 @@ export function PortfolioFormDialog({
                                   </div>
                                   <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
                                     <strong>Calculation Base:</strong> ₹{calcBase.toLocaleString()} 
-                                    ({(() => {
-                                      const { isFirstTimeCreation } = getWeightageCalculationBase();
-                                      return isFirstTimeCreation ? 'Minimum Investment - First Time Creation' : 'Current Portfolio Value - Existing Portfolio';
-                                    })()})
+                                    ({getWeightageCalculationBase().context})
                                   </div>
                                   <div className={`text-sm p-2 rounded ${details.leftoverAmount >= 0 ? 'text-orange-600 bg-orange-50' : 'text-green-700 bg-green-50'}`}>
                                     <strong>Note:</strong> ₹{details.leftoverAmount.toFixed(2)} {details.leftoverAmount >= 0 ? 'will be credited back to your cash balance' : 'will be drawn from cash balance'} due to share quantity rounding.
@@ -2568,7 +2833,7 @@ export function PortfolioFormDialog({
                       {(() => {
                         const investmentPrice = editingHolding.latestPrice || editingHolding.originalHolding.buyPrice;
                         // For editing, always use current portfolio value as base
-                        const previewBase = holdingsValue + cashBalance;
+                        const previewBase = cashBalance + holdingsValue;
                         const baseDetails = calculateInvestmentDetails(
                           editingHolding.newWeight,
                           investmentPrice,
