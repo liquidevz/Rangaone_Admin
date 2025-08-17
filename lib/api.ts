@@ -26,10 +26,14 @@ export interface PortfolioHolding {
   weight: number;
   sector: string;
   stockCapType?: "small cap" | "mid cap" | "large cap" | "micro cap" | "mega cap";
-  status: "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "addon-buy";
+  status: "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "addon-buy" | "Sold" | string; // Allow string for timestamp
   buyPrice: number;
   quantity: number;
   minimumInvestmentValueStock: number;
+  allocatedAmount?: number;
+  actualInvestmentAmount?: number;
+  leftoverAmount?: number;
+  soldDate?: string; // For tracking when stock was sold
 }
 
 export interface DownloadLink {
@@ -59,6 +63,7 @@ export interface Portfolio {
   durationMonths: number;
   PortfolioCategory: string;
   holdings: PortfolioHolding[];
+  sold?: PortfolioHolding[]; // Array of sold stocks
   timeHorizon?: string;
   rebalancing?: string;
   lastRebalanceDate?: string;
@@ -539,12 +544,12 @@ export const updateSubscriptionStatus = async (subscriptionId: string, status: s
 export const updatePortfolioHoldings = async (
   id: string, 
   holdings: PortfolioHolding[], 
-  action: 'update' | 'add' | 'delete' | 'replace' = 'update'
+  stockAction: 'update' | 'add' | 'delete' | 'replace' = 'update'
 ): Promise<Portfolio> => {
   if (!id) throw new Error("Invalid portfolio ID");
   const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ holdings, action }),
+    body: JSON.stringify({ holdings, stockAction }),
   });
   if (!response.ok) throw new Error((await response.json()).message || "Failed to update portfolio holdings");
   return await response.json();

@@ -185,13 +185,12 @@ export function PortfolioFormDialog({
     currentMarketPrice: number,
     proportionToSell: number // 0 to 1 (e.g., 0.5 for 50%)
   ): PnLCalculation => {
-    // Ensure integer shares are sold: round to nearest and sell at least 1 if selling at all
+    // Allow fractional shares - no rounding
     let quantitySold = 0;
     if (proportionToSell >= 1) {
       quantitySold = originalQuantity;
     } else if (proportionToSell > 0) {
-      quantitySold = Math.max(1, Math.round(originalQuantity * proportionToSell));
-      quantitySold = Math.min(quantitySold, originalQuantity);
+      quantitySold = originalQuantity * proportionToSell;
     }
     const saleValue = quantitySold * currentMarketPrice;
     const originalCost = quantitySold * originalBuyPrice;
@@ -215,7 +214,7 @@ export function PortfolioFormDialog({
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -523,7 +522,10 @@ export function PortfolioFormDialog({
         if (Array.isArray(initialData.holdings)) {
           console.log("Processing holdings from initialData:", initialData.holdings);
           
-          const convertedHoldings: ExtendedHolding[] = initialData.holdings.map(h => {
+          // Filter out sold stocks (those with Sold-Date- prefix)
+          const activeHoldings = initialData.holdings.filter(h => !h.symbol.startsWith('Sold-Date-'));
+          
+          const convertedHoldings: ExtendedHolding[] = activeHoldings.map(h => {
             // For old portfolios, recalculate allocation based on current logic
             // This ensures old portfolios also follow the new weightage calculation rules
             const baseForCalculation = initialData.holdings!.length === 0 ? 
@@ -737,57 +739,7 @@ export function PortfolioFormDialog({
         filteredDescriptions.push({ key: "description", value: `Investment portfolio: ${name}` });
       }
 
-      // For existing portfolios, use replace API to update all holdings
-      if (initialData && initialData.id) {
-        try {
-          const adminToken = getAdminAccessToken();
-          if (!adminToken) {
-            throw new Error('Admin authentication required');
-          }
-          
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${adminToken}`,
-            },
-            body: JSON.stringify({
-              stockAction: "replace",
-              holdings: holdings.filter(h => h.status !== 'Sell').map(holding => ({
-                symbol: holding.symbol,
-                sector: holding.sector,
-                buyPrice: holding.buyPrice,
-                quantity: holding.quantity,
-                minimumInvestmentValueStock: holding.minimumInvestmentValueStock
-              }))
-            })
-          });
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to update portfolio');
-          }
-
-          const result = await response.json();
-          
-          toast({
-            title: "Portfolio Updated",
-            description: "Holdings updated successfully",
-          });
-          
-          onOpenChange(false);
-          return;
-        } catch (error) {
-          console.error("Error updating portfolio:", error);
-          toast({
-            title: "Failed to update portfolio",
-            description: error instanceof Error ? error.message : "An error occurred",
-            variant: "destructive",
-          });
-          setIsSubmitting(false);
-          return;
-        }
-      }
+      // For existing portfolios, we'll continue with the normal submission process
 
       // Convert ExtendedHolding back to PortfolioHolding for new portfolio submission
       const portfolioHoldings: PortfolioHolding[] = holdings
@@ -801,6 +753,9 @@ export function PortfolioFormDialog({
           buyPrice: holding.buyPrice,
           quantity: holding.quantity,
           minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
+          allocatedAmount: holding.allocatedAmount,
+          actualInvestmentAmount: holding.minimumInvestmentValueStock,
+          leftoverAmount: holding.leftoverAmount,
           originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
           totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
           realizedPnL: holding.realizedPnL || 0,
@@ -808,21 +763,24 @@ export function PortfolioFormDialog({
 
 
 
-      // Create a deep copy of the portfolio data to ensure we don't lose any fields
+      // Calculate portfolio values
+      const calculatedCashBalance = Number(minInvestment || 0) - totalActualInvestment;
+      const calculatedCurrentValue = Number(minInvestment || 0);
+
+      // Create portfolio data matching backend structure
       const portfolioData: CreatePortfolioRequest = {
         name,
         description: filteredDescriptions,
         subscriptionFee: subscriptionFees,
         minInvestment: Number(minInvestment),
         monthlyContribution: monthlyContribution ? Number(monthlyContribution) : undefined,
-        durationMonths: 12,
-        holdings: portfolioHoldings.length > 0 ? portfolioHoldings : [],
+        durationMonths: 24, // Default duration
+        holdings: portfolioHoldings,
         PortfolioCategory: portfolioCategory,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
         youTubeLinks: youTubeLinks.length > 0 ? youTubeLinks : undefined,
         timeHorizon,
         rebalancing,
-        // Use both field names for compatibility with API
         lastRebalanceDate: lastRebalanceDate,
         nextRebalanceDate: nextRebalanceDate,
         index,
@@ -831,9 +789,9 @@ export function PortfolioFormDialog({
         CAGRSinceInception: cagrSinceInception,
         oneYearGains,
         compareWith,
-        // Include all calculated financial values
-        cashBalance: cashBalance,
-        currentValue: cashBalance + holdingsValue,
+        // Add missing fields that backend expects
+        cashBalance: calculatedCashBalance,
+        currentValue: calculatedCurrentValue,
       };
       
       // If we're updating an existing portfolio, preserve the ID
@@ -843,15 +801,12 @@ export function PortfolioFormDialog({
 
       console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
       console.log("Portfolio Name:", portfolioData.name);
-      console.log("Description:", portfolioData.description);
-      console.log("Subscription Fees:", portfolioData.subscriptionFee);
       console.log("Min Investment:", portfolioData.minInvestment);
-      console.log("Monthly Contribution:", portfolioData.monthlyContribution);
-      console.log("Last Rebalancing Date:", portfolioData.lastRebalanceDate);
-      console.log("Next Rebalancing Date:", portfolioData.nextRebalanceDate);
+      console.log("Portfolio Value:", portfolioData.portfolioValue);
+      console.log("Cash Balance:", portfolioData.cashBalance);
+      console.log("Total Actual Investment:", totalActualInvestment);
       console.log("Holdings Count:", portfolioData.holdings?.length || 0);
-      console.log("Holdings Data:", portfolioData.holdings);
-      console.log("Full Portfolio Data:", JSON.stringify(portfolioData, null, 2));
+      console.log("Request Body JSON:", JSON.stringify(portfolioData));
       console.log("=== END DEBUG ===");
       
       await onSubmit(portfolioData);
@@ -1061,18 +1016,6 @@ export function PortfolioFormDialog({
     } else {
       // For new portfolios, add to local state
       setHoldings([...holdings, holdingToAdd]);
-      
-      const newTotalInvestment = totalActualInvestment + investmentDetails.actualInvestmentAmount;
-      const newAdjustedMinInvestment = Math.ceil(newTotalInvestment * 1.1);
-      
-      if (newAdjustedMinInvestment > Number(minInvestment || 0)) {
-        setMinInvestment(newAdjustedMinInvestment.toString());
-        toast({
-          title: "Minimum Investment Auto-Adjusted",
-          description: `Minimum investment automatically adjusted to ₹${formatCurrency(newAdjustedMinInvestment)} to accommodate the new holding with a 10% buffer.`,
-          variant: "default",
-        });
-      }
     }
 
     resetNewHolding();
@@ -1771,28 +1714,7 @@ export function PortfolioFormDialog({
                       disabled={isSubmitting}
                       required
                     />
-                    {needsMinInvestmentAdjustment && (
-                      <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md">
-                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        <div className="flex-1 text-sm text-amber-800 dark:text-amber-300">
-                          <p className="font-medium">Minimum investment needs adjustment</p>
-                          <p className="text-xs">
-                            Total investment: ₹{formatCurrency(totalActualInvestment)} | 
-                            Recommended: ₹{formatCurrency(adjustedMinInvestment)}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleAutoAdjustMinInvestment}
-                          disabled={isSubmitting}
-                          className="text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                        >
-                          Auto Adjust
-                        </Button>
-                      </div>
-                    )}
+
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="monthly-contribution">Monthly Contribution</Label>
@@ -2351,11 +2273,11 @@ export function PortfolioFormDialog({
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Original Investment: </span>
-                                      <span className="font-medium">₹{holding.minimumInvestmentValueStock.toLocaleString()}</span>
+                                      <span className="font-medium">₹{(holding.buyPrice * holding.quantity).toLocaleString()}</span>
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Current Value: </span>
-                                      <span className="font-medium">₹{((holding.currentMarketPrice || holding.buyPrice) * holding.quantity).toLocaleString()}</span>
+                                      <span className="font-medium">₹{(holding.currentMarketPrice ? holding.currentMarketPrice * holding.quantity : holding.buyPrice * holding.quantity).toLocaleString()}</span>
                                     </div>
                                   </div>
 

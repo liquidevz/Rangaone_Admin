@@ -6,8 +6,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Moon, Sun } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { getAdminAccessToken } from "@/lib/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Home() {
   const { theme, setTheme } = useTheme();
@@ -32,8 +33,8 @@ export default function Home() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Image
-            src={isDark ? "/images/namelogodark.png" : "/images/namelogo.png"}
+          <Image  
+            src={isDark ? "/images/namelogo.png" : "/images/namelogodark.png"}
             alt="Ranga One Wealth"
             width={200}
             height={50}
@@ -41,13 +42,7 @@ export default function Home() {
             priority
           />
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            >
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
+            <ThemeToggle />
             {isAuthenticated ? (
               <Link href="/dashboard">
                 <Button>Dashboard</Button>
