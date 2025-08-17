@@ -35,7 +35,7 @@ import {
   type CreateTipRequest, 
   type Tip 
 } from "@/lib/api-tips";
-import { Portfolio } from "@/lib/api-portfolios"; // Explicitly import Portfolio
+import { Portfolio } from "@/lib/api"; // Explicitly import Portfolio
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertCircle,

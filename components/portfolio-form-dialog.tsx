@@ -74,6 +74,7 @@ interface PortfolioFormDialogProps {
   initialData?: Portfolio;
   title: string;
   description: string;
+  onDataChange?: () => void;
 }
 
 interface ExtendedHolding extends PortfolioHolding {
@@ -125,6 +126,7 @@ export function PortfolioFormDialog({
   initialData,
   title,
   description,
+  onDataChange,
 }: PortfolioFormDialogProps) {
   // Basic Info State
   const [name, setName] = useState("");
@@ -666,11 +668,13 @@ export function PortfolioFormDialog({
         setDownloadLinks([]);
       }
 
-      setActiveTab("basic");
+      if (!initialData) {
+        setActiveTab("basic");
+      }
       resetNewHolding();
       setEditingHolding(null);
     }
-  }, [open, initialData, holdings.length]);
+  }, [open, initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -849,58 +853,60 @@ export function PortfolioFormDialog({
           buyPrice: holding.buyPrice,
           quantity: holding.quantity,
           minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
-          originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
-          totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
-          realizedPnL: holding.realizedPnL || 0,
         }));
 
-
-
-      // Create a deep copy of the portfolio data to ensure we don't lose any fields
-      const portfolioData: CreatePortfolioRequest = {
+      // Calculate expected values to match backend validation
+      const totalHoldingsValue = portfolioHoldings.reduce((sum, h) => sum + h.minimumInvestmentValueStock, 0);
+      const expectedCashBalance = Number(minInvestment) - totalHoldingsValue;
+      const expectedCurrentValue = Number(minInvestment);
+      
+      // Create minimal portfolio data matching API documentation exactly
+      const portfolioData = {
         name,
         description: filteredDescriptions,
-        subscriptionFee: subscriptionFees,
+        subscriptionFee: subscriptionFees.map(fee => ({
+          type: fee.type,
+          price: fee.price
+        })),
         minInvestment: Number(minInvestment),
-        monthlyContribution: monthlyContribution ? Number(monthlyContribution) : undefined,
         durationMonths: 12,
-        holdings: portfolioHoldings.length > 0 ? portfolioHoldings : [],
         PortfolioCategory: portfolioCategory,
-        downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
-        youTubeLinks: youTubeLinks.length > 0 ? youTubeLinks : undefined,
-        timeHorizon,
-        rebalancing,
-        // Use both field names for compatibility with API
-        lastRebalanceDate: lastRebalanceDate,
-        nextRebalanceDate: nextRebalanceDate,
-        index,
-        details,
-        monthlyGains,
-        CAGRSinceInception: cagrSinceInception,
-        oneYearGains,
-        compareWith,
-        // Include all calculated financial values
-        cashBalance: cashBalance,
-        currentValue: cashBalance + holdingsValue,
+        cashBalance: expectedCashBalance,
+        currentValue: expectedCurrentValue,
+        holdings: portfolioHoldings.map(holding => ({
+          symbol: holding.symbol,
+          weight: holding.weight,
+          sector: holding.sector,
+          buyPrice: holding.buyPrice,
+          quantity: holding.quantity,
+          minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
+          stockCapType: holding.stockCapType || "large cap",
+          status: holding.status
+        })),
+        ...(timeHorizon && { timeHorizon }),
+        ...(rebalancing && { rebalancing }),
+        ...(index && { index }),
+        ...(details && { details }),
+        ...(downloadLinks.length > 0 && { downloadLinks: downloadLinks.map(link => ({
+          linkType: link.linkType,
+          linkUrl: link.linkUrl,
+          linkDiscription: link.linkDiscription
+        })) }),
+        ...(youTubeLinks.length > 0 && { youTubeLinks: youTubeLinks.map(link => ({
+          link: link.link
+        })) }),
       };
+      
+      console.log("=== PORTFOLIO DATA BEING SENT ===");
+      console.log(JSON.stringify(portfolioData, null, 2));
+      console.log("=== END PORTFOLIO DATA ===");
       
       // If we're updating an existing portfolio, preserve the ID
       if (initialData && initialData.id) {
         console.log(`Preserving portfolio ID: ${initialData.id}`);
       }
 
-      console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
-      console.log("Portfolio Name:", portfolioData.name);
-      console.log("Description:", portfolioData.description);
-      console.log("Subscription Fees:", portfolioData.subscriptionFee);
-      console.log("Min Investment:", portfolioData.minInvestment);
-      console.log("Monthly Contribution:", portfolioData.monthlyContribution);
-      console.log("Last Rebalancing Date:", portfolioData.lastRebalanceDate);
-      console.log("Next Rebalancing Date:", portfolioData.nextRebalanceDate);
-      console.log("Holdings Count:", portfolioData.holdings?.length || 0);
-      console.log("Holdings Data:", portfolioData.holdings);
-      console.log("Full Portfolio Data:", JSON.stringify(portfolioData, null, 2));
-      console.log("=== END DEBUG ===");
+
       
       await onSubmit(portfolioData);
       onOpenChange(false);
@@ -1085,9 +1091,8 @@ export function PortfolioFormDialog({
           console.log('Converted holdings:', convertedHoldings);
           setHoldings(convertedHoldings);
         } else {
-          console.log('No portfolio.holdings in response, refreshing page data');
-          // If no holdings in response, refresh the entire form data
-          window.location.reload();
+          console.log('No portfolio.holdings in response, closing dialog to refresh');
+          onOpenChange(false);
         }
         
         // Show operation results if available
@@ -1101,12 +1106,9 @@ export function PortfolioFormDialog({
           }
         }
 
-        if (!result.operationResults || result.operationResults.length === 0) {
-          toast({
-            title: "Holding Added Successfully",
-            description: `${newHolding.symbol} added to portfolio`,
-          });
-        }
+        onDataChange?.();
+        onOpenChange(false);
+        return;
       } catch (error) {
         toast({
           title: "Failed to Add Holding",
@@ -1117,6 +1119,8 @@ export function PortfolioFormDialog({
       }
     } else {
       // For new portfolios, add to local state
+      console.log('Adding holding to new portfolio:', holdingToAdd);
+      console.log('Current form state - name:', name, 'minInvestment:', minInvestment);
       setHoldings([...holdings, holdingToAdd]);
       
       const newTotalInvestment = totalActualInvestment + investmentDetails.actualInvestmentAmount;
@@ -1130,6 +1134,8 @@ export function PortfolioFormDialog({
           variant: "default",
         });
       }
+      
+      console.log('After adding holding - name:', name, 'minInvestment:', minInvestment);
     }
 
     resetNewHolding();
@@ -1145,6 +1151,7 @@ export function PortfolioFormDialog({
 
   const removeHolding = async (index: number) => {
     const removedHolding = holdings[index];
+    console.log('Removing holding:', removedHolding);
     
     // For existing portfolios, use API to delete holding
     if (initialData && initialData.id) {
@@ -1154,6 +1161,7 @@ export function PortfolioFormDialog({
           throw new Error('Admin authentication required');
         }
         
+        console.log('Sending delete request for:', removedHolding.symbol);
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
           method: 'PATCH',
           headers: {
@@ -1168,18 +1176,31 @@ export function PortfolioFormDialog({
           })
         });
 
+        console.log('Delete response status:', response.status);
         if (!response.ok) {
-          throw new Error('Failed to remove holding');
+          const errorText = await response.text();
+          console.error('Delete API error:', errorText);
+          
+          // If holding not found on server, refresh from database
+          if (errorText.includes('No holdings found')) {
+            console.log('Holding not found on server, refreshing from database');
+            onOpenChange(false);
+            return;
+          }
+          
+          throw new Error(`Failed to remove holding: ${errorText}`);
         }
 
         const result = await response.json();
+        console.log('Delete result:', result);
         
         // Update local state with server response
         if (result.portfolio && result.portfolio.holdings) {
+          const portfolioValue = (result.portfolio.cashBalance || 0) + (result.portfolio.holdingsValue || 0);
           const convertedHoldings = result.portfolio.holdings.map((h: any) => ({
             ...h,
             buyPrice: h.averagePrice || h.buyPrice,
-            allocatedAmount: (h.weight / 100) * (cashBalance + holdingsValue),
+            allocatedAmount: (h.weight / 100) * portfolioValue,
             leftoverAmount: 0,
             originalWeight: h.weight,
             originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
@@ -1189,13 +1210,16 @@ export function PortfolioFormDialog({
             status: h.status || 'Hold'
           }));
           setHoldings(convertedHoldings);
+        } else {
+          // Fallback: close dialog to refresh from database
+          onOpenChange(false);
         }
 
-        toast({
-          title: "Holding Removed",
-          description: `${removedHolding.symbol} removed from portfolio`,
-        });
+        onDataChange?.();
+        onOpenChange(false);
+        return;
       } catch (error) {
+        console.error('Error removing holding:', error);
         toast({
           title: "Failed to Remove Holding",
           description: error instanceof Error ? error.message : "An error occurred",
@@ -1204,9 +1228,14 @@ export function PortfolioFormDialog({
       }
     } else {
       // For new portfolios, remove from local state
+      console.log('Removing from local state');
       const updated = [...holdings];
       updated.splice(index, 1);
       setHoldings(updated);
+      toast({
+        title: "Holding Removed",
+        description: `${removedHolding.symbol} removed from portfolio`,
+      });
     }
   };
   
@@ -1428,6 +1457,14 @@ export function PortfolioFormDialog({
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Stock operation API error:', response.status, errorText);
+          
+          // If holding not found on server, refresh from database
+          if (errorText.includes('Holding not found')) {
+            console.log('Holding not found on server, refreshing from database');
+            onOpenChange(false);
+            return;
+          }
+          
           let errorMessage = `Failed to ${action} holding`;
           try {
             const errorData = JSON.parse(errorText);
@@ -1440,19 +1477,21 @@ export function PortfolioFormDialog({
 
         const result = await response.json();
         
-        // Update local state with server response
+        // Update local state with server response including sold stocks
         if (result.portfolio && result.portfolio.holdings) {
+          const portfolioValue = (result.portfolio.cashBalance || 0) + (result.portfolio.holdingsValue || 0);
           const convertedHoldings = result.portfolio.holdings.map((h: any) => ({
             ...h,
             buyPrice: h.averagePrice || h.buyPrice,
-            allocatedAmount: (h.weight / 100) * (cashBalance + holdingsValue),
+            allocatedAmount: (h.weight / 100) * portfolioValue,
             leftoverAmount: 0,
             originalWeight: h.weight,
             originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
             totalQuantityOwned: h.totalQuantity || h.quantity,
             quantity: h.totalQuantity || h.quantity,
             realizedPnL: h.realizedPnL || 0,
-            status: h.status || 'Hold'
+            status: h.status || 'Hold',
+            soldDate: h.soldDate
           }));
           setHoldings(convertedHoldings);
         }
@@ -1482,6 +1521,7 @@ export function PortfolioFormDialog({
           }
         }
         
+        onDataChange?.();
         setEditingHolding(null);
         return;
       } catch (error) {
@@ -2053,7 +2093,10 @@ export function PortfolioFormDialog({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={handleUpdateAllPrices}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleUpdateAllPrices();
+                          }}
                           disabled={isUpdatingAllPrices || isSubmitting}
                         >
                           {isUpdatingAllPrices ? (
@@ -2343,7 +2386,10 @@ export function PortfolioFormDialog({
                         <div className="mt-4">
                           <Button
                             type="button"
-                            onClick={addHolding}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              addHolding();
+                            }}
                             disabled={isSubmitting}
                           >
                             <Plus className="mr-2 h-4 w-4" />
@@ -2467,7 +2513,10 @@ export function PortfolioFormDialog({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        onClick={() => startEditHolding(index)}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          startEditHolding(index);
+                                        }}
                                         disabled={isSubmitting}
                                         title="Edit holding"
                                       >
@@ -2477,7 +2526,10 @@ export function PortfolioFormDialog({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        onClick={() => removeHolding(index)}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          removeHolding(index);
+                                        }}
                                         disabled={isSubmitting}
                                         title="Remove holding"
                                       >
@@ -2613,12 +2665,13 @@ export function PortfolioFormDialog({
       {editingHolding && (
         <Dialog open={true} onOpenChange={() => setEditingHolding(null)}>
           <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-            <DialogHeader>
-              <DialogTitle>Stock Management</DialogTitle>
-              <DialogDescription>
-                Manage stock position for {editingHolding.originalHolding.symbol} ({editingHolding.originalHolding.sector})
-              </DialogDescription>
-            </DialogHeader>
+            <form onSubmit={(e) => { e.preventDefault(); saveEditedHolding(); }}>
+              <DialogHeader>
+                <DialogTitle>Stock Management</DialogTitle>
+                <DialogDescription>
+                  Manage stock position for {editingHolding.originalHolding.symbol} ({editingHolding.originalHolding.sector})
+                </DialogDescription>
+              </DialogHeader>
 
             {/* Stock Summary Card */}
             <Card className="bg-muted/30">
@@ -2884,18 +2937,19 @@ export function PortfolioFormDialog({
               </Card>
             </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setEditingHolding(null)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={saveEditedHolding}>
-                Execute {editingHolding.action.charAt(0).toUpperCase() + editingHolding.action.slice(1)}
-              </Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingHolding(null)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Execute {editingHolding.action.charAt(0).toUpperCase() + editingHolding.action.slice(1)}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       )}

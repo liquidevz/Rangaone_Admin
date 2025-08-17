@@ -20,7 +20,7 @@ import {
   BarChart3,
   Trash,
 } from "lucide-react";
-import { fetchPortfolios, Portfolio } from "@/lib/api-portfolios";
+import { fetchPortfolios, Portfolio } from "@/lib/api";
 import { fetchChartData, createChartData, updateChartData, deleteChartData, fetchPortfolioChartData, createPortfolioChartData, fetchPortfolioPerformance, cleanupDuplicates, ChartDataResponse, ChartDataPoint, CreateChartDataRequest } from "@/lib/api-chart-data";
 
 export default function PriceHistoryPage() {
