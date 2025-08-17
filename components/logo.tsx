@@ -22,14 +22,14 @@ export function Logo({ className = "", width = 32, height = 16, showText = true,
   }, [])
 
   if (!mounted) {
-    return <div className={`w-[${width}px] h-[${height}px] bg-gray-200 rounded animate-pulse`} />
+    return <div className="w-32 h-6 bg-gray-200 rounded animate-pulse" />
   }
 
   const isDark = resolvedTheme === "dark"
   let logoSrc
   
   if (collapsed) {
-    logoSrc = isDark ? "/images/rlogo.png" : "/images/rlogodark.png"
+    logoSrc = isDark ? "/images/rlogodark.png" : "/images/rlogo.png"
   } else {
     logoSrc = isDark ? "/images/namelogo.png" : "/images/namelogodark.png"
   }
@@ -41,10 +41,11 @@ export function Logo({ className = "", width = 32, height = 16, showText = true,
         alt="Ranga One Logo"
         width={collapsed ? 32 : width}
         height={height}
-        className="object-contain"
+        className="object-contain max-w-none"
+        style={{ width: collapsed ? 32 : width, height }}
         priority
       />
-      {showText && <span className="font-semibold">Ranga One</span>}
+      {showText && !collapsed && <span className="font-semibold text-foreground">Ranga One</span>}
     </div>
   )
 }

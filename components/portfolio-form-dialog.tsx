@@ -1762,10 +1762,10 @@ export function PortfolioFormDialog({
                                 updated[index].value = content;
                                 setDescriptions(updated);
                               }}
-                              placeholder={`Enter ${desc.key} description`}
+                              placeholder={`Enter ${desc.key} description with formatting...`}
                               height={150}
                               disabled={isSubmitting}
-                              className="border border-zinc-700 rounded-md"
+                              theme="auto"
                             />
                           </div>
                         ) : (
@@ -1777,9 +1777,10 @@ export function PortfolioFormDialog({
                             updated[index].value = content;
                             setDescriptions(updated);
                           }}
-                          placeholder={`Enter ${desc.key} description`}
+                          placeholder={`Enter ${desc.key} description with formatting...`}
                           height={120}
                           disabled={isSubmitting}
+                          theme="auto"
                         />
                         )}
                       </div>
@@ -2070,13 +2071,14 @@ export function PortfolioFormDialog({
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="details">Additional Details</Label>
-                      <Textarea
+                      <RichTextEditor
                         id="details"
                         value={details}
-                        onChange={(e) => setDetails(e.target.value)}
-                        placeholder="Enter additional portfolio details"
-                        className="min-h-[100px]"
+                        onChange={setDetails}
+                        placeholder="Enter additional portfolio details with formatting..."
+                        height={120}
                         disabled={isSubmitting}
+                        theme="auto"
                       />
                     </div>
                   </div>
@@ -2613,13 +2615,14 @@ export function PortfolioFormDialog({
                               </div>
                               <div className="grid gap-2">
                                 <Label htmlFor={`link-description-${index}`}>Description</Label>
-                                <Textarea
+                                <RichTextEditor
                                   id={`link-description-${index}`}
                                   value={link.linkDiscription || ""}
-                                  onChange={(e) => updateDownloadLink(index, "linkDiscription", e.target.value)}
-                                  placeholder="Enter description for this document"
-                                  className="min-h-[80px]"
+                                  onChange={(content) => updateDownloadLink(index, "linkDiscription", content)}
+                                  placeholder="Enter description for this document with formatting..."
+                                  height={100}
                                   disabled={isSubmitting}
+                                  theme="auto"
                                 />
                               </div>
                               <div className="flex justify-end">

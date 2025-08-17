@@ -692,7 +692,7 @@ export function TipFormDialog({
                 </div>
               )}
 
-              {/* All other form fields with theme-aware classes */}
+              {/* Title */}
               <FormField
                 control={control}
                 name="title"
@@ -711,6 +711,7 @@ export function TipFormDialog({
                 )}
               />
 
+              {/* Category */}
               <FormField
                 control={control}
                 name="category"
@@ -734,6 +735,7 @@ export function TipFormDialog({
                 )}
               />
 
+              {/* Stop Loss */}
               <FormField
                 control={control}
                 name="stopLoss"
@@ -758,6 +760,7 @@ export function TipFormDialog({
                 )}
               />
 
+              {/* Description with TinyMCE */}
               <FormField
                 control={control}
                 name="description"
@@ -780,6 +783,7 @@ export function TipFormDialog({
                 )}
               />
 
+              {/* Action */}
               <FormField
                 control={control}
                 name="action"
@@ -806,6 +810,7 @@ export function TipFormDialog({
                 )}
               />
 
+              {/* Buy Range */}
               <FormField
                 control={control}
                 name="buyRange"
@@ -827,21 +832,351 @@ export function TipFormDialog({
                 )}
               />
 
+              {/* Target Price and Target Percentage */}
+              {showTargetFields && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={control}
+                  name="targetPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                          <FormLabel className="text-white text-sm">{watchedAction === "sell" ? "Exit Price" : "Target Price"} (₹) *</FormLabel>
+                      <FormControl>
+                        <Input
+                              placeholder="e.g., 150.75"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                          {...field}
+                          disabled={isSubmitting}
+                          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                        />
+                      </FormControl>
+                          <FormDescription className="text-zinc-500 text-xs">
+                            {watchedAction === "sell" 
+                              ? "Enter exit price (auto-calculates exit percentage)"
+                              : "Enter positive number (auto-calculates percentage)"
+                            }
+                          </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={control}
+                  name="targetPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                          <FormLabel className={`text-sm flex items-center gap-2 ${
+                            watchedStatus === "Closed" ? "text-orange-300" : "text-white"
+                          }`}>
+                            {watchedStatus === "Closed" ? "Exit Range" : watchedAction === "sell" ? "Exit Percentage" : "Target Percentage"} *
+                            {watchedStatus === "Closed" && (
+                              <Badge variant="outline" className="text-xs bg-orange-900/20 text-orange-300 border-orange-600">
+                                Closed Tip
+                              </Badge>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsAutoCalcTarget(!isAutoCalcTarget)}
+                              className="h-6 px-2 text-xs text-zinc-400 hover:text-zinc-300"
+                            >
+                              <Calculator className="h-3 w-3 mr-1" />
+                              {isAutoCalcTarget ? "Auto" : "Manual"}
+                            </Button>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={watchedStatus === "Closed" ? "e.g., 150-200 or 25-30%" : watchedAction === "sell" ? "e.g., 25% or 25" : "e.g., 25% or 25"}
+                              {...field}
+                              disabled={isSubmitting || isAutoCalcTarget}
+                              className={`bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 ${
+                                watchedStatus === "Closed" ? "border-orange-600" : ""
+                              }`}
+                            />
+                          </FormControl>
+                          <FormDescription className={`text-xs ${
+                            watchedStatus === "Closed" ? "text-orange-400" : "text-zinc-500"
+                          }`}>
+                            {watchedStatus === "Closed" 
+                              ? (isAutoCalcTarget ? "Auto-calculated exit range" : "Enter exit range manually (e.g., 150-200 or 25-30%)")
+                              : watchedAction === "sell" 
+                                ? (isAutoCalcTarget ? "Auto-calculated exit percentage" : "Enter exit percentage manually")
+                                : (isAutoCalcTarget ? "Auto-calculated from target price" : "Enter percentage manually")
+                            }
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {showAddMoreField && (
+                    <FormField
+                      control={control}
+                      name="addMoreAt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white text-sm">Add More At (₹) *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 95.50"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                            />
+                          </FormControl>
+                          <FormDescription className="text-zinc-500 text-xs">
+                            Price level to add more shares
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Exit Fields */}
+              {showExitFields && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="exitPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Price (₹) *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 200.00"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            {...field}
+                            disabled={isSubmitting}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-zinc-500 text-xs">
+                          Target exit price (auto-calculates percentage)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="exitStatusPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm flex items-center gap-2">
+                          Exit Percentage *
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsAutoCalcExit(!isAutoCalcExit)}
+                            className="h-6 px-2 text-xs text-zinc-400 hover:text-zinc-300"
+                          >
+                            <Calculator className="h-3 w-3 mr-1" />
+                            {isAutoCalcExit ? "Auto" : "Manual"}
+                          </Button>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 100% or 100"
+                            {...field}
+                            disabled={isSubmitting || isAutoCalcExit}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-zinc-500 text-xs">
+                          {isAutoCalcExit ? "Auto-calculated from exit price" : "Enter percentage manually"}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="exitStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Status *</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                              <SelectValue placeholder="Select exit status" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-800 border-zinc-700">
+                              <SelectItem value="Loss Booked" className="text-white hover:bg-zinc-700">Loss Booked</SelectItem>
+                              <SelectItem value="Profit Booked" className="text-white hover:bg-zinc-700">Profit Booked</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+              </div>
+              )}
+
+              {/* Exit Status and Percentage for Closed Tips */}
+              {showClosedTipFields && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="exitStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Status *</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                              <SelectValue placeholder="Select exit status" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-800 border-zinc-700">
+                              <SelectItem value="Loss Booked" className="text-white hover:bg-zinc-700">Loss Booked</SelectItem>
+                              <SelectItem value="Profit Booked" className="text-white hover:bg-zinc-700">Profit Booked</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="exitStatusPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white text-sm">Exit Status Percentage *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 25% or -15%"
+                            {...field}
+                            disabled={isSubmitting}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-zinc-500 text-xs">
+                          Enter percentage gain/loss (positive for profit, negative for loss)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {/* Horizon, Status and Analyst Confidence */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={control}
+                  name="horizon"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm">Time Horizon *</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                            <SelectValue placeholder="Select horizon" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                            <SelectItem value="Short Term" className="text-white hover:bg-zinc-700">Short Term</SelectItem>
+                            <SelectItem value="Medium Term" className="text-white hover:bg-zinc-700">Medium Term</SelectItem>
+                            <SelectItem value="Long Term" className="text-white hover:bg-zinc-700">Long Term</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Status */}
+                <FormField
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm">Status *</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                            <SelectItem value="Active" className="text-white hover:bg-zinc-700">Active</SelectItem>
+                            <SelectItem value="Closed" className="text-white hover:bg-zinc-700">Closed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Analyst Confidence Score */}
+              <FormField
+                control={control}
+                  name="analysistConfidence"
+                render={({ field }) => (
+                  <FormItem>
+                      <FormLabel className="text-white text-sm">Confidence Score *</FormLabel>
+                    <FormControl>
+                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                          <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500">
+                            <SelectValue placeholder="Rate 1-10" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+                              <SelectItem 
+                                key={score} 
+                                value={score.toString()} 
+                                className="text-white hover:bg-zinc-700"
+                              >
+                                {score} {score <= 3 ? "⭐ Low" : score <= 6 ? "⭐⭐ Medium" : score <= 8 ? "⭐⭐⭐ High" : "⭐⭐⭐⭐ Very High"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                    </FormControl>
+                      <FormDescription className="text-zinc-500 text-xs">
+                        Rate your confidence in this tip (1=Low, 10=Very High)
+                      </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              </div>
+
               {/* PDF Link */}
               <FormField
                 control={control}
                 name="tipUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm">PDF Link *</FormLabel>
+                    <FormLabel className="text-white text-sm">PDF Link *</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="https://example.com/analysis.pdf"
                         {...field}
                         disabled={isSubmitting}
+                        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                       />
                     </FormControl>
-                    <FormDescription className="text-xs">
+                    <FormDescription className="text-zinc-500 text-xs">
                       Enter a valid URL for additional analysis or report
                     </FormDescription>
                     <FormMessage />
