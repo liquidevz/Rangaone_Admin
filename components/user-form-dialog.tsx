@@ -79,13 +79,34 @@ export function UserFormDialog({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: user?.username || "",
-      email: user?.email || "",
-      password: "", // Don't pre-fill password
-      role: (user?.role as "admin" | "manager" | "user") || "user",
-      emailVerified: user?.emailVerified ?? true,
+      username: "",
+      email: "",
+      password: "",
+      role: "user",
+      emailVerified: true,
     },
   });
+  
+  // Reset form when user changes
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        username: user.username || "",
+        email: user.email || "",
+        password: "",
+        role: (user.role as "admin" | "manager" | "user") || "user",
+        emailVerified: user.emailVerified ?? true,
+      });
+    } else {
+      form.reset({
+        username: "",
+        email: "",
+        password: "",
+        role: "user",
+        emailVerified: true,
+      });
+    }
+  }, [user, form]);
   
   // Load draft data when dialog opens
   useEffect(() => {
@@ -110,7 +131,7 @@ export function UserFormDialog({
     });
     
     return () => subscription.unsubscribe();
-  }, [form, saveDraft, open, user]);
+  }, [open, user]); // Removed form and saveDraft from dependencies
 
   // Handle form submission
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {

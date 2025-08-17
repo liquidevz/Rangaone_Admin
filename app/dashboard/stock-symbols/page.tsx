@@ -495,7 +495,7 @@ export default function StockSymbolsPage() {
       accessorKey: "symbol",
       header: "Symbol",
       cell: ({ row }) => (
-        <div className="font-mono font-bold text-white flex items-center gap-2">
+        <div className="font-mono font-bold text-foreground flex items-center gap-2">
           {row.original.symbol}
           {isRealTimeEnabled && (
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Live data enabled" />
@@ -507,7 +507,7 @@ export default function StockSymbolsPage() {
       accessorKey: "name",
       header: "Company Name",
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate text-zinc-300">
+        <div className="max-w-[200px] truncate text-muted-foreground">
           {row.original.name}
         </div>
       ),
@@ -516,7 +516,7 @@ export default function StockSymbolsPage() {
       accessorKey: "exchange",
       header: "Exchange",
       cell: ({ row }) => (
-        <Badge variant="outline" className="bg-zinc-800 text-zinc-300 border-zinc-600">
+        <Badge variant="outline">
           {row.original.exchange}
         </Badge>
       ),
@@ -525,7 +525,7 @@ export default function StockSymbolsPage() {
       accessorKey: "currentPrice",
       header: "Current Price",
       cell: ({ row }) => (
-        <div className="font-medium text-white">
+        <div className="font-medium text-foreground">
           ₹{parseFloat(row.original.currentPrice).toLocaleString()}
         </div>
       ),
@@ -554,13 +554,13 @@ export default function StockSymbolsPage() {
           <Button
             variant="ghost"
             size="icon"
-            className="hover:bg-zinc-800"
+            className="hover:bg-muted"
             onClick={() => {
               setSelectedStockSymbol(row.original);
               setIsEditDialogOpen(true);
             }}
           >
-            <Edit className="h-4 w-4 text-zinc-400" />
+            <Edit className="h-4 w-4 text-muted-foreground" />
             <span className="sr-only">Edit</span>
           </Button>
           <Button
@@ -572,7 +572,7 @@ export default function StockSymbolsPage() {
               setIsDeleteDialogOpen(true);
             }}
           >
-            <Trash2 className="h-4 w-4 text-zinc-400" />
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
             <span className="sr-only">Delete</span>
           </Button>
         </div>
@@ -601,8 +601,8 @@ export default function StockSymbolsPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
         <div className="space-y-1">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">Stock Symbols</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">Stock Symbols</h1>
+          <p className="text-sm text-muted-foreground">
             Manage stock symbols database with real-time price tracking
           </p>
         </div>
@@ -612,7 +612,7 @@ export default function StockSymbolsPage() {
             size="sm"
             onClick={handleUpdateAllPrices}
             disabled={isUpdatingPrices}
-            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800 w-full sm:w-auto"
+            className="w-full sm:w-auto"
           >
             <Activity className={`h-4 w-4 mr-2 ${isUpdatingPrices ? "animate-pulse" : ""}`} />
             {isUpdatingPrices ? "Updating..." : "Update Prices"}
@@ -622,7 +622,7 @@ export default function StockSymbolsPage() {
             size="sm"
             onClick={() => loadStockSymbols(pagination.page, pagination.limit)}
             disabled={isLoading}
-            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800 w-full sm:w-auto"
+            className="w-full sm:w-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
@@ -631,7 +631,7 @@ export default function StockSymbolsPage() {
             variant="outline"
             size="sm"
             onClick={() => setShowLiveSearch(!showLiveSearch)}
-            className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800 w-full sm:w-auto"
+            className="w-full sm:w-auto"
           >
             <Search className="h-4 w-4 mr-2" />
             {showLiveSearch ? "Hide" : "Search Live"}
@@ -644,7 +644,7 @@ export default function StockSymbolsPage() {
       </div>
 
       {/* Real-Time Status and Controls */}
-      <Card className="border-zinc-800 bg-zinc-900/50">
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -654,14 +654,14 @@ export default function StockSymbolsPage() {
                 ) : (
                   <WifiOff className="h-5 w-5 text-red-400" />
                 )}
-                <CardTitle className="text-white text-lg">Real-Time Updates</CardTitle>
+                <CardTitle className="text-foreground text-lg">Real-Time Updates</CardTitle>
               </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsRealTimeEnabled(!isRealTimeEnabled)}
-                  className="text-zinc-300 hover:text-white"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   {isRealTimeEnabled ? (
                     <Pause className="h-4 w-4 mr-1" />
@@ -674,7 +674,7 @@ export default function StockSymbolsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowRealTimeSettings(!showRealTimeSettings)}
-                  className="text-zinc-300 hover:text-white"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <Settings className="h-4 w-4" />
                 </Button>
@@ -735,13 +735,13 @@ export default function StockSymbolsPage() {
 
       {/* Live Stock Search Section */}
       {showLiveSearch && (
-        <Card className="border-zinc-800 bg-zinc-900/50">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <Search className="h-5 w-5" />
               Add Stock from Live Data
             </CardTitle>
-            <CardDescription className="text-zinc-400">
+            <CardDescription className="text-muted-foreground">
               Search for stocks using real-time data and add them to your database
             </CardDescription>
           </CardHeader>
@@ -757,13 +757,13 @@ export default function StockSymbolsPage() {
       )}
 
       {/* Search Existing Stocks Section */}
-      <Card className="border-zinc-800 bg-zinc-900/50">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
+          <CardTitle className="text-foreground flex items-center gap-2">
             <Database className="h-5 w-5" />
             Search Database
           </CardTitle>
-          <CardDescription className="text-zinc-400">
+          <CardDescription className="text-muted-foreground">
             Search through your existing stock symbols database
           </CardDescription>
         </CardHeader>
@@ -774,14 +774,14 @@ export default function StockSymbolsPage() {
               placeholder="Search existing stocks in database..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+              className="pl-10"
             />
             {isSearching && (
               <RefreshCw className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-zinc-400" />
             )}
           </div>
           {searchQuery && (
-            <div className="mt-2 text-sm text-zinc-400">
+            <div className="mt-2 text-sm text-muted-foreground">
               {searchResults.length > 0 
                 ? `Found ${searchResults.length} matching symbols in database`
                 : isSearching 
@@ -797,7 +797,7 @@ export default function StockSymbolsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className={`border-zinc-800 bg-zinc-900/50 transition-all duration-300 ${
+        <Card className={`transition-all duration-300 ${
           isRealTimeEnabled ? 'border-blue-500/30 shadow-lg shadow-blue-500/10' : ''
         }`}>
           <CardContent className="p-4">
@@ -805,9 +805,9 @@ export default function StockSymbolsPage() {
             <div className="flex items-center gap-2">
               <Database className="h-5 w-5 text-blue-400" />
               <div>
-                <p className="text-sm text-zinc-400">Total Symbols</p>
+                <p className="text-sm text-muted-foreground">Total Symbols</p>
                   <div className="flex items-center gap-2">
-                    <p className={`text-xl font-semibold text-white transition-all duration-300 ${
+                    <p className={`text-xl font-semibold text-foreground transition-all duration-300 ${
                       isRealTimeEnabled && updateCounter > 0 ? 'scale-105' : ''
                     }`}>
                       {pagination.total || stockSymbols.length}
@@ -841,7 +841,7 @@ export default function StockSymbolsPage() {
           </CardContent>
         </Card>
 
-        <Card className={`border-zinc-800 bg-zinc-900/50 transition-all duration-300 ${
+        <Card className={`transition-all duration-300 ${
           pagination.pages > 1 ? 'border-green-500/30' : ''
         }`}>
           <CardContent className="p-4">
@@ -849,12 +849,12 @@ export default function StockSymbolsPage() {
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-green-400" />
               <div>
-                <p className="text-sm text-zinc-400">Current Page</p>
+                <p className="text-sm text-muted-foreground">Current Page</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xl font-semibold text-white">
                       {pagination.page}
                     </p>
-                    <span className="text-zinc-500">of</span>
+                    <span className="text-muted-foreground">of</span>
                     <p className="text-xl font-semibold text-white">
                       {pagination.pages || 1}
                     </p>
@@ -881,18 +881,18 @@ export default function StockSymbolsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-900/50">
+        <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-yellow-400" />
               <div>
-                <p className="text-sm text-zinc-400">Per Page</p>
-                <p className="text-xl font-semibold text-white">{pagination.limit}</p>
+                <p className="text-sm text-muted-foreground">Per Page</p>
+                <p className="text-xl font-semibold text-foreground">{pagination.limit}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-zinc-500">Showing</p>
+                <p className="text-xs text-muted-foreground">Showing</p>
                 <p className="text-sm font-mono text-yellow-400">
                   {Math.min(pagination.limit, (pagination.total || stockSymbols.length))}
                 </p>
@@ -911,7 +911,7 @@ export default function StockSymbolsPage() {
           </CardContent>
         </Card>
 
-        <Card className={`border-zinc-800 bg-zinc-900/50 transition-all duration-300 ${
+        <Card className={`transition-all duration-300 ${
           isConnected ? 'border-green-500/30' : 'border-red-500/30'
         }`}>
           <CardContent className="p-4">
@@ -919,7 +919,7 @@ export default function StockSymbolsPage() {
               <div className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-purple-400" />
                 <div>
-                  <p className="text-sm text-zinc-400">Data Status</p>
+                  <p className="text-sm text-muted-foreground">Data Status</p>
                   <div className="flex items-center gap-2">
                     <p className={`text-xl font-semibold ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
                       {isConnected ? 'Online' : 'Offline'}
@@ -933,7 +933,7 @@ export default function StockSymbolsPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-zinc-500">Mode</p>
+                <p className="text-xs text-muted-foreground">Mode</p>
                 <div className="flex items-center gap-1">
                   <p className={`text-sm font-mono ${isRealTimeEnabled ? 'text-blue-400' : 'text-zinc-400'}`}>
                     {isRealTimeEnabled ? 'Real-time' : 'Manual'}
@@ -1036,12 +1036,12 @@ export default function StockSymbolsPage() {
       )}
 
       {/* Data Table */}
-      <Card className="border-zinc-800 bg-zinc-900/50 shadow-md">
-        <CardHeader className="border-b border-zinc-800 pb-4">
-          <CardTitle className="text-lg font-medium text-white">
+      <Card className="shadow-md">
+        <CardHeader className="border-b pb-4">
+          <CardTitle className="text-lg font-medium text-foreground">
             {searchQuery ? 'Search Results' : 'Stock Symbols'}
           </CardTitle>
-          <CardDescription className="text-sm text-zinc-400">
+          <CardDescription className="text-sm text-muted-foreground">
             {searchQuery 
               ? `Showing search results for "${searchQuery}"`
               : "All stock symbols in the database"
@@ -1064,7 +1064,7 @@ export default function StockSymbolsPage() {
 
       {/* Pagination Controls with Real-time Integration */}
       {!searchQuery && pagination.pages > 1 && (
-        <Card className="border-zinc-800 bg-zinc-900/50">
+        <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -1074,7 +1074,6 @@ export default function StockSymbolsPage() {
                     size="sm"
                     onClick={() => loadStockSymbols(1, pagination.limit)}
                     disabled={pagination.page === 1 || isLoading}
-                    className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800"
                   >
                     First
                   </Button>
@@ -1083,7 +1082,6 @@ export default function StockSymbolsPage() {
                     size="sm"
                     onClick={() => loadStockSymbols(pagination.page - 1, pagination.limit)}
                     disabled={pagination.page === 1 || isLoading}
-                    className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800"
                   >
                     Previous
                   </Button>
@@ -1106,7 +1104,6 @@ export default function StockSymbolsPage() {
                     size="sm"
                     onClick={() => loadStockSymbols(pagination.page + 1, pagination.limit)}
                     disabled={pagination.page === pagination.pages || isLoading}
-                    className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800"
                   >
                     Next
                   </Button>
@@ -1115,7 +1112,6 @@ export default function StockSymbolsPage() {
                     size="sm"
                     onClick={() => loadStockSymbols(pagination.pages, pagination.limit)}
                     disabled={pagination.page === pagination.pages || isLoading}
-                    className="text-zinc-300 hover:text-white border-zinc-700 hover:bg-zinc-800"
                   >
                     Last
                   </Button>
@@ -1130,7 +1126,7 @@ export default function StockSymbolsPage() {
                   </div>
                 )}
                 
-                <div className="text-sm text-zinc-400">
+                <div className="text-sm text-muted-foreground">
                   Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                   {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
                   {pagination.total} entries

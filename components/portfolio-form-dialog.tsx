@@ -185,18 +185,18 @@ export function PortfolioFormDialog({
     currentMarketPrice: number,
     proportionToSell: number // 0 to 1 (e.g., 0.5 for 50%)
   ): PnLCalculation => {
-    // Allow fractional shares - no rounding
+    // Indian stock market - whole shares only
     let quantitySold = 0;
     if (proportionToSell >= 1) {
-      quantitySold = originalQuantity;
+      quantitySold = Math.floor(originalQuantity);
     } else if (proportionToSell > 0) {
-      quantitySold = originalQuantity * proportionToSell;
+      quantitySold = Math.floor(originalQuantity * proportionToSell);
     }
     const saleValue = quantitySold * currentMarketPrice;
     const originalCost = quantitySold * originalBuyPrice;
     const profitLoss = saleValue - originalCost;
     const profitLossPercent = originalCost > 0 ? (profitLoss / originalCost) * 100 : 0;
-    const remainingQuantity = originalQuantity - quantitySold;
+    const remainingQuantity = Math.floor(originalQuantity) - quantitySold;
     const remainingValue = remainingQuantity * currentMarketPrice;
 
     return {
@@ -225,24 +225,23 @@ export function PortfolioFormDialog({
 
   const calculateInvestmentDetails = (weightPercent: number, buyPrice: number, totalInvestment: number) => {
     const allocatedAmount = (weightPercent / 100) * totalInvestment;
-    let quantity = Math.floor(allocatedAmount / buyPrice);
+    let quantity = Math.floor(allocatedAmount / buyPrice); // Always whole number
     let actualInvestmentAmount = quantity * buyPrice;
     let leftoverAmount = allocatedAmount - actualInvestmentAmount;
 
     // Tolerance: if the gap to the next share is within 10% of the share price, buy 1 extra share
-    // gap = buyPrice - leftover; when leftover is positive after flooring
     if (buyPrice > 0 && leftoverAmount >= 0) {
       const gapToNextShare = buyPrice - leftoverAmount;
       if (gapToNextShare <= buyPrice * 0.1) {
-        quantity = quantity + 1;
+        quantity = quantity + 1; // Still whole number
         actualInvestmentAmount = quantity * buyPrice;
-        leftoverAmount = allocatedAmount - actualInvestmentAmount; // becomes negative equal to -gapToNextShare
+        leftoverAmount = allocatedAmount - actualInvestmentAmount;
       }
     }
     
     return {
       allocatedAmount,
-      quantity,
+      quantity, // Always integer
       actualInvestmentAmount,
       leftoverAmount,
     };
@@ -2175,7 +2174,7 @@ export function PortfolioFormDialog({
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Quantity:</span>
-                                      <p className="font-medium">{details.quantity} shares</p>
+                                      <p className="font-medium">{Math.floor(details.quantity)} shares</p>
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Actual Investment:</span>
@@ -2268,7 +2267,7 @@ export function PortfolioFormDialog({
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Quantity: </span>
-                                      <span className="font-medium">{holding.quantity}</span>
+                                      <span className="font-medium">{Math.floor(holding.quantity)}</span>
                                     </div>
                                     <div>
                                       <span className="text-muted-foreground">Original Investment: </span>
@@ -2681,7 +2680,7 @@ export function PortfolioFormDialog({
                             </div>
                             <div>
                               <span className="text-muted-foreground">New Quantity:</span>
-                              <p className="font-medium">{newQty} shares</p>
+                              <p className="font-medium">{Math.floor(newQty)} shares</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">New Investment:</span>

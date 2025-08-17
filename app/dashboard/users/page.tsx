@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { UserFormDialog } from "@/components/user-form-dialog";
+import { UserDetailsDialog } from "@/components/user-details-dialog";
+import { PanUpdateDialog } from "@/components/pan-update-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   type User,
@@ -16,6 +18,9 @@ import {
   fetchUsers,
   unbanUser,
   updateUser,
+  deleteUserLogs,
+  deleteServerLogs,
+  updateUserPAN,
 } from "@/lib/api-users";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
@@ -26,6 +31,9 @@ import {
   Trash2,
   UserCheck,
   UserPlus,
+  FileX,
+  Server,
+  CreditCard,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -52,6 +60,10 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userToBan, setUserToBan] = useState<User | null>(null);
   const [userToUnban, setUserToUnban] = useState<User | null>(null);
+  const [userToView, setUserToView] = useState<User | null>(null);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [userToUpdatePAN, setUserToUpdatePAN] = useState<User | null>(null);
+  const [isPanDialogOpen, setIsPanDialogOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const { cacheData, getCachedData, invalidateCache } = useCache();
@@ -75,7 +87,7 @@ export default function UsersPage() {
     enabled: true
   });
 
-  console.log("UsersPage component rendered", users);
+
 
   // Load users data with caching
   const loadUsers = async (useCache = true) => {
@@ -98,7 +110,7 @@ export default function UsersPage() {
         }
       }
 
-      console.log("Loading users...");
+
       const data = await fetchUsers();
       setUsers(data);
       
@@ -250,6 +262,32 @@ export default function UsersPage() {
     }
   };
 
+  // Handle PAN update
+  const handleUpdatePAN = async (pandetails: string, reason: string) => {
+    if (!userToUpdatePAN) return;
+    
+    try {
+      await updateUserPAN(userToUpdatePAN._id, pandetails, reason);
+      
+      // Invalidate cache and reload fresh data
+      invalidateCache(CACHE_KEYS.USERS_DATA);
+      await loadUsers(false);
+      
+      toast({
+        title: "PAN updated successfully",
+      });
+    } catch (err) {
+      console.error("Error updating PAN:", err);
+      toast({
+        title: "Failed to update PAN",
+        description:
+          err instanceof Error ? err.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+      throw err;
+    }
+  };
+
   // Define table columns
   const columns: ColumnDef<User>[] = [
     {
@@ -258,9 +296,15 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const username = row.getValue("username") as string;
         return (
-          <div className="font-medium text-sm sm:text-base">
+          <button
+            className="font-medium text-sm sm:text-base text-blue-600 hover:text-blue-800 hover:underline text-left"
+            onClick={() => {
+              setUserToView(row.original);
+              setIsDetailsDialogOpen(true);
+            }}
+          >
             {username || row.original.email.split("@")[0]}
-          </div>
+          </button>
         );
       },
     },
@@ -351,7 +395,21 @@ export default function UsersPage() {
               <span className="sr-only">Edit</span>
             </Button>
 
-            {isBanned ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setUserToUpdatePAN(user);
+                setIsPanDialogOpen(true);
+              }}
+              className="h-8 w-8 p-0"
+              title="Update PAN"
+            >
+              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="sr-only">Update PAN</span>
+            </Button>
+
+            {(user.isBanned || user.banInfo) ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -404,6 +462,38 @@ export default function UsersPage() {
           </p>
         </div>
         <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                await deleteUserLogs();
+                toast({ title: "User logs deleted successfully" });
+              } catch (error) {
+                toast({ title: "Failed to delete user logs", variant: "destructive" });
+              }
+            }}
+            className="w-full sm:w-auto"
+          >
+            <FileX className="h-4 w-4 mr-2" />
+            Clear User Logs
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                await deleteServerLogs();
+                toast({ title: "Server logs deleted successfully" });
+              } catch (error) {
+                toast({ title: "Failed to delete server logs", variant: "destructive" });
+              }
+            }}
+            className="w-full sm:w-auto"
+          >
+            <Server className="h-4 w-4 mr-2" />
+            Clear Server Logs
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -505,6 +595,28 @@ export default function UsersPage() {
         }? They will regain access to the system.`}
         confirmText="Unban User"
         cancelText="Cancel"
+      />
+      
+      {/* User Details Dialog */}
+      <UserDetailsDialog
+        open={isDetailsDialogOpen}
+        onOpenChange={(open) => {
+          setIsDetailsDialogOpen(open);
+          if (!open) setUserToView(null);
+        }}
+        user={userToView}
+      />
+      
+      {/* PAN Update Dialog */}
+      <PanUpdateDialog
+        open={isPanDialogOpen}
+        onOpenChange={(open) => {
+          setIsPanDialogOpen(open);
+          if (!open) setUserToUpdatePAN(null);
+        }}
+        onSubmit={handleUpdatePAN}
+        currentPAN={userToUpdatePAN?.pandetails}
+        username={userToUpdatePAN?.username || userToUpdatePAN?.email}
       />
     </div>
   );

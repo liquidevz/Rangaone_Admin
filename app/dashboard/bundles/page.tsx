@@ -49,7 +49,7 @@ export default function BundlesPage() {
       // Always attempt to load bundles, the fetchWithAuth function will handle auth errors
       loadPortfolios().then(() => loadBundles())
     } catch (error) {
-      console.error("Error checking authentication:", error)
+
       setIsUserAuthenticated(false)
       setError("Error checking authentication status. Please try logging in again.")
       setIsLoading(false)
@@ -63,7 +63,7 @@ export default function BundlesPage() {
       setPortfolios(data)
       return data
     } catch (error) {
-      console.error("Error loading portfolios:", error)
+
       return []
     }
   }
@@ -73,9 +73,7 @@ export default function BundlesPage() {
     setError(null)
 
     try {
-      console.log("Fetching bundles...")
       const data = await fetchBundles()
-      console.log(`Loaded ${data.length} bundles:`, data)
       
       // Enhance bundles with portfolio details
       const enhancedBundles = await Promise.all(
@@ -108,7 +106,7 @@ export default function BundlesPage() {
               }
             }
           } catch (error) {
-            console.error(`Error enhancing bundle ${bundle.id}:`, error)
+
             return bundle
           }
         })
@@ -116,7 +114,7 @@ export default function BundlesPage() {
       
       setBundles(enhancedBundles)
     } catch (error) {
-      console.error("Error loading bundles:", error)
+
 
       // Check if it's an authentication error
       const errorMessage = error instanceof Error ? error.message : "Failed to load bundles"
@@ -143,7 +141,7 @@ export default function BundlesPage() {
 
   const handleAddBundle = async (bundleData: CreateBundleRequest) => {
     try {
-      console.log("Creating bundle with data:", bundleData)
+
       
       // Create the bundle via API
       const createdBundle = await createBundle(bundleData)
@@ -171,7 +169,7 @@ export default function BundlesPage() {
         description: `Failed to create bundle: ${errorMessage}`,
         variant: "destructive",
       })
-      console.error("Error creating bundle:", error)
+
       throw error // Re-throw to be handled by the form dialog
     }
   }
@@ -199,8 +197,7 @@ export default function BundlesPage() {
     }
 
     try {
-      console.log(`Updating bundle with ID: ${bundleId}`)
-      console.log("Bundle data being sent:", JSON.stringify(bundleData, null, 2))
+
 
       // Make the API call to update the bundle
       const updatedBundle = await updateBundle(bundleId, bundleData)
@@ -228,7 +225,7 @@ export default function BundlesPage() {
         description: `Failed to update bundle: ${errorMessage}`,
         variant: "destructive",
       })
-      console.error("Error updating bundle:", error)
+
       throw error // Re-throw to be handled by the form dialog
     }
   }
@@ -277,7 +274,7 @@ export default function BundlesPage() {
         description: `Failed to delete bundle: ${errorMessage}`,
         variant: "destructive",
       })
-      console.error("Error deleting bundle:", error)
+
     }
   }
 

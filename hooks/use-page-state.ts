@@ -55,7 +55,7 @@ export function usePageState<T extends Record<string, any> = Record<string, any>
 
     setState(initialState as T)
     setIsLoading(false)
-  }, [pageName, defaultState, syncWithUrl, searchParams, getPageState])
+  }, [pageName, syncWithUrl]) // Removed unstable dependencies
 
   const updateState = useCallback((updates: Partial<T>) => {
     setState(prevState => {

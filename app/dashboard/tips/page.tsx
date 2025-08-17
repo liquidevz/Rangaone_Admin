@@ -76,8 +76,6 @@ function StockDetailsCell({ tip }: { tip: Tip }) {
       try {
         setIsLoading(true);
         if (tip.stockId) {
-          console.log(`Fetching stock details for tip ${tip.id}, stockId: ${tip.stockId}`);
-          
           // Check cache first
           if (stockDetailsCache.has(tip.stockId)) {
             setStockDetails(stockDetailsCache.get(tip.stockId) || null);
@@ -86,11 +84,8 @@ function StockDetailsCell({ tip }: { tip: Tip }) {
             stockDetailsCache.set(tip.stockId, stock);
             setStockDetails(stock);
           }
-        } else {
-          console.log(`No stockId found for tip ${tip.id}`);
         }
       } catch (error) {
-        console.error(`Error fetching stock details for tip ${tip.id}:`, error);
         // Don't set stock details on error, just show the fallback
       } finally {
         setIsLoading(false);
@@ -150,12 +145,9 @@ export default function TipsManagementPage() {
 
   const loadPortfolios = async () => {
     try {
-      console.log("Fetching portfolios for filter options...");
       const portfoliosData = await fetchPortfolios();
-      console.log(`Loaded ${portfoliosData.length} portfolios:`, portfoliosData);
       setPortfolios(portfoliosData);
     } catch (error) {
-      console.error("Error loading portfolios:", error);
       // Don't show error for portfolios, just continue without them
     }
   };
@@ -165,17 +157,10 @@ export default function TipsManagementPage() {
     setError(null);
 
     try {
-      console.log("Fetching all tips (general + portfolio-specific)...");
-      
-      // For now, we'll use fetchAllTips which should return all tips
-      // including portfolio-specific ones from the backend
       const allTipsData = await fetchAllTips();
-      console.log(`Loaded ${allTipsData.length} total tips:`, allTipsData);
-      
       setAllTips(allTipsData);
       setFilteredTips(allTipsData);
     } catch (error) {
-      console.error("Error loading all tips:", error);
 
       setError(
         error instanceof Error ? error.message : "Failed to load tips data"
@@ -255,7 +240,6 @@ export default function TipsManagementPage() {
         throw new Error("Invalid tip data");
       }
       
-      console.log("Creating general tip:", tipData);
       const newTip = await createGeneralTip(tipData);
 
       toast({
@@ -266,7 +250,6 @@ export default function TipsManagementPage() {
       // Refresh the tips list
       loadAllTips();
     } catch (error) {
-      console.error("Error creating tip:", error);
       toast({
         title: "Failed to create tip",
         description:
@@ -290,7 +273,6 @@ export default function TipsManagementPage() {
         tipData.stockName = selectedTip.stockName;
       }
       
-      console.log(`Updating tip ${selectedTip.id}:`, tipData);
       const updatedTip = await updateTip(selectedTip.id, tipData);
 
       toast({
@@ -301,7 +283,6 @@ export default function TipsManagementPage() {
       // Refresh the tips list
       loadAllTips();
     } catch (error) {
-      console.error("Error updating tip:", error);
       toast({
         title: "Failed to update tip",
         description:
@@ -328,7 +309,6 @@ export default function TipsManagementPage() {
       // Refresh the tips list
       loadAllTips();
     } catch (error) {
-      console.error("Error deleting tip:", error);
       toast({
         title: "Failed to delete tip",
         description:
@@ -340,7 +320,6 @@ export default function TipsManagementPage() {
 
   const openEditDialog = async (id: string) => {
     try {
-      console.log("Opening edit dialog for tip ID:", id);
       // First try to find the tip in our current list
       const existingTip = allTips.find((tip) => tip._id === id || tip.id === id);
 
@@ -350,7 +329,6 @@ export default function TipsManagementPage() {
           existingTip.stockSymbol = existingTip.stockId;
         }
         
-        console.log('Opening edit dialog with tip data:', existingTip);
         setSelectedTip(existingTip);
         setEditDialogOpen(true);
         return;
@@ -363,11 +341,9 @@ export default function TipsManagementPage() {
         tip.stockSymbol = tip.stockId;
       }
       
-      console.log('Opening edit dialog with fetched tip data:', tip);
       setSelectedTip(tip);
       setEditDialogOpen(true);
     } catch (error) {
-      console.error("Error fetching tip:", error);
       toast({
         title: "Failed to load tip",
         description:

@@ -17,13 +17,13 @@ export const getAdminAccessToken = (): string | null => {
     const token = localStorage.getItem("adminAccessToken")
 
     if (!token) {
-      console.log("No admin access token found in localStorage")
+  
       return null
     }
 
     return token
   } catch (error) {
-    console.error("Error retrieving admin access token:", error)
+
     return null
   }
 }
@@ -61,12 +61,12 @@ export const logout = async (): Promise<void> => {
           Authorization: `Bearer ${accessToken}`,
         },
       }).catch((error) => {
-        console.error("Error during logout API call:", error)
+
         // Continue with local logout even if API call fails
       })
     }
   } catch (error) {
-    console.error("Logout error:", error)
+
   } finally {
     // Always clear local storage
     if (typeof window !== "undefined") {
@@ -81,11 +81,11 @@ export const refreshToken = async (): Promise<boolean> => {
   try {
     const refreshToken = getAdminRefreshToken()
     if (!refreshToken) {
-      console.log("No refresh token found")
+
       return false
     }
 
-    console.log("Attempting to refresh token...")
+
 
     // According to the API docs, we should send the refresh token in the body, not as an Authorization header
     const response = await fetch(`${API_BASE_URL}/admin/refresh`, {
@@ -98,7 +98,7 @@ export const refreshToken = async (): Promise<boolean> => {
 
     // Handle 403 Forbidden specifically
     if (response.status === 403) {
-      console.error("Token refresh failed with status: 403 - Permission denied or invalid token")
+
       // Clear tokens on 403 error as the refresh token is likely invalid or revoked
       if (typeof window !== "undefined") {
         localStorage.removeItem("adminAccessToken")
@@ -108,11 +108,11 @@ export const refreshToken = async (): Promise<boolean> => {
     }
 
     if (!response.ok) {
-      console.error("Token refresh failed with status:", response.status)
+
 
       // If it's a 401, clear tokens and return false
       if (response.status === 401) {
-        console.log("Refresh token is invalid or expired, clearing tokens")
+
         if (typeof window !== "undefined") {
           localStorage.removeItem("adminAccessToken")
           localStorage.removeItem("adminRefreshToken")
@@ -123,16 +123,16 @@ export const refreshToken = async (): Promise<boolean> => {
       // For other errors, try to get more information
       try {
         const errorData = await response.json()
-        console.error("Token refresh error details:", errorData)
+
       } catch (e) {
-        console.error("Could not parse error response")
+
       }
 
       return false
     }
 
     const data = await response.json()
-    console.log("Token refresh successful")
+
 
     localStorage.setItem("adminAccessToken", data.accessToken)
     // If the API returns a new refresh token, update it
@@ -141,7 +141,7 @@ export const refreshToken = async (): Promise<boolean> => {
     }
     return true
   } catch (error) {
-    console.error("Error refreshing token:", error)
+
     return false
   }
 }
@@ -174,7 +174,7 @@ export const changePassword = async (
 
     return { success: true, message: "Password changed successfully" }
   } catch (error) {
-    console.error("Error changing password:", error)
+
     return { success: false, message: "An error occurred while changing password" }
   }
 }
@@ -201,15 +201,14 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
 
   if (accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`
-    console.log("Using access token for request to:", url)
+
   } else {
-    console.error("No access token available for request to:", url)
-    console.error("Available localStorage keys:", typeof window !== "undefined" ? Object.keys(localStorage) : "server-side")
+
     throw new Error("Authentication required. Please login again.")
   }
 
   // Log the request for debugging (without sensitive headers)
-  console.log(`API Request: ${options.method || "GET"} ${url}`)
+
 
   try {
     // Make the request with a timeout
@@ -226,15 +225,15 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
     clearTimeout(timeoutId)
 
     // Log the response status for debugging
-    console.log(`API Response: ${response.status} for ${options.method || "GET"} ${url}`)
+
 
     // If the response is 401 (Unauthorized) or 403 (Forbidden), try to refresh the token
     if (response.status === 401 || response.status === 403) {
-      console.log(`Received ${response.status}, attempting to refresh token...`)
+
 
       // For development/testing, continue with the response if mock data is enabled
       if (process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === "true" || process.env.NODE_ENV === "development") {
-        console.log("Continuing with response for mock data")
+
         return response
       }
 
@@ -275,10 +274,10 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
     // Improve error logging
     if (error instanceof Error) {
       if (error.name === "AbortError") {
-        console.error(`Request timeout for ${url}`)
+
         throw new Error(`Request timeout: The server took too long to respond`)
       } else {
-        console.error(`Fetch error for ${url}:`, error)
+
         throw error
       }
     }
@@ -293,7 +292,7 @@ export const loginAdmin = async (
   password: string,
 ): Promise<{ success: boolean; message: string; data?: any }> => {
   try {
-    console.log("Attempting login for:", email)
+
 
     const response = await fetch(`${API_BASE_URL}/admin/login`, {
       method: "POST",
@@ -306,11 +305,11 @@ export const loginAdmin = async (
     const data = await response.json()
 
     if (!response.ok) {
-      console.error("Login failed with status:", response.status)
+
       return { success: false, message: data.message || "Login failed" }
     }
 
-    console.log("Login successful, storing tokens...")
+
 
     // Store tokens in localStorage
     localStorage.setItem("adminAccessToken", data.accessToken)
@@ -320,14 +319,11 @@ export const loginAdmin = async (
     const storedAccessToken = localStorage.getItem("adminAccessToken")
     const storedRefreshToken = localStorage.getItem("adminRefreshToken")
 
-    console.log("Tokens stored successfully:", {
-      accessToken: !!storedAccessToken,
-      refreshToken: !!storedRefreshToken,
-    })
+
 
     return { success: true, message: "Login successful", data }
   } catch (error) {
-    console.error("Login error:", error)
+
     return { success: false, message: "An error occurred during login" }
   }
 }

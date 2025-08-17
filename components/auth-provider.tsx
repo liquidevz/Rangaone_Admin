@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      console.log("Checking authentication for path:", pathname)
+
 
       // Skip auth check for public pages
       if (pathname === "/login" || pathname === "/") {
@@ -36,11 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Check if user is authenticated
       const authenticated = isAuthenticated()
-      console.log("Is authenticated:", authenticated)
+
 
       if (!authenticated) {
         // If not authenticated, redirect to login
-        console.log("Not authenticated, redirecting to login")
+
         setIsLoggedIn(false)
         setLoading(false)
         router.push("/login")
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Try to refresh the token, but don't immediately redirect on failure
         const refreshed = await refreshToken()
         if (!refreshed) {
-          console.log("Token refresh failed, redirecting to login")
+
           // Clear any remaining tokens
           if (typeof window !== "undefined") {
             localStorage.removeItem("adminAccessToken")
@@ -63,11 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           window.location.href = "/login"
           return
         } else {
-          console.log("Token refresh successful")
+
           setIsLoggedIn(true)
         }
       } catch (error) {
-        console.error("Error during authentication check:", error)
+
         // Don't redirect here, let the API calls handle auth failures
         setIsLoggedIn(false)
       } finally {
@@ -81,15 +81,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshInterval = setInterval(
       async () => {
         if (isAuthenticated()) {
-          console.log("Periodic token refresh check")
+
           try {
             const refreshed = await refreshToken()
             if (!refreshed) {
-              console.log("Periodic token refresh failed")
+
               // Don't redirect here, let the next API call handle it
             }
           } catch (error) {
-            console.error("Error during periodic token refresh:", error)
+
           }
         }
       },

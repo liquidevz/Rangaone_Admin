@@ -99,10 +99,6 @@ export const fetchBundles = async (): Promise<Bundle[]> => {
       throw new Error("Admin authentication required to fetch bundles");
     }
 
-    // Log the API request for debugging
-    console.log(`Fetching bundles from: ${API_BASE_URL}/api/bundles`);
-    console.log(`Using admin token: ${adminToken.substring(0, 10)}...`);
-
     // Make the request with the admin token in the Authorization header
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -113,9 +109,6 @@ export const fetchBundles = async (): Promise<Bundle[]> => {
       method: "GET",
       headers,
     });
-
-    // Log the response status for debugging
-    console.log(`Bundle API response status: ${response.status}`);
 
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
@@ -132,36 +125,22 @@ export const fetchBundles = async (): Promise<Bundle[]> => {
       }
     }
 
-    // Parse the response as text first to inspect it
-    const responseText = await response.text();
-    console.log("Raw API response:", responseText);
-
-    let bundles;
-    try {
-      bundles = JSON.parse(responseText);
-    } catch (error) {
-      console.error("Failed to parse JSON response:", error);
-      throw new Error("Invalid JSON response from server");
-    }
-
-    console.log("Parsed bundles:", bundles);
+    const bundles = await response.json();
 
     // Check if the response is an array
-    if (!Array.isArray(bundles)) {
-      console.error("API did not return an array of bundles:", bundles);
-
+    let bundleArray = bundles;
+    if (!Array.isArray(bundleArray)) {
       // If the response has a data property that is an array, use that
-      if (bundles && Array.isArray(bundles.data)) {
-        bundles = bundles.data;
+      if (bundleArray && Array.isArray(bundleArray.data)) {
+        bundleArray = bundleArray.data;
       } else {
         throw new Error("API response format is not as expected");
       }
     }
 
     // Ensure all bundles have valid IDs
-    const validatedBundles = bundles.map((bundle: Bundle) => {
+    const validatedBundles = bundleArray.map((bundle: Bundle) => {
       if (!bundle.id && bundle._id) {
-        console.log(`Bundle ${bundle.name} has _id (${bundle._id}) but no id, copying _id to id`);
         return {
           ...bundle,
           id: bundle._id,
@@ -170,12 +149,8 @@ export const fetchBundles = async (): Promise<Bundle[]> => {
       return bundle;
     });
 
-    // Log the number of bundles fetched for debugging
-    console.log(`Fetched ${validatedBundles.length} bundles from API`);
-
     return validatedBundles;
   } catch (error) {
-    console.error("Error fetching bundles:", error);
     throw error;
   }
 };

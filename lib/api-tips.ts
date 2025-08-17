@@ -79,7 +79,7 @@ export const fetchTipById = async (id: string): Promise<Tip> => {
       throw new Error("Invalid tip ID");
     }
 
-    console.log(`Fetching tip with ID: ${id}`);
+
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/tips/${id}`);
 
@@ -104,7 +104,7 @@ export const fetchTipById = async (id: string): Promise<Tip> => {
       downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
     };
   } catch (error) {
-    console.error(`Error fetching tip with id ${id}:`, error);
+
     throw error;
   }
 };
@@ -119,7 +119,7 @@ export const updateTip = async (
       throw new Error("Invalid tip ID");
     }
 
-    console.log('Updating tip with data:', tipData);
+
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/tips/${id}`, {
       method: "PUT",
@@ -147,7 +147,7 @@ export const updateTip = async (
       downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
     };
   } catch (error) {
-    console.error(`Error updating tip with id ${id}:`, error);
+
     throw error;
   }
 };
@@ -159,7 +159,7 @@ export const deleteTip = async (id: string): Promise<{ message: string }> => {
       throw new Error("Invalid tip ID");
     }
 
-    console.log(`Deleting tip with ID: ${id}`);
+
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/tips/${id}`, {
       method: "DELETE",
@@ -179,7 +179,7 @@ export const deleteTip = async (id: string): Promise<{ message: string }> => {
 
     return await response.json();
   } catch (error) {
-    console.error(`Error deleting tip with id ${id}:`, error);
+
     throw error;
   }
 };
@@ -194,7 +194,7 @@ export const createTip = async (
       throw new Error("Invalid portfolio ID");
     }
 
-    console.log('Creating tip for portfolio:', portfolioId, 'with data:', JSON.stringify(tipData, null, 2));
+
 
     // Ensure content is properly formatted as an array
     if (!Array.isArray(tipData.content) || tipData.content.length === 0) {
@@ -225,12 +225,12 @@ export const createTip = async (
       }
 
       const error = await response.json();
-      console.error("API error response:", error);
+
       throw new Error(error.message || "Failed to create tip");
     }
 
     const tip = await response.json();
-    console.log("Successfully created tip:", tip);
+
     return {
       ...tip,
       id: tip._id || tip.id,
@@ -239,7 +239,7 @@ export const createTip = async (
       downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
     };
   } catch (error) {
-    console.error("Error creating tip:", error);
+
     throw error;
   }
 };
@@ -253,7 +253,7 @@ export const fetchPortfolioTips = async (
       throw new Error("Invalid portfolio ID");
     }
 
-    console.log("Fetching portfolio tips for ID:", portfolioId);
+
 
     const response = await fetchWithAuth(
       `${API_BASE_URL}/api/tips/portfolios/${portfolioId}/tips`
@@ -280,7 +280,7 @@ export const fetchPortfolioTips = async (
       downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
     }));
   } catch (error) {
-    console.error("Error fetching portfolio tips:", error);
+
     throw error;
   }
 };
@@ -288,7 +288,7 @@ export const fetchPortfolioTips = async (
 // Get all tips (both portfolio-specific and general) - ENHANCED FOR UNIFIED VIEW
 export const fetchAllTips = async (): Promise<Tip[]> => {
   try {
-    console.log("Fetching all tips (general + portfolio-specific) from:", `${API_BASE_URL}/api/tips`);
+
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/tips`);
 
@@ -303,7 +303,7 @@ export const fetchAllTips = async (): Promise<Tip[]> => {
     }
 
     const tips = await response.json();
-    console.log(`Successfully fetched ${tips.length} total tips (general + portfolio-specific)`);
+
     
     // Ensure all tips have proper structure and an id property
     return tips.map((tip: any) => ({
@@ -316,7 +316,7 @@ export const fetchAllTips = async (): Promise<Tip[]> => {
       downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
     }));
   } catch (error) {
-    console.error("Error fetching all tips:", error);
+
     throw error;
   }
 };
@@ -326,7 +326,7 @@ export const createGeneralTip = async (
   tipData: CreateTipRequest
 ): Promise<Tip> => {
   try {
-    console.log('Creating general tip with data:', JSON.stringify(tipData, null, 2));
+
 
     // Validate required fields for RangaOne Wealth
     if (!tipData.title?.trim()) {
@@ -383,12 +383,12 @@ export const createGeneralTip = async (
       }
 
       const error = await response.json();
-      console.error('API Error Response:', error);
+
       throw new Error(error.message || "Failed to create general tip");
     }
 
     const tip = await response.json();
-    console.log("Successfully created general tip:", tip);
+
     
     return {
       ...tip,
@@ -397,7 +397,7 @@ export const createGeneralTip = async (
       downloadLinks: Array.isArray(tip.downloadLinks) ? tip.downloadLinks : [],
     };
   } catch (error) {
-    console.error("Error creating general tip:", error);
+
     throw error;
   }
 };

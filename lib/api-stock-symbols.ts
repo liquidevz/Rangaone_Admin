@@ -129,7 +129,7 @@ export const initializeRealtimeConnection = (onUpdate?: (data: StockSymbol[]) =>
     wsConnection = new WebSocket(wsUrl);
     
     wsConnection.onopen = () => {
-      console.log('WebSocket connected for real-time stock updates');
+
       connectionStatus.isConnected = true;
       connectionStatus.retryCount = 0;
       
@@ -150,7 +150,7 @@ export const initializeRealtimeConnection = (onUpdate?: (data: StockSymbol[]) =>
             try {
               callback(data.stocks);
             } catch (error) {
-              console.error('Error in real-time callback:', error);
+      
             }
           });
           
@@ -160,29 +160,29 @@ export const initializeRealtimeConnection = (onUpdate?: (data: StockSymbol[]) =>
           }
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+
       }
     };
     
     wsConnection.onclose = () => {
-      console.log('WebSocket disconnected');
+
       connectionStatus.isConnected = false;
       
       // Attempt to reconnect after 5 seconds
       wsReconnectTimeout = setTimeout(() => {
         if (connectionStatus.retryCount < 5) {
-          console.log('Attempting to reconnect WebSocket...');
+
           initializeRealtimeConnection(onUpdate);
         }
       }, 5000);
     };
     
     wsConnection.onerror = (error) => {
-      console.error('WebSocket error:', error);
+
       connectionStatus.isConnected = false;
     };
   } catch (error) {
-    console.error('Failed to initialize WebSocket connection:', error);
+
     connectionStatus.isConnected = false;
   }
 };
@@ -249,7 +249,7 @@ export const searchStockSymbols = async (keyword: string): Promise<StockSymbol[]
     const result: StockSearchResult = await response.json();
     return result.data || [];
   } catch (error) {
-    console.error("Error searching stock symbols:", error);
+
     throw error;
   }
 };
@@ -290,7 +290,7 @@ export const fetchStockSymbolBySymbol = async (symbol: string): Promise<StockSym
     const result = await response.json();
     return result.data || result;
   } catch (error) {
-    console.error(`Error fetching stock symbol ${symbol}:`, error);
+
     throw error;
   }
 };
@@ -327,7 +327,7 @@ export const updateStockPrices = async (): Promise<StockPriceUpdateResult> => {
     const result: StockPriceUpdateResult = await response.json();
     return result;
   } catch (error) {
-    console.error("Error updating stock prices:", error);
+
     throw error;
   }
 };
@@ -364,7 +364,7 @@ export const fetchAllStockSymbols = async (): Promise<StockSymbol[]> => {
     const result = await response.json();
     return result.data || result;
   } catch (error) {
-    console.error("Error fetching all stock symbols:", error);
+
     throw error;
   }
 };
@@ -399,7 +399,7 @@ export const createStockSymbol = async (stockData: CreateStockSymbolRequest): Pr
     const result = await response.json();
     return result.data || result;
   } catch (error) {
-    console.error("Error creating stock symbol:", error);
+
     throw error;
   }
 };
@@ -443,7 +443,7 @@ export const fetchStockSymbols = async (page: number = 1, limit: number = 50): P
     
     return enhancedResult;
   } catch (error) {
-    console.error("Error fetching stock symbols:", error);
+
     throw error;
   }
 };
@@ -465,7 +465,7 @@ export const fetchStockSymbolById = async (id: string): Promise<StockSymbol> => 
       throw new Error("Admin authentication required");
     }
 
-    console.log(`Fetching stock symbol with ID: ${id}`);
+
 
     const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/stock-symbols/${id}`, {
       method: "GET",
@@ -488,7 +488,7 @@ export const fetchStockSymbolById = async (id: string): Promise<StockSymbol> => 
     const result = await response.json();
     return result.data || result;
   } catch (error) {
-    console.error(`Error fetching stock symbol ${id}:`, error);
+
     throw error;
   }
 };
@@ -527,7 +527,7 @@ export const updateStockSymbol = async (id: string, stockData: UpdateStockSymbol
     const result = await response.json();
     return result.data || result;
   } catch (error) {
-    console.error(`Error updating stock symbol ${id}:`, error);
+
     throw error;
   }
 };
@@ -562,7 +562,7 @@ export const deleteStockSymbol = async (id: string): Promise<void> => {
       throw new Error(errorData.message || errorData.error || "Failed to delete stock symbol");
     }
   } catch (error) {
-    console.error(`Error deleting stock symbol ${id}:`, error);
+
     throw error;
   }
 };
@@ -579,7 +579,7 @@ export const checkApiHealth = async (): Promise<boolean> => {
     
     return response.ok;
   } catch (error) {
-    console.error("API health check failed:", error);
+
     return false;
   }
 };

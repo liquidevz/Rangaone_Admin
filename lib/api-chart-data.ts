@@ -57,15 +57,15 @@ export const fetchChartData = async (
     params.append("limit", limit.toString());
     params.append("page", page.toString());
 
-    const url = `/api/chart-data?${params.toString()}`;
-    console.log('Making request to:', url);
+    const url = `${API_BASE_URL}/api/chart-data?${params.toString()}`;
+
     const response = await fetchWithAuth(url);
 
     if (!response.ok) {
       console.error('API Error Response:', response.status, response.statusText);
       try {
         const errorText = await response.text();
-        console.error('Error response body:', errorText);
+
         const error = JSON.parse(errorText);
         throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
       } catch (parseError) {
@@ -75,7 +75,7 @@ export const fetchChartData = async (
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching chart data:", error);
+
     throw error;
   }
 };
@@ -104,7 +104,7 @@ export const fetchPortfolioChartData = async (
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching portfolio chart data:", error);
+
     throw error;
   }
 };
@@ -119,7 +119,7 @@ export const fetchPortfolioPerformance = async (
     if (startDate) params.append("startDate", startDate);
     if (endDate) params.append("endDate", endDate);
 
-    const url = `/api/chart-data/portfolio/${portfolioId}/performance?${params.toString()}`;
+    const url = `${API_BASE_URL}/api/chart-data/portfolio/${portfolioId}/performance?${params.toString()}`;
     const response = await fetchWithAuth(url);
 
     if (!response.ok) {
@@ -129,14 +129,14 @@ export const fetchPortfolioPerformance = async (
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching portfolio performance:", error);
+
     throw error;
   }
 };
 
 export const cleanupDuplicates = async (): Promise<any> => {
   try {
-    const response = await fetchWithAuth(`/api/chart-data/cleanup-duplicates`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chart-data/cleanup-duplicates`, {
       method: "POST",
     });
 
@@ -147,7 +147,7 @@ export const cleanupDuplicates = async (): Promise<any> => {
 
     return await response.json();
   } catch (error) {
-    console.error("Error cleaning up duplicates:", error);
+
     throw error;
   }
 };
@@ -156,7 +156,7 @@ export const createChartData = async (
   data: CreateChartDataRequest
 ): Promise<ChartDataPoint> => {
   try {
-    const response = await fetchWithAuth(`/api/chart-data`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chart-data`, {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -168,7 +168,7 @@ export const createChartData = async (
 
     return await response.json();
   } catch (error) {
-    console.error("Error creating chart data:", error);
+
     throw error;
   }
 };
@@ -190,7 +190,7 @@ export const createPortfolioChartData = async (
 
     return await response.json();
   } catch (error) {
-    console.error("Error creating portfolio chart data:", error);
+
     throw error;
   }
 };
@@ -200,7 +200,7 @@ export const updateChartData = async (
   data: Partial<CreateChartDataRequest>
 ): Promise<ChartDataPoint> => {
   try {
-    const response = await fetchWithAuth(`/api/chart-data/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chart-data/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
@@ -212,14 +212,14 @@ export const updateChartData = async (
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating chart data:", error);
+
     throw error;
   }
 };
 
 export const deleteChartData = async (id: string): Promise<void> => {
   try {
-    const response = await fetchWithAuth(`/api/chart-data/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chart-data/${id}`, {
       method: "DELETE",
     });
 
@@ -228,14 +228,14 @@ export const deleteChartData = async (id: string): Promise<void> => {
       throw new Error(error.message || "Failed to delete chart data");
     }
   } catch (error) {
-    console.error("Error deleting chart data:", error);
+
     throw error;
   }
 };
 
 export const fetchChartDataById = async (id: string): Promise<ChartDataPoint> => {
   try {
-    const response = await fetchWithAuth(`/api/chart-data/${id}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chart-data/${id}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -244,7 +244,7 @@ export const fetchChartDataById = async (id: string): Promise<ChartDataPoint> =>
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching chart data by ID:", error);
+
     throw error;
   }
 };
@@ -254,7 +254,7 @@ export const patchChartData = async (
   data: Partial<CreateChartDataRequest>
 ): Promise<ChartDataPoint> => {
   try {
-    const response = await fetchWithAuth(`/api/chart-data/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/chart-data/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
@@ -266,7 +266,7 @@ export const patchChartData = async (
 
     return await response.json();
   } catch (error) {
-    console.error("Error patching chart data:", error);
+
     throw error;
   }
 };

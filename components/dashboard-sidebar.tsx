@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, createContext, useContext, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart, FileText, Home, Menu, Settings, Users, X, Lightbulb, Briefcase, CreditCard, Package, ChevronLeft, Bot, TrendingUp } from "lucide-react"
+import { BarChart, FileText, Home, Menu, Settings, Users, X, Lightbulb, Briefcase, CreditCard, Package, ChevronLeft, Bot, TrendingUp, Mail } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -69,6 +69,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Users",
     href: "/dashboard/users",
     icon: Users,
+  },
+  {
+    title: "Notifications",
+    href: "/dashboard/notifications",
+    icon: Mail,
   },
   {
     title: "Bot Manager",

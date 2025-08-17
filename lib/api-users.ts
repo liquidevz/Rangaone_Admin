@@ -10,11 +10,21 @@ export interface User {
   emailVerified: boolean
   createdAt: string
   updatedAt: string
-  role?: string // We'll handle this as optional since it's not in the API response
-  status?: string // We'll derive this from emailVerified
-  lastLogin?: string // Not in the API response, but we'll keep it for UI
-  isBanned?: boolean // We'll derive this from other fields if available
-  banInfo?: boolean // Ban information for consistency
+  fullName?: string
+  dateofBirth?: string
+  phone?: string
+  pnadetails?: string
+  profileComplete?: boolean
+  pandetails?: string
+  adharcard?: string
+  address?: string
+  forceComplete?: boolean
+  missingFields?: string[]
+  role?: string
+  status?: string
+  lastLogin?: string
+  isBanned?: boolean
+  banInfo?: boolean
 }
 
 export interface CreateUserRequest {
@@ -35,10 +45,11 @@ export interface UpdateUserRequest {
 // User API Functions
 export const fetchUsers = async (): Promise<User[]> => {
   try {
-    console.log("Fetching users from API...")
+    console.log("Fetching users from API...", `${API_BASE_URL}/admin/users`)
 
     // According to the docs, the endpoint is /admin/users
     const response = await fetchWithAuth(`${API_BASE_URL}/admin/users`)
+    console.log("Users API response status:", response.status)
 
     // Check if the response is HTML instead of JSON
     const contentType = response.headers.get("content-type")
@@ -145,10 +156,12 @@ export const updateUser = async (id: string, userData: UpdateUserRequest): Promi
       throw new Error("Invalid user ID")
     }
 
+    console.log("Updating user:", id, userData)
     const response = await fetchWithAuth(`${API_BASE_URL}/admin/users/${id}`, {
       method: "PUT",
       body: JSON.stringify(userData),
     })
+    console.log("Update user response status:", response.status)
 
     // Check if the response is HTML instead of JSON
     const contentType = response.headers.get("content-type")
@@ -203,25 +216,22 @@ export const deleteUser = async (id: string): Promise<void> => {
   }
 }
 
-export const banUser = async (id: string): Promise<void> => {
+export const banUser = async (id: string, reason?: string): Promise<void> => {
   try {
     if (!id || id === "undefined") {
       throw new Error("Invalid user ID")
     }
 
+    console.log("Banning user:", id, reason)
     const response = await fetchWithAuth(`${API_BASE_URL}/admin/users/${id}/ban`, {
       method: "POST",
+      body: JSON.stringify({ reason: reason || "Banned by admin" }),
     })
-
-    // Check if the response is HTML instead of JSON
-    const contentType = response.headers.get("content-type")
-    if (contentType && contentType.includes("text/html")) {
-      throw new Error("Server returned HTML instead of JSON")
-    }
+    console.log("Ban user response status:", response.status)
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Failed to ban user" }))
-      throw new Error(error.message || `Failed to ban user: ${response.status}`)
+      const errorText = await response.text()
+      throw new Error(errorText || `Failed to ban user: ${response.status}`)
     }
   } catch (error) {
     console.error(`Error banning user with id ${id}:`, error)
@@ -239,18 +249,68 @@ export const unbanUser = async (id: string): Promise<void> => {
       method: "POST",
     })
 
-    // Check if the response is HTML instead of JSON
-    const contentType = response.headers.get("content-type")
-    if (contentType && contentType.includes("text/html")) {
-      throw new Error("Server returned HTML instead of JSON")
-    }
-
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Failed to unban user" }))
-      throw new Error(error.message || `Failed to unban user: ${response.status}`)
+      const errorText = await response.text()
+      throw new Error(errorText || `Failed to unban user: ${response.status}`)
     }
   } catch (error) {
     console.error(`Error unbanning user with id ${id}:`, error)
+    throw error
+  }
+}
+
+export const updateUserPAN = async (id: string, pandetails: string, reason?: string): Promise<User> => {
+  try {
+    if (!id || id === "undefined") {
+      throw new Error("Invalid user ID")
+    }
+
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/users/${id}/pan`, {
+      method: "PUT",
+      body: JSON.stringify({ pandetails, reason: reason || "Admin update" }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Failed to update PAN" }))
+      throw new Error(error.message || `Failed to update PAN: ${response.status}`)
+    }
+
+    const result = await response.json()
+    return result.user
+  } catch (error) {
+    console.error(`Error updating PAN for user ${id}:`, error)
+    throw error
+  }
+}
+
+export const deleteUserLogs = async (): Promise<void> => {
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/users/logs`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Failed to delete logs" }))
+      throw new Error(error.message || `Failed to delete logs: ${response.status}`)
+    }
+  } catch (error) {
+    console.error("Error deleting user logs:", error)
+    throw error
+  }
+}
+
+export const deleteServerLogs = async (): Promise<void> => {
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/files/logs`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Failed to delete server logs" }))
+      throw new Error(error.message || `Failed to delete server logs: ${response.status}`)
+    }
+  } catch (error) {
+    console.error("Error deleting server logs:", error)
     throw error
   }
 }

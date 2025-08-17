@@ -1,60 +1,108 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
+
+// Mock data for demonstration
+let mockChartData = [
+  {
+    _id: '1',
+    portfolio: 'portfolio1',
+    date: '2024-01-15T10:00:00.000Z',
+    dateOnly: '2024-01-15',
+    portfolioValue: 150000,
+    cashRemaining: 25000,
+    compareIndexValue: 18500,
+    compareIndexPriceSource: 'closing' as const,
+    usedClosingPrices: true,
+    dataVerified: true,
+    dataQualityIssues: []
+  },
+  {
+    _id: '2',
+    portfolio: 'portfolio1',
+    date: '2024-01-16T10:00:00.000Z',
+    dateOnly: '2024-01-16',
+    portfolioValue: 152000,
+    cashRemaining: 23000,
+    compareIndexValue: 18600,
+    compareIndexPriceSource: 'closing' as const,
+    usedClosingPrices: true,
+    dataVerified: true,
+    dataQualityIssues: []
+  }
+];
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const portfolioId = searchParams.get('portfolioId')
-  const startDate = searchParams.get('startDate')
-  const endDate = searchParams.get('endDate')
-  const limit = parseInt(searchParams.get('limit') || '100')
-  const page = parseInt(searchParams.get('page') || '1')
+  try {
+    const { searchParams } = new URL(request.url);
+    const portfolioId = searchParams.get('portfolioId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const limit = parseInt(searchParams.get('limit') || '100');
+    const page = parseInt(searchParams.get('page') || '1');
 
-  const mockData = {
-    success: true,
-    count: 2,
-    total: 2,
-    pagination: { page, limit, totalPages: 1 },
-    data: [
-      {
-        _id: '1',
-        portfolio: portfolioId || 'portfolio-1',
-        date: new Date().toISOString(),
-        dateOnly: new Date().toISOString().split('T')[0],
-        portfolioValue: 100000,
-        cashRemaining: 10000,
-        compareIndexValue: 25000,
-        compareIndexPriceSource: 'closing' as const,
-        usedClosingPrices: true,
-        dataVerified: true,
-        dataQualityIssues: []
+    let filteredData = [...mockChartData];
+
+    // Filter by portfolio
+    if (portfolioId) {
+      filteredData = filteredData.filter(item => item.portfolio === portfolioId);
+    }
+
+    // Filter by date range
+    if (startDate) {
+      filteredData = filteredData.filter(item => new Date(item.dateOnly) >= new Date(startDate));
+    }
+    if (endDate) {
+      filteredData = filteredData.filter(item => new Date(item.dateOnly) <= new Date(endDate));
+    }
+
+    // Pagination
+    const total = filteredData.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    return NextResponse.json({
+      success: true,
+      count: paginatedData.length,
+      total,
+      pagination: {
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
       },
-      {
-        _id: '2',
-        portfolio: portfolioId || 'portfolio-1',
-        date: new Date(Date.now() - 86400000).toISOString(),
-        dateOnly: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-        portfolioValue: 98000,
-        cashRemaining: 12000,
-        compareIndexValue: 24800,
-        compareIndexPriceSource: 'closing' as const,
-        usedClosingPrices: true,
-        dataVerified: true,
-        dataQualityIssues: []
-      }
-    ]
+      data: paginatedData
+    });
+  } catch (error) {
+    console.error('Error in GET /api/chart-data:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch chart data' },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json(mockData)
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  
-  const newEntry = {
-    _id: Date.now().toString(),
-    ...body,
-    date: body.date || new Date().toISOString(),
-    dateOnly: body.dateOnly || new Date().toISOString().split('T')[0]
-  }
+  try {
+    const body = await request.json();
+    
+    const newEntry = {
+      _id: Date.now().toString(),
+      ...body,
+      date: body.date || new Date().toISOString(),
+      dateOnly: body.dateOnly || new Date().toISOString().split('T')[0],
+      compareIndexPriceSource: body.compareIndexPriceSource || 'closing',
+      usedClosingPrices: body.usedClosingPrices ?? true,
+      dataVerified: body.dataVerified ?? true,
+      dataQualityIssues: body.dataQualityIssues || []
+    };
 
-  return NextResponse.json(newEntry, { status: 201 })
+    mockChartData.push(newEntry);
+
+    return NextResponse.json(newEntry, { status: 201 });
+  } catch (error) {
+    console.error('Error in POST /api/chart-data:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to create chart data' },
+      { status: 400 }
+    );
+  }
 }

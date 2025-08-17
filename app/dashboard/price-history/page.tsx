@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { isAuthenticated } from "@/lib/auth";
 import {
   TrendingUp,
   RefreshCw,
@@ -19,9 +20,11 @@ import {
   Copy,
   BarChart3,
   Trash,
+  AlertCircle,
 } from "lucide-react";
 import { fetchPortfolios, Portfolio } from "@/lib/api";
-import { fetchChartData, createChartData, updateChartData, deleteChartData, fetchPortfolioChartData, createPortfolioChartData, fetchPortfolioPerformance, cleanupDuplicates, ChartDataResponse, ChartDataPoint, CreateChartDataRequest } from "@/lib/api-chart-data";
+import { fetchChartData, createChartData, updateChartData, deleteChartData, fetchPortfolioPerformance, cleanupDuplicates, ChartDataResponse, ChartDataPoint, CreateChartDataRequest } from "@/lib/api-chart-data";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function PriceHistoryPage() {
   const { toast } = useToast();
@@ -29,12 +32,18 @@ export default function PriceHistoryPage() {
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>("");
   const [chartData, setChartData] = useState<ChartDataResponse | null>(null);
   const [performanceData, setPerformanceData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingEntry, setEditingEntry] = useState<ChartDataPoint | null>(null);
+  const [isAuthenticatedState, setIsAuthenticatedState] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(100);
   const [newEntry, setNewEntry] = useState<CreateChartDataRequest>({
     portfolio: "",
     date: new Date().toISOString(),
@@ -50,41 +59,40 @@ export default function PriceHistoryPage() {
 
 
 
-  // Load portfolios using the authenticated function
   const loadPortfolios = async () => {
     try {
       const data = await fetchPortfolios();
-      setPortfolios(data);
+      setPortfolios(data || []);
+      if (data && data.length > 0 && !selectedPortfolio) {
+        setSelectedPortfolio(data[0].id || data[0]._id || '');
+      }
     } catch (error) {
-      console.error("Error loading portfolios:", error);
+      setError("Failed to load portfolios");
       toast({
         title: "Error",
-        description: "Failed to load portfolios. Please check your authentication.",
+        description: "Failed to load portfolios",
         variant: "destructive",
       });
     }
   };
 
-  const loadChartData = async () => {
+  const loadChartData = async (page = currentPage) => {
     setIsLoading(true);
+    setError(null);
     try {
-      // Check if admin token exists
-      const token = localStorage.getItem("adminAccessToken");
-      if (!token) {
-        throw new Error("No admin token found. Please login first.");
-      }
-      
       const portfolioFilter = selectedPortfolio && selectedPortfolio !== "all" ? selectedPortfolio : undefined;
-      const data = await fetchChartData(portfolioFilter, undefined, undefined, 100, 1);
+      const data = await fetchChartData(
+        portfolioFilter, 
+        startDate || undefined, 
+        endDate || undefined, 
+        limit, 
+        page
+      );
       setChartData(data);
+      setCurrentPage(page);
     } catch (error) {
-      console.error("Error loading chart data:", error);
+      setError(error instanceof Error ? error.message : "Failed to load chart data");
       setChartData(null);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load chart data",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
@@ -151,19 +159,23 @@ export default function PriceHistoryPage() {
   };
 
   const loadPortfolioPerformance = async () => {
-    if (!selectedPortfolio || selectedPortfolio === "all") return;
+    if (!selectedPortfolio || selectedPortfolio === "all") {
+      setPerformanceData(null);
+      return;
+    }
     
     setIsLoadingPerformance(true);
     try {
-      const data = await fetchPortfolioPerformance(selectedPortfolio);
+      const data = await fetchPortfolioPerformance(selectedPortfolio, startDate, endDate);
       setPerformanceData(data);
     } catch (error) {
-      console.error("Error loading portfolio performance:", error);
+      console.error("Error loading performance data:", error);
       toast({
         title: "Error",
-        description: "Failed to load portfolio performance data",
+        description: "Failed to load performance data",
         variant: "destructive",
       });
+      setPerformanceData(null);
     } finally {
       setIsLoadingPerformance(false);
     }
@@ -179,7 +191,6 @@ export default function PriceHistoryPage() {
       });
       loadChartData();
     } catch (error) {
-      console.error("Error cleaning up duplicates:", error);
       toast({
         title: "Error",
         description: "Failed to cleanup duplicate entries",
@@ -193,21 +204,29 @@ export default function PriceHistoryPage() {
 
 
   useEffect(() => {
-    loadPortfolios();
+    const checkAuth = async () => {
+      const authStatus = isAuthenticated();
+      setIsAuthenticatedState(authStatus);
+      if (authStatus) {
+        await loadPortfolios();
+      } else {
+        setError("Authentication required");
+        setIsLoading(false);
+      }
+    };
+    checkAuth();
   }, []);
 
   useEffect(() => {
-    if (portfolios.length > 0) {
-      loadChartData();
+    if (isAuthenticatedState) {
+      setCurrentPage(1);
+      loadChartData(1);
       loadPortfolioPerformance();
+      if (selectedPortfolio) {
+        setNewEntry(prev => ({ ...prev, portfolio: selectedPortfolio }));
+      }
     }
-  }, [selectedPortfolio, portfolios]);
-
-  useEffect(() => {
-    if (selectedPortfolio) {
-      setNewEntry(prev => ({ ...prev, portfolio: selectedPortfolio }));
-    }
-  }, [selectedPortfolio]);
+  }, [selectedPortfolio, startDate, endDate, limit, isAuthenticatedState]);
 
 
 
@@ -221,17 +240,38 @@ export default function PriceHistoryPage() {
 
 
 
+  if (!isAuthenticatedState) {
+    return (
+      <div className="container mx-auto p-4 sm:p-6 space-y-4">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            Please log in to access the price history management.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Header */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
             <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-            Chart Data Management
+            Price History Management
           </h1>
           <p className="text-muted-foreground">
-            Manage chart data entries with CRUD operations
+            Manage portfolio price logs and performance data
           </p>
         </div>
         <div className="flex gap-2">
@@ -273,7 +313,7 @@ export default function PriceHistoryPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {portfolios.map((p) => (
-                        <SelectItem key={p.id} value={p.id || 'unknown'}>{p.name}</SelectItem>
+                        <SelectItem key={p.id || p._id} value={p.id || p._id || 'unknown'}>{p.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -371,24 +411,73 @@ export default function PriceHistoryPage() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-        <div className="flex-1 min-w-[220px]">
-          <label className="text-sm font-medium mb-2 block">Filter by Portfolio</label>
-          <Select value={selectedPortfolio || "all"} onValueChange={(value) => setSelectedPortfolio(value === "all" ? "" : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="All portfolios" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All portfolios</SelectItem>
-              {portfolios.map((portfolio) => (
-                <SelectItem key={portfolio.id} value={portfolio.id || 'unknown'}>
-                  {portfolio.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+          <CardDescription>Filter price logs by portfolio, date range, and pagination</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Portfolio</label>
+              <Select value={selectedPortfolio || "all"} onValueChange={(value) => {
+                const newValue = value === "all" ? "" : value;
+                setSelectedPortfolio(newValue);
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All portfolios" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All portfolios</SelectItem>
+                  {portfolios.map((portfolio) => (
+                    <SelectItem key={portfolio.id || portfolio._id} value={portfolio.id || portfolio._id || 'unknown'}>
+                      {portfolio.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Start Date</label>
+              <Input 
+                type="date" 
+                value={startDate} 
+                onChange={(e) => setStartDate(e.target.value)}
+                placeholder="Start date"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">End Date</label>
+              <Input 
+                type="date" 
+                value={endDate} 
+                onChange={(e) => setEndDate(e.target.value)}
+                placeholder="End date"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Limit</label>
+              <Select value={limit.toString()} onValueChange={(value) => setLimit(parseInt(value))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="200">200</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button onClick={() => loadChartData(1)} className="w-full">
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Performance Data Card */}
       {performanceData && (
@@ -447,11 +536,12 @@ export default function PriceHistoryPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  Showing {chartData.data.length} of {chartData.total} entries (includes historical & future dates)
+                  Showing {chartData.data.length} of {chartData.total} entries (Page {chartData.pagination?.page || 1} of {chartData.pagination?.totalPages || 1})
                 </div>
-                <Badge variant="outline">
-                  Total: {chartData.total}
-                </Badge>
+                <div className="flex gap-2">
+                  <Badge variant="outline">Total: {chartData.total}</Badge>
+                  <Badge variant="secondary">Page: {currentPage}</Badge>
+                </div>
               </div>
               
               <div className="w-full overflow-x-auto">
@@ -486,7 +576,7 @@ export default function PriceHistoryPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {portfolios.find(p => p.id === point.portfolio)?.name || point.portfolio}
+                            {portfolios.find(p => (p.id || p._id) === point.portfolio)?.name || point.portfolio}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -501,7 +591,7 @@ export default function PriceHistoryPage() {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-purple-600">
-                            ₹{point.compareIndexValue.toLocaleString()}
+                            ₹{point.compareIndexValue?.toLocaleString() || '0'}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {point.compareIndexPriceSource}
@@ -537,12 +627,57 @@ export default function PriceHistoryPage() {
                   </TableBody>
                 </Table>
               </div>
+              
+              {/* Pagination */}
+              {chartData.pagination && chartData.pagination.totalPages! > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => loadChartData(1)}
+                      disabled={currentPage === 1 || isLoading}
+                    >
+                      First
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => loadChartData(currentPage - 1)}
+                      disabled={currentPage === 1 || isLoading}
+                    >
+                      Previous
+                    </Button>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    Page {currentPage} of {chartData.pagination.totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => loadChartData(currentPage + 1)}
+                      disabled={currentPage === chartData.pagination.totalPages || isLoading}
+                    >
+                      Next
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => loadChartData(chartData.pagination?.totalPages || 1)}
+                      disabled={currentPage === chartData.pagination.totalPages || isLoading}
+                    >
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               {portfolios.length === 0 
                 ? "Loading portfolios..."
-                : "No chart data available. The API endpoint may not be implemented yet."
+                : "No price logs found. Try adjusting your filters or create a new entry."
               }
             </div>
           )}
