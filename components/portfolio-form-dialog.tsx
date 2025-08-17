@@ -2332,7 +2332,7 @@ export function PortfolioFormDialog({
                                     </Badge>
                                   </div>
                                   
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                  <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-sm">
                                     <div>
                                       <span className="text-muted-foreground">Weight: </span>
                                       <span className="font-medium">{holding.weight.toFixed(2)}%</span>
@@ -2342,12 +2342,20 @@ export function PortfolioFormDialog({
                                       <span className="font-medium">₹{holding.buyPrice.toLocaleString()}</span>
                                     </div>
                                     <div>
+                                      <span className="text-muted-foreground">Current Price: </span>
+                                      <span className="font-medium">₹{(holding.currentMarketPrice || holding.buyPrice).toLocaleString()}</span>
+                                    </div>
+                                    <div>
                                       <span className="text-muted-foreground">Quantity: </span>
                                       <span className="font-medium">{holding.quantity}</span>
                                     </div>
                                     <div>
-                                      <span className="text-muted-foreground">Investment: </span>
+                                      <span className="text-muted-foreground">Original Investment: </span>
                                       <span className="font-medium">₹{holding.minimumInvestmentValueStock.toLocaleString()}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Current Value: </span>
+                                      <span className="font-medium">₹{((holding.currentMarketPrice || holding.buyPrice) * holding.quantity).toLocaleString()}</span>
                                     </div>
                                   </div>
 
