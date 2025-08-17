@@ -85,10 +85,6 @@ interface ExtendedHolding extends PortfolioHolding {
   currentMarketPrice?: number;
   priceChange?: number;
   priceChangePercent?: number;
-  originalBuyPrice?: number; // NEW: Track original purchase price for P&L
-  totalQuantityOwned?: number; // NEW: Track total quantity for partial sells
-  realizedPnL?: number; // NEW: Track realized profit/loss
-  soldDate?: string; // NEW: Track when stock was sold for 10-day display
 }
 
 interface PnLCalculation {
@@ -270,10 +266,7 @@ export function PortfolioFormDialog({
   const cashBalance = initialData?.cashBalance ?? (isNaN(calculatedCashBalance) ? 0 : calculatedCashBalance);
   const remainingWeight = 100 - totalWeightUsed;
   
-  // Calculate total realized P&L from sold stocks
-  const totalRealizedPnL = holdings.reduce((sum, holding) => {
-    return sum + (holding.realizedPnL || 0);
-  }, 0);
+
 
   // Auto-adjust minimum investment based on total investment
   const calculateAdjustedMinInvestment = () => {
@@ -326,15 +319,7 @@ export function PortfolioFormDialog({
   const adjustedMinInvestment = calculateAdjustedMinInvestment();
   const needsMinInvestmentAdjustment = adjustedMinInvestment > Number(minInvestment || 0);
 
-  const totalUnrealizedPnL = holdings.reduce((sum, holding) => {
-    if (holding.status === 'Sell') return sum;
-    if (holding.currentMarketPrice && holding.originalBuyPrice) {
-      const currentValue = holding.quantity * holding.currentMarketPrice;
-      const originalCost = holding.quantity * holding.originalBuyPrice;
-      return sum + (currentValue - originalCost);
-    }
-    return sum;
-  }, 0);
+
 
   // Auto-adjust minimum investment and notify admin
   const handleAutoAdjustMinInvestment = () => {
@@ -584,13 +569,7 @@ export function PortfolioFormDialog({
                 stockCapType: h.stockCapType || undefined,
                 originalWeight: h.weight,
                 weight: 0, // Display weight as 0 for sold stocks
-                // Enhanced P&L tracking fields - preserve existing values if present
-                originalBuyPrice: h.originalBuyPrice || h.buyPrice,
-                totalQuantityOwned: h.totalQuantityOwned || 0, // Use preserved actual quantity
-                realizedPnL: h.realizedPnL || 0,
-                status: h.status,
-                sector: h.sector || '',
-                soldDate: h.soldDate, // Preserve sold date
+
               };
             } else {
               // For active holdings, calculate normally
@@ -607,12 +586,7 @@ export function PortfolioFormDialog({
                 leftoverAmount: Math.max(0, leftoverAmount),
                 stockCapType: h.stockCapType || undefined,
                 originalWeight: h.weight,
-                // Enhanced P&L tracking fields - preserve existing values if present
-                originalBuyPrice: h.originalBuyPrice || h.buyPrice,
-                totalQuantityOwned: h.totalQuantityOwned || h.quantity,
-                realizedPnL: h.realizedPnL || 0,
-                status: h.status || 'Hold',
-                sector: h.sector || '',
+
               };
             }
           });
@@ -1014,10 +988,6 @@ export function PortfolioFormDialog({
       originalWeight: accurateWeight,
       stockDetails: newHolding.stockDetails,
       currentMarketPrice: newHolding.stockDetails ? parseFloat(newHolding.stockDetails.currentPrice) : newHolding.buyPrice,
-      // NEW: Enhanced P&L tracking fields
-      originalBuyPrice: newHolding.buyPrice,
-      totalQuantityOwned: investmentDetails.quantity,
-      realizedPnL: 0,
     };
 
     // For existing portfolios, use PATCH API to add holding
@@ -2132,20 +2102,7 @@ export function PortfolioFormDialog({
                           </div>
                         </div>
                         
-                        {/* Show realized P&L if there are any sales */}
-                        {totalRealizedPnL !== 0 && (
-                          <div className="mt-4">
-                            <div className="text-center p-3 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                              <p className="text-sm text-yellow-700 dark:text-yellow-300 font-medium">Total Realized P&L</p>
-                              <p className={`text-xl font-bold ${totalRealizedPnL >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {totalRealizedPnL >= 0 ? '+' : ''}₹{totalRealizedPnL.toLocaleString()}
-                              </p>
-                              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                                From completed stock sales
-                              </p>
-                            </div>
-                          </div>
-                        )}
+
                         
                         {/* Holdings Value Database Notice */}
                         <div className="mt-4">
@@ -2196,23 +2153,7 @@ export function PortfolioFormDialog({
                         })()}
                       </div>
 
-                      {/* Total Unrealized P&L Display */}
-                      {totalUnrealizedPnL !== 0 && (
-                        <div className="p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <TrendingUp className="h-4 w-4 text-blue-600" />
-                              <span className="font-medium">Total Unrealized P&L</span>
-                            </div>
-                            <div className={`font-bold text-lg ${totalUnrealizedPnL >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {totalUnrealizedPnL >= 0 ? '+' : ''}{formatCurrency(totalUnrealizedPnL)}
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            From current holdings at market prices
-                          </p>
-                        </div>
-                      )}
+
                       
                       {totalLeftover > 0 && (
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-800 rounded">
@@ -2460,42 +2401,7 @@ export function PortfolioFormDialog({
                                     </div>
                                   </div>
 
-                                  {/* Enhanced P&L display */}
-                                  {holding.currentMarketPrice && holding.originalBuyPrice && (
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm pt-2 border-t">
-                                      <div>
-                                        <span className="text-muted-foreground">Current Price: </span>
-                                        <span className="font-medium">₹{holding.currentMarketPrice.toLocaleString()}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-muted-foreground">Price Change: </span>
-                                      <span className={`font-medium flex items-center gap-1 ${
-                                          holding.currentMarketPrice > holding.originalBuyPrice ? 'text-green-600 dark:text-green-400' : 
-                                          holding.currentMarketPrice < holding.originalBuyPrice ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'
-                                        }`}>
-                                          {holding.currentMarketPrice > holding.originalBuyPrice ? <TrendingUp className="h-3 w-3" /> : 
-                                           holding.currentMarketPrice < holding.originalBuyPrice ? <TrendingDown className="h-3 w-3" /> : null}
-                                          ₹{Math.abs(holding.currentMarketPrice - holding.originalBuyPrice).toFixed(2)}
-                                        </span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground">Unrealized P&L: </span>
-                                        <span className={`font-medium ${
-                                          (holding.currentMarketPrice * holding.quantity) > (holding.originalBuyPrice * holding.quantity) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                        }`}>
-                                          ₹{((holding.currentMarketPrice - holding.originalBuyPrice) * holding.quantity).toFixed(2)}
-                                        </span>
-                                      </div>
-                                      {holding.realizedPnL && holding.realizedPnL !== 0 && (
-                                        <div>
-                                          <span className="text-muted-foreground">Realized P&L: </span>
-                                          <span className={`font-medium ${holding.realizedPnL > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            ₹{holding.realizedPnL.toFixed(2)}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
