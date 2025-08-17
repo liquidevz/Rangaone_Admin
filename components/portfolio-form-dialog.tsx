@@ -668,13 +668,11 @@ export function PortfolioFormDialog({
         setDownloadLinks([]);
       }
 
-      if (!initialData) {
-        setActiveTab("basic");
-      }
+      setActiveTab("basic");
       resetNewHolding();
       setEditingHolding(null);
     }
-  }, [open, initialData]);
+  }, [open, initialData, holdings.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -853,60 +851,58 @@ export function PortfolioFormDialog({
           buyPrice: holding.buyPrice,
           quantity: holding.quantity,
           minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
+          originalBuyPrice: holding.originalBuyPrice || holding.buyPrice,
+          totalQuantityOwned: holding.totalQuantityOwned || holding.quantity,
+          realizedPnL: holding.realizedPnL || 0,
         }));
 
-      // Calculate expected values to match backend validation
-      const totalHoldingsValue = portfolioHoldings.reduce((sum, h) => sum + h.minimumInvestmentValueStock, 0);
-      const expectedCashBalance = Number(minInvestment) - totalHoldingsValue;
-      const expectedCurrentValue = Number(minInvestment);
-      
-      // Create minimal portfolio data matching API documentation exactly
-      const portfolioData = {
+
+
+      // Create a deep copy of the portfolio data to ensure we don't lose any fields
+      const portfolioData: CreatePortfolioRequest = {
         name,
         description: filteredDescriptions,
-        subscriptionFee: subscriptionFees.map(fee => ({
-          type: fee.type,
-          price: fee.price
-        })),
+        subscriptionFee: subscriptionFees,
         minInvestment: Number(minInvestment),
+        monthlyContribution: monthlyContribution ? Number(monthlyContribution) : undefined,
         durationMonths: 12,
+        holdings: portfolioHoldings.length > 0 ? portfolioHoldings : [],
         PortfolioCategory: portfolioCategory,
-        cashBalance: expectedCashBalance,
-        currentValue: expectedCurrentValue,
-        holdings: portfolioHoldings.map(holding => ({
-          symbol: holding.symbol,
-          weight: holding.weight,
-          sector: holding.sector,
-          buyPrice: holding.buyPrice,
-          quantity: holding.quantity,
-          minimumInvestmentValueStock: holding.minimumInvestmentValueStock,
-          stockCapType: holding.stockCapType || "large cap",
-          status: holding.status
-        })),
-        ...(timeHorizon && { timeHorizon }),
-        ...(rebalancing && { rebalancing }),
-        ...(index && { index }),
-        ...(details && { details }),
-        ...(downloadLinks.length > 0 && { downloadLinks: downloadLinks.map(link => ({
-          linkType: link.linkType,
-          linkUrl: link.linkUrl,
-          linkDiscription: link.linkDiscription
-        })) }),
-        ...(youTubeLinks.length > 0 && { youTubeLinks: youTubeLinks.map(link => ({
-          link: link.link
-        })) }),
+        downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
+        youTubeLinks: youTubeLinks.length > 0 ? youTubeLinks : undefined,
+        timeHorizon,
+        rebalancing,
+        // Use both field names for compatibility with API
+        lastRebalanceDate: lastRebalanceDate,
+        nextRebalanceDate: nextRebalanceDate,
+        index,
+        details,
+        monthlyGains,
+        CAGRSinceInception: cagrSinceInception,
+        oneYearGains,
+        compareWith,
+        // Include all calculated financial values
+        cashBalance: cashBalance,
+        currentValue: cashBalance + holdingsValue,
       };
-      
-      console.log("=== PORTFOLIO DATA BEING SENT ===");
-      console.log(JSON.stringify(portfolioData, null, 2));
-      console.log("=== END PORTFOLIO DATA ===");
       
       // If we're updating an existing portfolio, preserve the ID
       if (initialData && initialData.id) {
         console.log(`Preserving portfolio ID: ${initialData.id}`);
       }
 
-
+      console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
+      console.log("Portfolio Name:", portfolioData.name);
+      console.log("Description:", portfolioData.description);
+      console.log("Subscription Fees:", portfolioData.subscriptionFee);
+      console.log("Min Investment:", portfolioData.minInvestment);
+      console.log("Monthly Contribution:", portfolioData.monthlyContribution);
+      console.log("Last Rebalancing Date:", portfolioData.lastRebalanceDate);
+      console.log("Next Rebalancing Date:", portfolioData.nextRebalanceDate);
+      console.log("Holdings Count:", portfolioData.holdings?.length || 0);
+      console.log("Holdings Data:", portfolioData.holdings);
+      console.log("Full Portfolio Data:", JSON.stringify(portfolioData, null, 2));
+      console.log("=== END DEBUG ===");
       
       await onSubmit(portfolioData);
       onOpenChange(false);
@@ -1119,8 +1115,6 @@ export function PortfolioFormDialog({
       }
     } else {
       // For new portfolios, add to local state
-      console.log('Adding holding to new portfolio:', holdingToAdd);
-      console.log('Current form state - name:', name, 'minInvestment:', minInvestment);
       setHoldings([...holdings, holdingToAdd]);
       
       const newTotalInvestment = totalActualInvestment + investmentDetails.actualInvestmentAmount;
@@ -1134,8 +1128,6 @@ export function PortfolioFormDialog({
           variant: "default",
         });
       }
-      
-      console.log('After adding holding - name:', name, 'minInvestment:', minInvestment);
     }
 
     resetNewHolding();
@@ -1762,10 +1754,10 @@ export function PortfolioFormDialog({
                                 updated[index].value = content;
                                 setDescriptions(updated);
                               }}
-                              placeholder={`Enter ${desc.key} description with formatting...`}
+                              placeholder={`Enter ${desc.key} description`}
                               height={150}
                               disabled={isSubmitting}
-                              theme="auto"
+                              className="border border-zinc-700 rounded-md"
                             />
                           </div>
                         ) : (
@@ -1777,10 +1769,9 @@ export function PortfolioFormDialog({
                             updated[index].value = content;
                             setDescriptions(updated);
                           }}
-                          placeholder={`Enter ${desc.key} description with formatting...`}
+                          placeholder={`Enter ${desc.key} description`}
                           height={120}
                           disabled={isSubmitting}
-                          theme="auto"
                         />
                         )}
                       </div>
@@ -2071,14 +2062,13 @@ export function PortfolioFormDialog({
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="details">Additional Details</Label>
-                      <RichTextEditor
+                      <Textarea
                         id="details"
                         value={details}
-                        onChange={setDetails}
-                        placeholder="Enter additional portfolio details with formatting..."
-                        height={120}
+                        onChange={(e) => setDetails(e.target.value)}
+                        placeholder="Enter additional portfolio details"
+                        className="min-h-[100px]"
                         disabled={isSubmitting}
-                        theme="auto"
                       />
                     </div>
                   </div>
@@ -2615,14 +2605,13 @@ export function PortfolioFormDialog({
                               </div>
                               <div className="grid gap-2">
                                 <Label htmlFor={`link-description-${index}`}>Description</Label>
-                                <RichTextEditor
+                                <Textarea
                                   id={`link-description-${index}`}
                                   value={link.linkDiscription || ""}
-                                  onChange={(content) => updateDownloadLink(index, "linkDiscription", content)}
-                                  placeholder="Enter description for this document with formatting..."
-                                  height={100}
+                                  onChange={(e) => updateDownloadLink(index, "linkDiscription", e.target.value)}
+                                  placeholder="Enter description for this document"
+                                  className="min-h-[80px]"
                                   disabled={isSubmitting}
-                                  theme="auto"
                                 />
                               </div>
                               <div className="flex justify-end">

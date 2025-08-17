@@ -27,8 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkAuth = async () => {
       console.log("Checking authentication for path:", pathname)
 
-      // Skip auth check for login page
-      if (pathname === "/login") {
+      // Skip auth check for public pages
+      if (pathname === "/login" || pathname === "/") {
         setLoading(false)
         setIsLoggedIn(false)
         return

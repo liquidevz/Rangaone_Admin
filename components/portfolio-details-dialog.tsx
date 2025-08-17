@@ -35,12 +35,11 @@ import {
   Building,
   Activity,
   Banknote,
-  RefreshCw,
-  Loader2
+
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { fetchStockSymbolBySymbol, updateStockPrices, type StockSymbol } from "@/lib/api-stock-symbols";
+
 import { HtmlContent } from "@/components/html-content";
 
 // Portfolio interface
@@ -102,11 +101,6 @@ interface HoldingWithPrice {
   buyPrice: number;
   quantity: number;
   minimumInvestmentValueStock: number;
-  currentPrice?: number;
-  exchange?: string;
-  lastUpdated?: string;
-  isLoading?: boolean;
-  error?: string;
 }
 
 export function PortfolioDetailsDialog({
@@ -115,149 +109,7 @@ export function PortfolioDetailsDialog({
   portfolio,
 }: PortfolioDetailsDialogProps) {
   const [copiedId, setCopiedId] = useState(false);
-  const [holdingsWithPrices, setHoldingsWithPrices] = useState<HoldingWithPrice[]>([]);
-  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
-  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
   const { toast } = useToast();
-
-  // Initialize holdings with prices when portfolio changes
-  useEffect(() => {
-    // Always clear holdings first to prevent stale data
-    setHoldingsWithPrices([]);
-    
-    if (portfolio?.holdings) {
-      console.log(`Portfolio Details Dialog - Loading holdings for portfolio: ${portfolio.name} (ID: ${portfolio.id || portfolio._id})`);
-      console.log("Portfolio holdings:", portfolio.holdings);
-      
-      const initialHoldings: HoldingWithPrice[] = portfolio.holdings.map(holding => ({
-        ...holding,
-        isLoading: true
-      }));
-      setHoldingsWithPrices(initialHoldings);
-      fetchAllHoldingPrices(portfolio.holdings);
-    } else {
-      console.log("Portfolio Details Dialog - No portfolio or holdings found, clearing holdings");
-    }
-  }, [portfolio]);
-
-  // Fetch current prices for all holdings
-  const fetchAllHoldingPrices = async (holdings: Portfolio['holdings']) => {
-    setIsLoadingPrices(true);
-    const updatedHoldings: HoldingWithPrice[] = [];
-
-    for (const holding of holdings) {
-      try {
-        const stockData = await fetchStockSymbolBySymbol(holding.symbol);
-        updatedHoldings.push({
-          ...holding,
-          currentPrice: parseFloat(stockData.currentPrice),
-          exchange: stockData.exchange,
-          lastUpdated: stockData.updatedAt,
-          isLoading: false,
-          error: undefined
-        });
-      } catch (error) {
-        console.error(`Error fetching price for ${holding.symbol}:`, error);
-        updatedHoldings.push({
-          ...holding,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to fetch price'
-        });
-      }
-    }
-
-    setHoldingsWithPrices(updatedHoldings);
-    setIsLoadingPrices(false);
-  };
-
-  // Refresh all stock prices (update database first, then fetch)
-  const handleRefreshAllPrices = async () => {
-    if (!portfolio?.holdings || portfolio.holdings.length === 0) {
-      toast({
-        title: "No Holdings",
-        description: "This portfolio has no holdings to refresh",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsRefreshingPrices(true);
-    
-    try {
-      // First, update all stock prices in the database
-      toast({
-        title: "Updating Prices",
-        description: "Fetching latest stock prices from market...",
-      });
-
-      const updateResult = await updateStockPrices();
-      
-      toast({
-        title: "Prices Updated",
-        description: `Updated ${updateResult.updated} stocks, ${updateResult.failed} failed`,
-      });
-
-      // Then fetch the updated prices for our holdings
-      await fetchAllHoldingPrices(portfolio.holdings);
-
-      toast({
-        title: "Success",
-        description: "Portfolio prices refreshed successfully",
-      });
-
-    } catch (error) {
-      console.error("Error refreshing prices:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to refresh prices",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshingPrices(false);
-    }
-  };
-
-  // Refresh individual holding price
-  const handleRefreshSinglePrice = async (symbol: string) => {
-    setHoldingsWithPrices(prev => 
-      prev.map(h => h.symbol === symbol ? { ...h, isLoading: true, error: undefined } : h)
-    );
-
-    try {
-      const stockData = await fetchStockSymbolBySymbol(symbol);
-      setHoldingsWithPrices(prev => 
-        prev.map(h => h.symbol === symbol ? {
-          ...h,
-          currentPrice: parseFloat(stockData.currentPrice),
-          exchange: stockData.exchange,
-          lastUpdated: stockData.updatedAt,
-          isLoading: false,
-          error: undefined
-        } : h)
-      );
-
-      toast({
-        title: "Price Updated",
-        description: `Updated price for ${symbol}`,
-      });
-
-    } catch (error) {
-      console.error(`Error fetching price for ${symbol}:`, error);
-      setHoldingsWithPrices(prev => 
-        prev.map(h => h.symbol === symbol ? {
-          ...h,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to fetch price'
-        } : h)
-      );
-
-      toast({
-        title: "Error",
-        description: `Failed to update price for ${symbol}`,
-        variant: "destructive",
-      });
-    }
-  };
 
   if (!portfolio) return null;
 
@@ -350,14 +202,18 @@ export function PortfolioDetailsDialog({
   };
 
   // Calculate metrics
-  const totalWeight = holdingsWithPrices?.reduce((sum, holding) => sum + holding.weight, 0) || 0;
+  const totalWeight = portfolio.holdings?.reduce((sum, holding) => sum + holding.weight, 0) || 0;
   const totalHoldingsValue = portfolio.holdingsValue || 0;
+  
+  // Debug: Log the actual values
+  console.log('Portfolio holdingsValue from DB:', portfolio.holdingsValue);
+  console.log('Individual holding values:', portfolio.holdings?.map(h => ({ symbol: h.symbol, value: h.minimumInvestmentValueStock })));
   
   const weightUtilization = (totalWeight / 100) * 100;
   const cashUtilization = portfolio.cashBalance ? (portfolio.cashBalance / portfolio.minInvestment) * 100 : 0;
 
   // Group holdings by sector
-  const sectorBreakdown = holdingsWithPrices?.reduce((acc, holding) => {
+  const sectorBreakdown = portfolio.holdings?.reduce((acc, holding) => {
     const sector = holding.sector || "Other";
     if (!acc[sector]) {
       acc[sector] = { weight: 0, value: 0, count: 0 };
@@ -368,30 +224,7 @@ export function PortfolioDetailsDialog({
     return acc;
   }, {} as Record<string, {weight: number; value: number; count: number}>) || {};
 
-  // Calculate portfolio performance based on current prices
-  const portfolioPerformance = holdingsWithPrices?.reduce((acc, holding) => {
-    if (holding.currentPrice && !holding.error) {
-      const currentValue = holding.currentPrice * holding.quantity;
-      const investedValue = holding.buyPrice * holding.quantity;
-      const gain = currentValue - investedValue;
-      const gainPercent = (gain / investedValue) * 100;
-      
-      acc.totalCurrentValue += currentValue;
-      acc.totalInvestedValue += investedValue;
-      acc.totalGain += gain;
-      acc.validHoldings += 1;
-    }
-    return acc;
-  }, {
-    totalCurrentValue: 0,
-    totalInvestedValue: 0,
-    totalGain: 0,
-    validHoldings: 0
-  });
 
-  const overallGainPercent = portfolioPerformance && portfolioPerformance.totalInvestedValue > 0 
-    ? (portfolioPerformance.totalGain / portfolioPerformance.totalInvestedValue) * 100 
-    : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -476,7 +309,7 @@ export function PortfolioDetailsDialog({
                   <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:from-blue-950 dark:to-blue-900 dark:border-blue-700">
                     <CardContent className="p-3 text-center">
                       <IndianRupee className="h-5 w-5 mx-auto text-blue-600 dark:text-blue-400 mb-1" />
-                      <div className="text-lg font-bold text-blue-900 dark:text-blue-100">{holdingsWithPrices?.length || 0}</div>
+                      <div className="text-lg font-bold text-blue-900 dark:text-blue-100">{portfolio.holdings?.length || 0}</div>
                       <div className="text-xs text-blue-700 dark:text-blue-300">Holdings</div>
                     </CardContent>
                   </Card>
@@ -521,48 +354,7 @@ export function PortfolioDetailsDialog({
                   </Card>
                 </div>
 
-                {/* Portfolio Performance Overview */}
-                {portfolioPerformance && portfolioPerformance.validHoldings > 0 && (
-                  <Card className={`border-2 ${overallGainPercent >= 0 ? 'border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-950' : 'border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-950'}`}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <TrendingUp className="h-4 w-4" />
-                        Current Portfolio Performance
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                        <div>
-                          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                            {formatCurrency(portfolioPerformance.totalCurrentValue)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">Current Value</div>
-                        </div>
-                        <div>
-                          <div className="text-lg font-bold">
-                            {formatCurrency(portfolioPerformance.totalInvestedValue)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">Invested</div>
-                        </div>
-                        <div>
-                          <div className={`text-lg font-bold ${overallGainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {overallGainPercent >= 0 ? '+' : ''}{formatCurrency(portfolioPerformance.totalGain)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">P&L</div>
-                        </div>
-                        <div>
-                          <div className={`text-lg font-bold ${overallGainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {overallGainPercent >= 0 ? '+' : ''}{overallGainPercent.toFixed(2)}%
-                          </div>
-                          <div className="text-xs text-muted-foreground">Returns</div>
-                        </div>
-                      </div>
-                      <div className="mt-6 text-xs text-muted-foreground text-center">
-                        Based on {portfolioPerformance.validHoldings} holdings with current prices
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-base">
@@ -757,33 +549,13 @@ export function PortfolioDetailsDialog({
                         <PieChart className="h-4 w-4" />
                         Holdings Overview
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleRefreshAllPrices}
-                          disabled={isRefreshingPrices || isLoadingPrices}
-                          className="h-7 text-xs"
-                        >
-                          {isRefreshingPrices ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Updating...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="h-3 w-3 mr-1" />
-                              Refresh Prices
-                            </>
-                          )}
-                        </Button>
-                      </div>
+
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                       <div className="text-center">
-                        <div className="text-lg font-bold">{holdingsWithPrices?.length || 0}</div>
+                        <div className="text-lg font-bold">{portfolio.holdings?.length || 0}</div>
                         <div className="text-xs text-muted-foreground">Holdings</div>
                       </div>
                       <div className="text-center">
@@ -808,13 +580,7 @@ export function PortfolioDetailsDialog({
                       </div>
                     </div>
 
-                    {/* Loading indicator */}
-                    {isLoadingPrices && (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        <span className="text-sm text-muted-foreground">Loading current prices...</span>
-                      </div>
-                    )}
+
 
                     {/* Compact Sector Breakdown */}
                     {Object.keys(sectorBreakdown).length > 0 && (
@@ -845,14 +611,14 @@ export function PortfolioDetailsDialog({
                     <CardTitle className="text-base">Individual Holdings</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    {!holdingsWithPrices || holdingsWithPrices.length === 0 ? (
+                    {!portfolio.holdings || portfolio.holdings.length === 0 ? (
                       <div className="text-center py-8">
                         <PieChart className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-muted-foreground text-sm">No holdings in this portfolio.</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {holdingsWithPrices.map((holding, index) => (
+                        {portfolio.holdings.map((holding, index) => (
                           <Card key={index} className="border-l-4 border-l-blue-500 dark:border-l-blue-400 hover:shadow-sm transition-shadow">
                             <CardContent className="p-3">
                               <div className="space-y-2">
@@ -870,30 +636,11 @@ export function PortfolioDetailsDialog({
                                         {holding.stockCapType}
                                       </Badge>
                                     )}
-                                    {holding.exchange && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {holding.exchange}
-                                      </Badge>
-                                    )}
                                   </div>
-                                  <div className="text-right flex items-center gap-2">
+                                  <div className="text-right">
                                     <div className="text-lg font-bold text-green-600 dark:text-green-400">
                                       {holding.weight.toFixed(2)}%
                                     </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRefreshSinglePrice(holding.symbol)}
-                                      disabled={holding.isLoading}
-                                      className="h-6 w-6 p-0"
-                                      title="Refresh price"
-                                    >
-                                      {holding.isLoading ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <RefreshCw className="h-3 w-3" />
-                                      )}
-                                    </Button>
                                   </div>
                                 </div>
 
@@ -919,67 +666,9 @@ export function PortfolioDetailsDialog({
                                   </div>
                                 </div>
 
-                                {/* Current vs Buy Price */}
-                                {holding.currentPrice && !holding.error && holding.currentPrice !== holding.buyPrice && (
-                                  <div className="pt-2 border-t">
-                                    <div className="space-y-1">
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-muted-foreground">Current Price:</span>
-                                        <div className="flex items-center gap-2">
-                                          <span className={`font-medium ${
-                                            holding.currentPrice > holding.buyPrice ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                          }`}>
-                                            {formatCurrency(holding.currentPrice)}
-                                          </span>
-                                          <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                            holding.currentPrice > holding.buyPrice 
-                                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                          }`}>
-                                            {holding.currentPrice > holding.buyPrice ? '+' : ''}
-                                            {((holding.currentPrice - holding.buyPrice) / holding.buyPrice * 100).toFixed(2)}%
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-muted-foreground">P&L:</span>
-                                        <div className="flex items-center gap-2">
-                                          <span className={`font-medium ${
-                                            holding.currentPrice > holding.buyPrice ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                          }`}>
-                                            {holding.currentPrice > holding.buyPrice ? '+' : ''}
-                                            {formatCurrency((holding.currentPrice - holding.buyPrice) * holding.quantity)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      {holding.lastUpdated && (
-                                        <div className="text-xs text-muted-foreground">
-                                          Updated: {formatDate(holding.lastUpdated)}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
 
-                                {/* Error state */}
-                                {holding.error && (
-                                  <div className="pt-2 border-t">
-                                    <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-                                      <AlertTriangle className="h-3 w-3" />
-                                      <span>Failed to load current price: {holding.error}</span>
-                                    </div>
-                                  </div>
-                                )}
 
-                                {/* Loading state */}
-                                {holding.isLoading && (
-                                  <div className="pt-2 border-t">
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      <span>Loading current price...</span>
-                                    </div>
-                                  </div>
-                                )}
+
                               </div>
                             </CardContent>
                           </Card>
@@ -1026,36 +715,7 @@ export function PortfolioDetailsDialog({
                       </div>
                     </div>
 
-                    {/* Real-time Portfolio Performance */}
-                    {portfolioPerformance && portfolioPerformance.validHoldings > 0 && (
-                      <div className="mt-4">
-                        <Separator className="mb-4" />
-                        <h4 className="font-medium mb-3 text-sm flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4" />
-                          Real-time Performance
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="text-center p-3 border rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950">
-                            <div className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-1">
-                              {formatCurrency(portfolioPerformance.totalCurrentValue)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">Current Value</div>
-                          </div>
-                          
-                          <div className="text-center p-3 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
-                            <div className={`text-lg font-bold mb-1 ${
-                              overallGainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                            }`}>
-                              {overallGainPercent >= 0 ? '+' : ''}{overallGainPercent.toFixed(2)}%
-                            </div>
-                            <div className="text-xs text-muted-foreground">Overall Returns</div>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-xs text-muted-foreground text-center">
-                          Based on {portfolioPerformance.validHoldings} holdings with current market prices
-                        </div>
-                      </div>
-                    )}
+
 
                     {portfolio.compareWith && (
                       <div className="mt-4 p-3 bg-muted rounded-lg">

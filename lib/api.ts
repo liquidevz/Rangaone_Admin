@@ -19,6 +19,9 @@ export interface SubscriptionFee {
 }
 
 export interface PortfolioHolding {
+  realizedPnL: number;
+  originalBuyPrice: number;
+  totalQuantityOwned: number;
   symbol: string;
   weight: number;
   sector: string;
@@ -27,10 +30,6 @@ export interface PortfolioHolding {
   buyPrice: number;
   quantity: number;
   minimumInvestmentValueStock: number;
-  originalBuyPrice?: number;
-  totalQuantityOwned?: number;
-  realizedPnL?: number;
-  soldDate?: string;
 }
 
 export interface DownloadLink {
