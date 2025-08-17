@@ -400,7 +400,7 @@ export default function PriceHistoryPage() {
             </DialogContent>
           </Dialog>
           <Button 
-            onClick={loadChartData} 
+            onClick={() => loadChartData()} 
             disabled={isLoading}
             variant="outline"
             className="w-full sm:w-auto"
@@ -581,20 +581,20 @@ export default function PriceHistoryPage() {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-blue-600">
-                            {formatCurrency(point.portfolioValue)}
+                            {formatCurrency(point.portfolioValue || 0)}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-green-600">
-                            {formatCurrency(point.cashRemaining)}
+                            {formatCurrency(point.cashRemaining || 0)}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-purple-600">
-                            ₹{point.compareIndexValue?.toLocaleString() || '0'}
+                            ₹{point.compareIndexValue ? point.compareIndexValue.toLocaleString() : '0'}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {point.compareIndexPriceSource}
+                            {point.compareIndexPriceSource || 'N/A'}
                           </div>
                         </TableCell>
                         <TableCell>
