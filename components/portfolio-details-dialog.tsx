@@ -70,6 +70,20 @@ interface Portfolio {
     buyPrice: number;
     quantity: number;
     minimumInvestmentValueStock: number;
+    realizedPnL?: number;
+    soldDate?: string;
+  }>;
+  sold?: Array<{
+    symbol: string;
+    weight: number;
+    sector: string;
+    stockCapType?: string;
+    status: string;
+    buyPrice: number;
+    quantity: number;
+    minimumInvestmentValueStock: number;
+    realizedPnL?: number;
+    soldDate?: string;
   }>;
   downloadLinks?: Array<{
     _id?: string;

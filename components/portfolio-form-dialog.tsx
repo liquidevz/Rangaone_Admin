@@ -802,7 +802,6 @@ export function PortfolioFormDialog({
       console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
       console.log("Portfolio Name:", portfolioData.name);
       console.log("Min Investment:", portfolioData.minInvestment);
-      console.log("Portfolio Value:", portfolioData.portfolioValue);
       console.log("Cash Balance:", portfolioData.cashBalance);
       console.log("Total Actual Investment:", totalActualInvestment);
       console.log("Holdings Count:", portfolioData.holdings?.length || 0);
@@ -1131,7 +1130,7 @@ export function PortfolioFormDialog({
       index,
       originalHolding: holding,
       newWeight: holding.weight,
-      status: holding.status,
+      status: holding.status as "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "addon-buy",
       action: "hold",
       weightChange: 0,
       latestPrice,
