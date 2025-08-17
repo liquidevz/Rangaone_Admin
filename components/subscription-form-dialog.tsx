@@ -133,16 +133,16 @@ export function SubscriptionFormDialog({ open, onOpenChange, onSuccess }: Subscr
                     <span>{getSelectedPortfolio()?.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Risk Level:</span>
-                    <span>{getSelectedPortfolio()?.riskLevel}</span>
+                    <span className="text-muted-foreground">Category:</span>
+                    <span>{getSelectedPortfolio()?.PortfolioCategory || "N/A"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subscription Fee:</span>
-                    <span>(getSelectedPortfolio()?.subscriptionFee)</span>
+                    <span>{getSelectedPortfolio()?.subscriptionFee?.[0] ? `₹${getSelectedPortfolio()?.subscriptionFee[0].price}/${getSelectedPortfolio()?.subscriptionFee[0].type}` : "N/A"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Min Investment:</span>
-                    <span>(getSelectedPortfolio()?.minInvestment)</span>
+                    <span>{getSelectedPortfolio()?.minInvestment ? `₹${getSelectedPortfolio()?.minInvestment.toLocaleString()}` : "N/A"}</span>
                   </div>
                 </div>
               </div>

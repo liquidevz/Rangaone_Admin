@@ -21,7 +21,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   fetchPaymentHistory,
   fetchSubscriptions,
-  updateSubscriptionStatus,
   cancelSubscription,
   type PaymentHistory,
   type Subscription,
@@ -152,11 +151,11 @@ export default function SubscriptionsPage() {
           description: result.message || "The subscription has been successfully cancelled",
         });
       } else {
-      await updateSubscriptionStatus(selectedSubscription.id, newStatus);
-      toast({
-        title: "Status Updated",
-        description: `Subscription status has been updated to ${newStatus}`,
-      });
+        toast({
+          title: "Feature Not Available",
+          description: "Status update functionality is not implemented yet",
+          variant: "destructive",
+        });
       }
       setStatusDialogOpen(false);
       loadData();

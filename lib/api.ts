@@ -519,6 +519,19 @@ export const cancelSubscription = async (subscriptionId: string): Promise<{ mess
   return await response.json();
 };
 
+/**
+ * Updates a subscription's status.
+ */
+export const updateSubscriptionStatus = async (subscriptionId: string, status: string): Promise<Subscription> => {
+  if (!subscriptionId) throw new Error("Invalid subscription ID");
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/subscriptions/${subscriptionId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) throw new Error((await response.json()).message || "Failed to update subscription status");
+  return await response.json();
+};
+
 
 
 /**

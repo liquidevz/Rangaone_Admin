@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  fetchActiveSubscriptions,
+  fetchSubscriptions,
   fetchPaymentHistory,
   cancelSubscription,
   type PaymentHistory,
@@ -55,7 +55,7 @@ export default function ActiveSubscriptionsPage() {
     setIsLoading(true);
     try {
       const [subscriptionsData, paymentsData] = await Promise.all([
-        fetchActiveSubscriptions(),
+        fetchSubscriptions(),
         fetchPaymentHistory(),
       ]);
 

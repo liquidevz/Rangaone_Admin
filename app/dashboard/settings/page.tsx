@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { PlusCircle, Pencil, Trash2, RefreshCw, Mail, Upload, MoreHorizontal, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { fetchConfigs, createConfig, updateConfig, deleteConfig, fetchConfigByKey, type Config } from "@/lib/api"
+import { fetchConfigs, createConfig, updateConfig, deleteConfig, type Config } from "@/lib/api"
 import { ConfigFormDialog } from "@/components/config-form-dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { SmtpTestDialog } from "@/components/smtp-test-dialog"
@@ -128,16 +128,15 @@ export default function SettingsPage() {
     }
   }
 
-  const openEditDialog = async (key: string) => {
-    try {
-      const config = await fetchConfigByKey(key)
+  const openEditDialog = (key: string) => {
+    const config = configs.find(c => c.key === key)
+    if (config) {
       setSelectedConfig(config)
       setEditDialogOpen(true)
-    } catch (error) {
-      console.error("Error fetching configuration:", error)
+    } else {
       toast({
-        title: "Failed to load configuration",
-        description: error instanceof Error ? error.message : "An error occurred",
+        title: "Configuration not found",
+        description: "The requested configuration could not be found",
         variant: "destructive",
       })
     }
