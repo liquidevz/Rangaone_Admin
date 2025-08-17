@@ -333,28 +333,7 @@ export function PortfolioFormDialog({
     }
   };
 
-  // Clean up sold stocks that are older than 10 days
-  const cleanupOldSoldStocks = () => {
-    const now = Date.now();
-    const updatedHoldings = holdings.filter(holding => {
-      if (holding.status === 'Sell' && holding.soldDate) {
-        const soldDate = new Date(holding.soldDate);
-        const daysSinceSold = Math.floor((now - soldDate.getTime()) / (1000 * 60 * 60 * 24));
-        return daysSinceSold <= 10; // Keep stocks sold within 10 days
-      }
-      return true; // Keep all non-sold stocks
-    });
-    
-    if (updatedHoldings.length !== holdings.length) {
-      setHoldings(updatedHoldings);
-      const removedCount = holdings.length - updatedHoldings.length;
-      toast({
-        title: "Cleanup Complete",
-        description: `Removed ${removedCount} sold stock${removedCount > 1 ? 's' : ''} that were sold more than 10 days ago.`,
-        variant: "default",
-      });
-    }
-  };
+
 
   // Update all stock prices
   const handleUpdateAllPrices = async () => {
@@ -440,13 +419,8 @@ export function PortfolioFormDialog({
     });
   };
 
-  // Auto-cleanup old sold stocks when dialog opens
   useEffect(() => {
     if (open) {
-      // Clean up old sold stocks first
-      if (holdings.length > 0) {
-        cleanupOldSoldStocks();
-      }
       if (initialData) {
         console.log("Initializing form with data:", initialData);
 
@@ -642,11 +616,13 @@ export function PortfolioFormDialog({
         setDownloadLinks([]);
       }
 
-      setActiveTab("basic");
+      if (!initialData) {
+        setActiveTab("basic");
+      }
       resetNewHolding();
       setEditingHolding(null);
     }
-  }, [open, initialData, holdings.length]);
+  }, [open, initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -988,6 +964,9 @@ export function PortfolioFormDialog({
       originalWeight: accurateWeight,
       stockDetails: newHolding.stockDetails,
       currentMarketPrice: newHolding.stockDetails ? parseFloat(newHolding.stockDetails.currentPrice) : newHolding.buyPrice,
+      realizedPnL: 0,
+      originalBuyPrice: newHolding.buyPrice,
+      totalQuantityOwned: investmentDetails.quantity,
     };
 
     // For existing portfolios, use PATCH API to add holding
@@ -1048,10 +1027,6 @@ export function PortfolioFormDialog({
             allocatedAmount: (h.weight / 100) * portfolioBase,
             leftoverAmount: 0,
             originalWeight: h.weight,
-            originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
-            totalQuantityOwned: h.totalQuantity || h.quantity,
-            quantity: h.totalQuantity || h.quantity,
-            realizedPnL: h.realizedPnL || 0,
             status: h.status || 'Hold'
           }));
           console.log('Converted holdings:', convertedHoldings);
@@ -1165,10 +1140,6 @@ export function PortfolioFormDialog({
             allocatedAmount: (h.weight / 100) * portfolioValue,
             leftoverAmount: 0,
             originalWeight: h.weight,
-            originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
-            totalQuantityOwned: h.totalQuantity || h.quantity,
-            quantity: h.totalQuantity || h.quantity,
-            realizedPnL: h.realizedPnL || 0,
             status: h.status || 'Hold'
           }));
           setHoldings(convertedHoldings);
@@ -1448,12 +1419,7 @@ export function PortfolioFormDialog({
             allocatedAmount: (h.weight / 100) * portfolioValue,
             leftoverAmount: 0,
             originalWeight: h.weight,
-            originalBuyPrice: h.originalBuyPrice || h.averagePrice || h.buyPrice,
-            totalQuantityOwned: h.totalQuantity || h.quantity,
-            quantity: h.totalQuantity || h.quantity,
-            realizedPnL: h.realizedPnL || 0,
-            status: h.status || 'Hold',
-            soldDate: h.soldDate
+            status: h.status || 'Hold'
           }));
           setHoldings(convertedHoldings);
         }
@@ -1515,8 +1481,6 @@ export function PortfolioFormDialog({
       allocatedAmount: recomputed.allocatedAmount,
       leftoverAmount: Number(recomputed.leftoverAmount.toFixed(2)),
       currentMarketPrice: editingHolding.latestPrice,
-      originalBuyPrice: originalHolding.originalBuyPrice || originalHolding.buyPrice,
-      totalQuantityOwned: recomputed.quantity,
     };
     updatedHoldings[index] = updatedHolding;
     setHoldings(updatedHoldings);
@@ -2342,16 +2306,7 @@ export function PortfolioFormDialog({
                     ) : (
                       <div className="space-y-3">
                         {holdings.map((holding, index) => {
-                          // Check if stock was sold and if it's been more than 10 days
                           const isSold = holding.status === 'Sell';
-                          const soldDate = holding.soldDate ? new Date(holding.soldDate) : null;
-                          const daysSinceSold = soldDate ? Math.floor((Date.now() - soldDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-                          const shouldHideSoldStock = isSold && daysSinceSold > 10;
-                          
-                          // Don't render stocks that have been sold for more than 10 days
-                          if (shouldHideSoldStock) {
-                            return null;
-                          }
                           
                           return (
                           <Card key={index} className={isSold ? 'opacity-60 border-red-200 dark:border-red-800' : ''}>
@@ -2373,13 +2328,8 @@ export function PortfolioFormDialog({
                                       holding.status === 'partial-sell' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300' :
                                       'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                                     }`}>
-                                      {holding.status === 'addon-buy' ? 'Buy More' : holding.status === 'Sell' ? `SOLD ${daysSinceSold}d ago` : holding.status}
+                                      {holding.status === 'addon-buy' ? 'Buy More' : holding.status}
                                     </Badge>
-                                    {isSold && (
-                                      <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400">
-                                        {10 - daysSinceSold} days left
-                                      </Badge>
-                                    )}
                                   </div>
                                   
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
@@ -2435,17 +2385,13 @@ export function PortfolioFormDialog({
                                       </Button>
                                     </>
                                   )}
-                                  {isSold && (
-                                    <div className="text-xs text-muted-foreground">
-                                      Sold on {soldDate?.toLocaleDateString()}
-                                    </div>
-                                  )}
+
                                 </div>
                               </div>
                             </CardContent>
                           </Card>
                           );
-                        }).filter(Boolean)}
+                        })}
                       </div>
                     )}
                   </div>
