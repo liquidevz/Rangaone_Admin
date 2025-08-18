@@ -793,21 +793,21 @@ export function PortfolioFormDialog({
         currentValue: calculatedCurrentValue,
       };
       
-      // If we're updating an existing portfolio, preserve the ID
-      if (initialData && initialData.id) {
-        console.log(`Preserving portfolio ID: ${initialData.id}`);
-      }
-
       console.log("=== PORTFOLIO SUBMISSION DEBUG ===");
       console.log("Portfolio Name:", portfolioData.name);
       console.log("Min Investment:", portfolioData.minInvestment);
       console.log("Cash Balance:", portfolioData.cashBalance);
       console.log("Total Actual Investment:", totalActualInvestment);
       console.log("Holdings Count:", portfolioData.holdings?.length || 0);
-      console.log("Request Body JSON:", JSON.stringify(portfolioData));
       console.log("=== END DEBUG ===");
       
       await onSubmit(portfolioData);
+      
+      // Trigger data refresh in parent component
+      if (onDataChange) {
+        onDataChange();
+      }
+      
       onOpenChange(false);
     } catch (error) {
       console.error("Error submitting portfolio:", error);
@@ -985,7 +985,10 @@ export function PortfolioFormDialog({
           console.log('Converted holdings:', convertedHoldings);
           setHoldings(convertedHoldings);
         } else {
-          console.log('No portfolio.holdings in response, closing dialog to refresh');
+          console.log('No portfolio.holdings in response, refreshing parent data');
+          if (onDataChange) {
+            onDataChange();
+          }
           onOpenChange(false);
         }
         
@@ -1000,18 +1003,16 @@ export function PortfolioFormDialog({
           }
         }
 
-        // Trigger data refresh in parent component
-        if (onDataChange) {
-          onDataChange();
-        }
-        
         toast({
           title: "Holding Added",
           description: `${newHolding.symbol} added successfully`,
         });
         
-        // Don't close dialog, just refresh the form data
-        resetNewHolding();
+        // Close dialog and refresh parent data
+        onOpenChange(false);
+        if (onDataChange) {
+          setTimeout(() => onDataChange(), 100);
+        }
         return;
       } catch (error) {
         toast({
@@ -1099,19 +1100,19 @@ export function PortfolioFormDialog({
           if (onDataChange) {
             onDataChange();
           }
+          onOpenChange(false);
         }
 
-        // Trigger data refresh in parent component
-        if (onDataChange) {
-          onDataChange();
-        }
-        
         toast({
           title: "Holding Removed",
           description: `${removedHolding.symbol} removed successfully`,
         });
         
-        // Don't close dialog, just refresh
+        // Close dialog and refresh parent data
+        onOpenChange(false);
+        if (onDataChange) {
+          setTimeout(() => onDataChange(), 100);
+        }
         return;
       } catch (error) {
         console.error('Error removing holding:', error);
@@ -1306,7 +1307,7 @@ export function PortfolioFormDialog({
           const additionalQuantity = Math.floor(additionalInvestment / (editingHolding.latestPrice || originalHolding.buyPrice));
           
           requestBody = {
-            stockAction: 'buy',
+            stockAction: "buy",
             holdings: [{
               symbol: originalHolding.symbol,
               sector: originalHolding.sector,
@@ -1325,7 +1326,7 @@ export function PortfolioFormDialog({
           const saleType = action === 'sell' ? 'complete' : 'partial';
           
           requestBody = {
-            stockAction: 'sell',
+            stockAction: "sell",
             holdings: [{
               symbol: originalHolding.symbol,
               saleType: saleType
@@ -1384,6 +1385,12 @@ export function PortfolioFormDialog({
             status: h.status || 'Hold'
           }));
           setHoldings(convertedHoldings);
+        } else {
+          // Refresh parent data if no holdings in response
+          if (onDataChange) {
+            onDataChange();
+          }
+          onOpenChange(false);
         }
         
         // Show operation results
@@ -1411,12 +1418,13 @@ export function PortfolioFormDialog({
           }
         }
         
-        // Trigger data refresh in parent component
-        if (onDataChange) {
-          onDataChange();
-        }
-        
         setEditingHolding(null);
+        
+        // Close dialog and refresh parent data
+        onOpenChange(false);
+        if (onDataChange) {
+          setTimeout(() => onDataChange(), 100);
+        }
         return;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "An error occurred";

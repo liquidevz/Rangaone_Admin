@@ -576,7 +576,11 @@ export default function PriceHistoryPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {portfolios.find(p => (p.id || p._id) === point.portfolio)?.name || point.portfolio}
+                            {(() => {
+                              const portfolioId = typeof point.portfolio === 'string' ? point.portfolio : (point.portfolio as any)?.id || (point.portfolio as any)?._id;
+                              const portfolio = portfolios.find(p => (p.id || p._id) === portfolioId);
+                              return portfolio?.name || portfolioId || 'Unknown';
+                            })()}
                           </Badge>
                         </TableCell>
                         <TableCell>

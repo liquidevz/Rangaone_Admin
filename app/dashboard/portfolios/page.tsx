@@ -18,6 +18,7 @@ import {
   deletePortfolio,
   createPortfolio,
   updatePortfolio,
+  updatePortfolioHoldings,
   type Portfolio,
   type CreatePortfolioRequest,
 } from "@/lib/api"

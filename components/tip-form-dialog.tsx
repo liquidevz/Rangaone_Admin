@@ -74,7 +74,7 @@ const tipSchema = z.object({
   }),
   action: z.string()
     .min(1, "Action is required")
-    .refine((val) => ["buy", "sell", "hold", "partial sell", "partial profit", "add more"].includes(val), {
+    .refine((val) => ["buy", "sell", "hold"].includes(val), {
       message: "Please select a valid action",
     }),
   buyRange: z.string()
@@ -193,8 +193,6 @@ export function TipFormDialog({
 
   // Conditional field display logic
   const showTargetFields = watchedAction === "buy" || watchedAction === "sell";
-  const showExitFields = watchedAction === "partial sell" || watchedAction === "partial profit";
-  const showAddMoreField = watchedAction === "buy" || watchedAction === "hold" || watchedAction === "add more";
   const showClosedTipFields = watchedStatus === "Closed";
 
   // Auto-calculate target/exit percentage
@@ -795,8 +793,6 @@ export function TipFormDialog({
                           <SelectItem value="buy">Buy</SelectItem>
                           <SelectItem value="sell">Sell</SelectItem>
                           <SelectItem value="hold">Hold</SelectItem>
-                          <SelectItem value="partial sell">Partial Sell</SelectItem>
-                          <SelectItem value="partial profit">Partial Profit</SelectItem>
                           <SelectItem value="add more">Add More</SelectItem>
                         </SelectContent>
                       </Select>
@@ -829,154 +825,93 @@ export function TipFormDialog({
 
               {/* Target Price and Percentage - Show for buy/sell actions */}
               {showTargetFields && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={control}
-                    name="targetPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm flex items-center gap-2">
-                          Target Price (₹)
-                          {selectedStockDetails && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setIsAutoCalcTarget(!isAutoCalcTarget)}
-                              className="h-6 px-2 text-xs"
-                            >
-                              <Calculator className="h-3 w-3 mr-1" />
-                              {isAutoCalcTarget ? "Manual" : "Auto"}
-                            </Button>
-                          )}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter target price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={control}
-                    name="targetPercentage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">
-                          {watchedAction === "sell" ? "Exit Percentage" : "Target Percentage"}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., 15% or -10%"
-                            {...field}
-                            disabled={isSubmitting || isAutoCalcTarget}
-                          />
-                        </FormControl>
-                        <FormDescription className="text-xs">
-                          {isAutoCalcTarget ? "Auto-calculated based on current price" : "Enter percentage manually"}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              {/* Add More At - Show for buy/hold/add more actions */}
-              {showAddMoreField && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={control}
-                  name="addMoreAt"
+                  name="targetPrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Add More At (₹)</FormLabel>
+                          <FormLabel className="text-sm">{watchedAction === "sell" ? "Exit Price" : "Target Price"} (₹)</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Price to add more shares"
-                          type="number"
-                          step="0.01"
-                          min="0"
+                              placeholder="e.g., 150.75"
+                              type="number"
+                              step="0.01"
+                              min="0"
                           {...field}
                           disabled={isSubmitting}
                         />
                       </FormControl>
-                      <FormDescription className="text-xs">
-                        Price level to consider adding more shares
-                      </FormDescription>
+                          <FormDescription className="text-xs">
+                            {watchedAction === "sell" 
+                              ? "Enter exit price (auto-calculates exit percentage)"
+                              : "Enter positive number (auto-calculates percentage)"
+                            }
+                          </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
 
-              {/* Exit Fields - Show for partial sell/profit actions */}
-              {showExitFields && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={control}
-                    name="exitPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm flex items-center gap-2">
-                          Exit Price (₹)
-                          {selectedStockDetails && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setIsAutoCalcExit(!isAutoCalcExit)}
-                              className="h-6 px-2 text-xs"
-                            >
-                              <Calculator className="h-3 w-3 mr-1" />
-                              {isAutoCalcExit ? "Manual" : "Auto"}
-                            </Button>
-                          )}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter exit price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={control}
-                    name="exitStatusPercentage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Exit Percentage</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., 25%"
-                            {...field}
-                            disabled={isSubmitting || isAutoCalcExit}
-                          />
-                        </FormControl>
-                        <FormDescription className="text-xs">
-                          {isAutoCalcExit ? "Auto-calculated based on current price" : "Enter percentage manually"}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={control}
+                  name="targetPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                          <FormLabel className={`text-sm flex items-center gap-2 ${
+                            watchedStatus === "Closed" ? "text-orange-600" : ""
+                          }`}>
+                            {watchedStatus === "Closed" ? "Exit Range" : watchedAction === "sell" ? "Exit Percentage" : "Target Percentage"}
+                            {watchedStatus === "Closed" && (
+                              <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                                Closed Tip
+                              </Badge>
+                            )}
+                            {selectedStockDetails && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsAutoCalcTarget(!isAutoCalcTarget)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                <Calculator className="h-3 w-3 mr-1" />
+                                {isAutoCalcTarget ? "Auto" : "Manual"}
+                              </Button>
+                            )}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={watchedStatus === "Closed" ? "e.g., 150-200 or 25-30%" : watchedAction === "sell" ? "e.g., 25% or 25" : "e.g., 25% or 25"}
+                              {...field}
+                              disabled={isSubmitting || isAutoCalcTarget}
+                              className={watchedStatus === "Closed" ? "border-orange-300" : ""}
+                            />
+                          </FormControl>
+                          <FormDescription className={`text-xs ${
+                            watchedStatus === "Closed" ? "text-orange-600" : ""
+                          }`}>
+                            {watchedStatus === "Closed" 
+                              ? (isAutoCalcTarget ? "Auto-calculated exit range" : "Enter exit range manually (e.g., 150-200 or 25-30%)")
+                              : watchedAction === "sell" 
+                                ? (isAutoCalcTarget ? "Auto-calculated exit percentage" : "Enter exit percentage manually")
+                                : (isAutoCalcTarget ? "Auto-calculated from target price" : "Enter percentage manually")
+                            }
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+
                 </div>
               )}
+
+
+
+
 
               {/* Status and Horizon */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1026,28 +961,52 @@ export function TipFormDialog({
                 />
               </div>
 
-              {/* Closed Tip Fields - Show when status is Closed */}
+              {/* Exit Status and Percentage for Closed Tips */}
               {showClosedTipFields && (
-                <FormField
-                  control={control}
-                  name="exitStatus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Exit Status</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Reason for closing (e.g., Target achieved, Stop loss hit)"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs">
-                        Explain why this tip was closed
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="exitStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Exit Status</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select exit status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Loss Booked">Loss Booked</SelectItem>
+                              <SelectItem value="Profit Booked">Profit Booked</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="exitStatusPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Exit Status Percentage</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 25% or -15%"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          Enter percentage gain/loss (positive for profit, negative for loss)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               )}
 
               {/* Confidence Score */}

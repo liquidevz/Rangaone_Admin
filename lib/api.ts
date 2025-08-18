@@ -261,11 +261,26 @@ export const createPortfolio = async (portfolioData: CreatePortfolioRequest): Pr
  */
 export const updatePortfolio = async (id: string, portfolioData: Partial<CreatePortfolioRequest>): Promise<Portfolio> => {
   if (!id) throw new Error("Invalid portfolio ID");
+  // Use the exact same structure as working stock operations
+  const requestBody = {
+    stockAction: "replace",
+    holdings: portfolioData.holdings || [],
+    ...portfolioData
+  };
+  console.log('UPDATE PORTFOLIO REQUEST BODY:', JSON.stringify(requestBody, null, 2));
   const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(portfolioData),
+    body: JSON.stringify(requestBody),
   });
-  if (!response.ok) throw new Error((await response.json()).message || "Failed to update portfolio");
+  if (!response.ok) {
+    const responseText = await response.text();
+    try {
+      const errorData = JSON.parse(responseText);
+      throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`);
+    } catch (jsonError) {
+      throw new Error(responseText || `Server error: ${response.status}`);
+    }
+  }
   return await response.json();
 };
 
