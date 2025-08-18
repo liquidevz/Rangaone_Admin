@@ -132,7 +132,7 @@ export interface PortfolioTip {
   exitPrice?: string;
   exitStatus?: string;
   exitStatusPercentage?: string;
-  horizon?: "Short Term" | "Medium Term" | "Long Term";
+  horizon?: "Short Term" | "Swing " | "Long Term";
   downloadLinks?: Array<{ _id?: string; name: string; url: string }>;
   createdAt: string;
   updatedAt: string;
@@ -153,7 +153,7 @@ export interface CreatePortfolioTipRequest {
   exitPrice?: string;
   exitStatus?: string;
   exitStatusPercentage?: string;
-  horizon?: "Short Term" | "Medium Term" | "Long Term";
+  horizon?: "Short Term" | "Swing " | "Long Term";
   downloadLinks?: Array<{ name: string; url: string }>;
 }
 

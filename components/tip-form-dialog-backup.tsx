@@ -93,7 +93,7 @@ const tipSchema = z.object({
   exitStatusPercentage: z.string().optional(),
   horizon: z.string()
     .min(1, "Horizon is required")
-    .refine((val) => ["Short Term", "Medium Term", "Long Term"].includes(val), {
+    .refine((val) => ["Short Term", "Swing ", "Long Term"].includes(val), {
       message: "Please select a valid time horizon",
     }),
   tipUrl: z.string()
@@ -1094,7 +1094,7 @@ export function TipFormDialog({
                           </SelectTrigger>
                           <SelectContent className="bg-zinc-800 border-zinc-700">
                             <SelectItem value="Short Term" className="text-white hover:bg-zinc-700">Short Term</SelectItem>
-                            <SelectItem value="Medium Term" className="text-white hover:bg-zinc-700">Medium Term</SelectItem>
+                            <SelectItem value="Swing " className="text-white hover:bg-zinc-700">Swing </SelectItem>
                             <SelectItem value="Long Term" className="text-white hover:bg-zinc-700">Long Term</SelectItem>
                           </SelectContent>
                         </Select>
