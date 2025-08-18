@@ -827,6 +827,255 @@ export function TipFormDialog({
                 )}
               />
 
+              {/* Target Price and Percentage - Show for buy/sell actions */}
+              {showTargetFields && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="targetPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm flex items-center gap-2">
+                          Target Price (₹)
+                          {selectedStockDetails && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsAutoCalcTarget(!isAutoCalcTarget)}
+                              className="h-6 px-2 text-xs"
+                            >
+                              <Calculator className="h-3 w-3 mr-1" />
+                              {isAutoCalcTarget ? "Manual" : "Auto"}
+                            </Button>
+                          )}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter target price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={control}
+                    name="targetPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">
+                          {watchedAction === "sell" ? "Exit Percentage" : "Target Percentage"}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 15% or -10%"
+                            {...field}
+                            disabled={isSubmitting || isAutoCalcTarget}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          {isAutoCalcTarget ? "Auto-calculated based on current price" : "Enter percentage manually"}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {/* Add More At - Show for buy/hold/add more actions */}
+              {showAddMoreField && (
+                <FormField
+                  control={control}
+                  name="addMoreAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Add More At (₹)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Price to add more shares"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Price level to consider adding more shares
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Exit Fields - Show for partial sell/profit actions */}
+              {showExitFields && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={control}
+                    name="exitPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm flex items-center gap-2">
+                          Exit Price (₹)
+                          {selectedStockDetails && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsAutoCalcExit(!isAutoCalcExit)}
+                              className="h-6 px-2 text-xs"
+                            >
+                              <Calculator className="h-3 w-3 mr-1" />
+                              {isAutoCalcExit ? "Manual" : "Auto"}
+                            </Button>
+                          )}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter exit price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={control}
+                    name="exitStatusPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Exit Percentage</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., 25%"
+                            {...field}
+                            disabled={isSubmitting || isAutoCalcExit}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          {isAutoCalcExit ? "Auto-calculated based on current price" : "Enter percentage manually"}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {/* Status and Horizon */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Status *</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Closed">Closed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={control}
+                  name="horizon"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Time Horizon *</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select horizon" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Short Term">Short Term</SelectItem>
+                            <SelectItem value="Medium Term">Medium Term</SelectItem>
+                            <SelectItem value="Long Term">Long Term</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Closed Tip Fields - Show when status is Closed */}
+              {showClosedTipFields && (
+                <FormField
+                  control={control}
+                  name="exitStatus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Exit Status</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Reason for closing (e.g., Target achieved, Stop loss hit)"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Explain why this tip was closed
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Confidence Score */}
+              <FormField
+                control={control}
+                name="analysistConfidence"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm">Confidence Score (1-10) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter confidence level (1-10)"
+                        type="number"
+                        min="1"
+                        max="10"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 5)}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Rate your confidence in this analysis (1 = Low, 10 = Very High)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* PDF Link */}
               <FormField
                 control={control}
