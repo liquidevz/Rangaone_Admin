@@ -74,7 +74,7 @@ const tipSchema = z.object({
   }),
   action: z.string()
     .min(1, "Action is required")
-    .refine((val) => ["buy", "sell", "hold"].includes(val), {
+    .refine((val) => ["buy", "sell", "hold", "add more"].includes(val), {
       message: "Please select a valid action",
     }),
   buyRange: z.string()
@@ -832,7 +832,7 @@ export function TipFormDialog({
                   name="targetPrice"
                   render={({ field }) => (
                     <FormItem>
-                          <FormLabel className="text-sm">{watchedAction === "sell" ? "Exit Price" : "Target Price"} (₹)</FormLabel>
+                          <FormLabel className="text-sm">Target Price (₹)</FormLabel>
                       <FormControl>
                         <Input
                               placeholder="e.g., 150.75"
@@ -844,10 +844,7 @@ export function TipFormDialog({
                         />
                       </FormControl>
                           <FormDescription className="text-xs">
-                            {watchedAction === "sell" 
-                              ? "Enter exit price (auto-calculates exit percentage)"
-                              : "Enter positive number (auto-calculates percentage)"
-                            }
+                            Enter target price (auto-calculates percentage)
                           </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -868,7 +865,7 @@ export function TipFormDialog({
                                 Closed Tip
                               </Badge>
                             )}
-                            {selectedStockDetails && (
+                            {selectedStockDetails && watchedStatus !== "Closed" && (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -885,7 +882,7 @@ export function TipFormDialog({
                             <Input
                               placeholder={watchedStatus === "Closed" ? "e.g., 150-200 or 25-30%" : watchedAction === "sell" ? "e.g., 25% or 25" : "e.g., 25% or 25"}
                               {...field}
-                              disabled={isSubmitting || isAutoCalcTarget}
+                              disabled={isSubmitting || (isAutoCalcTarget && watchedStatus !== "Closed")}
                               className={watchedStatus === "Closed" ? "border-orange-300" : ""}
                             />
                           </FormControl>
@@ -893,7 +890,7 @@ export function TipFormDialog({
                             watchedStatus === "Closed" ? "text-orange-600" : ""
                           }`}>
                             {watchedStatus === "Closed" 
-                              ? (isAutoCalcTarget ? "Auto-calculated exit range" : "Enter exit range manually (e.g., 150-200 or 25-30%)")
+                              ? "Enter exit range manually (e.g., 150-200 or 25-30%)"
                               : watchedAction === "sell" 
                                 ? (isAutoCalcTarget ? "Auto-calculated exit percentage" : "Enter exit percentage manually")
                                 : (isAutoCalcTarget ? "Auto-calculated from target price" : "Enter percentage manually")
