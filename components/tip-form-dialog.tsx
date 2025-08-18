@@ -856,44 +856,20 @@ export function TipFormDialog({
                   name="targetPercentage"
                   render={({ field }) => (
                     <FormItem>
-                          <FormLabel className={`text-sm flex items-center gap-2 ${
-                            watchedStatus === "Closed" ? "text-orange-600" : ""
-                          }`}>
+                          <FormLabel className="text-sm">
                             {watchedStatus === "Closed" ? "Exit Range" : watchedAction === "sell" ? "Exit Percentage" : "Target Percentage"}
-                            {watchedStatus === "Closed" && (
-                              <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
-                                Closed Tip
-                              </Badge>
-                            )}
-                            {selectedStockDetails && watchedStatus !== "Closed" && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setIsAutoCalcTarget(!isAutoCalcTarget)}
-                                className="h-6 px-2 text-xs"
-                              >
-                                <Calculator className="h-3 w-3 mr-1" />
-                                {isAutoCalcTarget ? "Auto" : "Manual"}
-                              </Button>
-                            )}
                           </FormLabel>
                           <FormControl>
                             <Input
                               placeholder={watchedStatus === "Closed" ? "e.g., 150-200 or 25-30%" : watchedAction === "sell" ? "e.g., 25% or 25" : "e.g., 25% or 25"}
                               {...field}
-                              disabled={isSubmitting || (isAutoCalcTarget && watchedStatus !== "Closed")}
-                              className={watchedStatus === "Closed" ? "border-orange-300" : ""}
+                              disabled={isSubmitting}
                             />
                           </FormControl>
-                          <FormDescription className={`text-xs ${
-                            watchedStatus === "Closed" ? "text-orange-600" : ""
-                          }`}>
+                          <FormDescription className="text-xs">
                             {watchedStatus === "Closed" 
                               ? "Enter exit range manually (e.g., 150-200 or 25-30%)"
-                              : watchedAction === "sell" 
-                                ? (isAutoCalcTarget ? "Auto-calculated exit percentage" : "Enter exit percentage manually")
-                                : (isAutoCalcTarget ? "Auto-calculated from target price" : "Enter percentage manually")
+                              : "Enter percentage manually"
                             }
                           </FormDescription>
                           <FormMessage />
