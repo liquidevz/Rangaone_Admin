@@ -1000,8 +1000,18 @@ export function PortfolioFormDialog({
           }
         }
 
-        onDataChange?.();
-        onOpenChange(false);
+        // Trigger data refresh in parent component
+        if (onDataChange) {
+          onDataChange();
+        }
+        
+        toast({
+          title: "Holding Added",
+          description: `${newHolding.symbol} added successfully`,
+        });
+        
+        // Don't close dialog, just refresh the form data
+        resetNewHolding();
         return;
       } catch (error) {
         toast({
@@ -1085,12 +1095,23 @@ export function PortfolioFormDialog({
           }));
           setHoldings(convertedHoldings);
         } else {
-          // Fallback: close dialog to refresh from database
-          onOpenChange(false);
+          // Fallback: refresh parent data
+          if (onDataChange) {
+            onDataChange();
+          }
         }
 
-        onDataChange?.();
-        onOpenChange(false);
+        // Trigger data refresh in parent component
+        if (onDataChange) {
+          onDataChange();
+        }
+        
+        toast({
+          title: "Holding Removed",
+          description: `${removedHolding.symbol} removed successfully`,
+        });
+        
+        // Don't close dialog, just refresh
         return;
       } catch (error) {
         console.error('Error removing holding:', error);
@@ -1390,7 +1411,11 @@ export function PortfolioFormDialog({
           }
         }
         
-        onDataChange?.();
+        // Trigger data refresh in parent component
+        if (onDataChange) {
+          onDataChange();
+        }
+        
         setEditingHolding(null);
         return;
       } catch (error) {
