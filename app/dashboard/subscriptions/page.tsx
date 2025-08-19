@@ -374,32 +374,32 @@ export default function SubscriptionsPage() {
               <div key={subscription._id || subscription.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/20 items-center">
                 {/* Subscription ID */}
                 <div className="col-span-3 text-sm font-mono">
-                  {subscription._id || subscription.id}
+                  {String(subscription._id || subscription.id || 'Unknown')}
                 </div>
                 
                 {/* User */}
                 <div className="col-span-2 text-sm">
-                  {typeof subscription.user === 'object' ? subscription.user.name || subscription.user.email : subscription.user}
+                  {typeof subscription.user === 'object' ? String(subscription.user.username || subscription.user.email) : String(subscription.user || 'Unknown')}
                 </div>
                 
                 {/* Product */}
                 <div className="col-span-2 text-sm">
-                  {subscription.productType === 'Bundle' 
-                    ? (typeof subscription.productId === 'object' ? subscription.productId.name : 'Bundle')
-                    : (typeof subscription.portfolio === 'object' ? subscription.portfolio.name : 'Portfolio')
-                  }
+                  {String(subscription.productType === 'Bundle' 
+                    ? (typeof subscription.productId === 'object' && subscription.productId ? subscription.productId.name : 'Bundle')
+                    : (typeof subscription.portfolio === 'object' && subscription.portfolio ? subscription.portfolio.name : 'Portfolio')
+                  )}
                 </div>
                 
                 {/* Status */}
                 <div className="col-span-2">
-                  <Badge className={getStatusColor(subscription.status)} variant="secondary">
-                    {subscription.status}
+                  <Badge className={getStatusColor(subscription.status || (subscription.isActive ? 'active' : 'inactive'))} variant="secondary">
+                    {subscription.status || (subscription.isActive ? 'active' : 'inactive')}
                   </Badge>
                 </div>
                 
                 {/* Expiry */}
                 <div className="col-span-2 text-sm">
-                  {formatDate(subscription.expiryDate)}
+                  {String(formatDate(subscription.expiryDate))}
                 </div>
                 
                 {/* Actions */}
@@ -407,10 +407,10 @@ export default function SubscriptionsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => openStatusDialog(subscription, subscription.status === 'active' ? 'cancelled' : 'active')}
+                    onClick={() => openStatusDialog(subscription, (subscription.status || (subscription.isActive ? 'active' : 'inactive')) === 'active' ? 'cancelled' : 'active')}
                     className="text-xs"
                   >
-                    {subscription.status === 'active' ? 'Cancel' : 'Activate'}
+                    {(subscription.status || (subscription.isActive ? 'active' : 'inactive')) === 'active' ? 'Cancel' : 'Activate'}
                   </Button>
                 </div>
               </div>
@@ -441,11 +441,15 @@ export default function SubscriptionsPage() {
             let displayName = "Unknown Item";
             let hasExpandableContent = false;
             
-            if (payment.isBundle && payment.bundle) {
-              displayName = payment.bundle.name;
+            if (payment.isBundle && payment.bundle && typeof payment.bundle === 'object') {
+              displayName = String(payment.bundle.name || 'Bundle');
               hasExpandableContent = true;
-            } else if (typeof payment.portfolio === 'object' && payment.portfolio) {
-              displayName = payment.portfolio.name;
+            } else if (payment.portfolio) {
+              if (typeof payment.portfolio === 'object' && payment.portfolio.name) {
+                displayName = String(payment.portfolio.name);
+              } else {
+                displayName = 'Portfolio';
+              }
             }
             
             const formattedDate = new Date(payment.createdAt).toLocaleDateString('en-US', {
@@ -477,9 +481,9 @@ export default function SubscriptionsPage() {
                   
                   {/* Order ID */}
                   <div className="col-span-2">
-                    <div className="text-sm font-mono">{payment.orderId}</div>
+                    <div className="text-sm font-mono">{String(payment.orderId)}</div>
                     <div className="text-xs text-muted-foreground font-mono">
-                      {payment.paymentId}
+                      {String(payment.paymentId)}
                     </div>
                   </div>
                   
@@ -501,14 +505,14 @@ export default function SubscriptionsPage() {
                         </Button>
                       )}
                       <div className="text-sm">
-                        • {displayName} ({payment.paymentType || "Portfolio"}) (₹{payment.amount})
+                        • {String(displayName)} ({String(payment.paymentType || "Portfolio")}) (₹{String(payment.amount)})
                       </div>
                     </div>
                   </div>
                   
                   {/* Amount */}
                   <div className="col-span-2 text-right">
-                    <div className="text-lg font-semibold">₹{payment.amount}</div>
+                    <div className="text-lg font-semibold">₹{String(payment.amount)}</div>
                   </div>
                   
                   {/* Status */}
@@ -539,16 +543,19 @@ export default function SubscriptionsPage() {
                       <div className="space-y-2">
                         <h4 className="font-medium text-sm">Bundle Contents:</h4>
                         <div className="grid gap-1 ml-4">
-                          {payment.bundle.portfolios.map((portfolio, index) => {
-                            const portfolioName = typeof portfolio === 'string'
-                              ? `Portfolio ${portfolio.substring(0, 8)}...`
-                              : portfolio.name || 'Unknown Portfolio';
+                          {Array.isArray(payment.bundle.portfolios) ? payment.bundle.portfolios.map((portfolio, index) => {
+                            let portfolioName = 'Unknown Portfolio';
+                            if (typeof portfolio === 'string') {
+                              portfolioName = `Portfolio ${portfolio.substring(0, 8)}...`;
+                            } else if (portfolio && typeof portfolio === 'object' && 'name' in portfolio) {
+                              portfolioName = String(portfolio.name || 'Unknown Portfolio');
+                            }
                             return (
                               <div key={index} className="text-sm text-muted-foreground">
                                 • {portfolioName}
                               </div>
                             );
-                          })}
+                          }) : null}
                         </div>
                         {payment.expiryDate && (
                           <div className="text-xs text-muted-foreground mt-2">

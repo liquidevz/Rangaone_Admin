@@ -366,7 +366,11 @@ export default function PriceHistoryPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium">Date: {editingEntry.dateOnly}</label>
-                    <p className="text-xs text-muted-foreground">Portfolio: {editingEntry.portfolio}</p>
+                    <p className="text-xs text-muted-foreground">Portfolio: {(() => {
+                      const portfolioId = typeof editingEntry.portfolio === 'string' ? editingEntry.portfolio : (editingEntry.portfolio as any)?.id || (editingEntry.portfolio as any)?._id;
+                      const portfolio = portfolios.find(p => (p.id || p._id) === portfolioId);
+                      return portfolio?.name || portfolioId || 'Unknown';
+                    })()}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Portfolio Value</label>

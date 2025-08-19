@@ -174,6 +174,8 @@ export interface Subscription {
   _id: string;
   id?: string;
   isActive: boolean;
+  status?: string;
+  subscriptionType?: string; // Added for subscription type (emandate, monthly, etc.)
   lastPaidAt?: string;
   lastRenewed?: string;
   expiryDate?: string;

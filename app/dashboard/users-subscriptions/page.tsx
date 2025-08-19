@@ -481,9 +481,19 @@ export default function UsersSubscriptionsPage() {
                           </Badge>
                           <div>
                             <div className="font-medium text-sm">
-                              {subscription.productType === 'Bundle' 
-                                ? (typeof subscription.productId === 'object' ? subscription.productId.name : 'Bundle')
-                                : (typeof subscription.portfolio === 'object' ? subscription.portfolio.name : 'Portfolio')
+                              {(() => {
+                                if (subscription.productType === 'Bundle') {
+                                  if (typeof subscription.productId === 'object' && subscription.productId?.name) {
+                                    return String(subscription.productId.name);
+                                  }
+                                  return 'Bundle';
+                                } else {
+                                  if (typeof subscription.portfolio === 'object' && subscription.portfolio?.name) {
+                                    return String(subscription.portfolio.name);
+                                  }
+                                  return 'Portfolio';
+                                }
+                              })()
                               }
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -492,8 +502,8 @@ export default function UsersSubscriptionsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(subscription.status)} variant="secondary">
-                            {subscription.status}
+                          <Badge className={getStatusColor(subscription.status || 'unknown')} variant="secondary">
+                            {subscription.status || 'Unknown'}
                           </Badge>
                           <Button
                             variant="ghost"
@@ -523,9 +533,8 @@ export default function UsersSubscriptionsPage() {
         open={userDialogOpen}
         onOpenChange={setUserDialogOpen}
         onSubmit={selectedUser ? handleUpdateUser : handleCreateUser}
-        initialData={selectedUser}
+        user={selectedUser || undefined}
         title={selectedUser ? "Edit User" : "Create User"}
-        description={selectedUser ? "Update user information" : "Add a new user to the system"}
       />
 
       <SubscriptionFormDialog

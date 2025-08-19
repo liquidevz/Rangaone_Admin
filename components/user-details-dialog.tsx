@@ -231,9 +231,19 @@ export function UserDetailsDialog({
                           )}
                           <div>
                             <p className="font-medium text-sm">
-                              {subscription.productType === 'Bundle' 
-                                ? (typeof subscription.productId === 'object' ? subscription.productId.name : 'Bundle')
-                                : (typeof subscription.portfolio === 'object' ? subscription.portfolio.name : 'Portfolio')
+                              {(() => {
+                                if (subscription.productType === 'Bundle') {
+                                  if (typeof subscription.productId === 'object' && subscription.productId?.name) {
+                                    return String(subscription.productId.name);
+                                  }
+                                  return 'Bundle';
+                                } else {
+                                  if (typeof subscription.portfolio === 'object' && subscription.portfolio?.name) {
+                                    return String(subscription.portfolio.name);
+                                  }
+                                  return 'Portfolio';
+                                }
+                              })()
                               }
                             </p>
                             <p className="text-xs text-muted-foreground">

@@ -4,6 +4,8 @@ import { fetchWithAuth, API_BASE_URL } from "@/lib/auth"
 // User Types based on the actual API response
 export interface User {
   _id: string
+  id: string // Added for compatibility
+  name: string // Added for compatibility
   username: string
   email: string
   provider: string
