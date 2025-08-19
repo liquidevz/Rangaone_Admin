@@ -40,6 +40,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -304,8 +305,11 @@ export default function UsersSubscriptionsPage() {
         return (
           <div className="text-sm">
             <div>{user.phone || "No phone"}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
               Profile: {user.profileCompleteness || 0}% complete
+              {(user.profileCompleteness || 0) < 100 && (
+                <AlertCircle className="h-3 w-3 text-amber-500" title="Profile incomplete" />
+              )}
             </div>
           </div>
         );
@@ -476,9 +480,16 @@ export default function UsersSubscriptionsPage() {
                     {user.userSubscriptions.map((subscription) => (
                       <div key={subscription._id || subscription.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                         <div className="flex items-center gap-4">
-                          <Badge variant="outline" className={subscription.subscriptionType === 'emandate' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}>
-                            {subscription.subscriptionType === 'emandate' ? 'E-Mandate' : 'Monthly'}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className={subscription.subscriptionType === 'emandate' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}>
+                              {subscription.subscriptionType === 'emandate' ? 'E-Mandate' : 'Monthly'}
+                            </Badge>
+                            {subscription.productType === 'Bundle' && typeof subscription.productId === 'object' && (subscription.productId as any)?.category === 'premium' && (
+                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                                Premium
+                              </Badge>
+                            )}
+                          </div>
                           <div>
                             <div className="font-medium text-sm">
                               {(() => {

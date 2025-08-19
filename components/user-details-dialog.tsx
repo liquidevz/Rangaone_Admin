@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -62,6 +63,9 @@ export function UserDetailsDialog({
             <User className="h-5 w-5" />
             User Details
           </DialogTitle>
+          <DialogDescription>
+            View detailed information about the user including profile, status, and subscriptions.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -104,10 +108,6 @@ export function UserDetailsDialog({
                     {formatDate(user.dateofBirth)}
                   </p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Provider</label>
-                  <p className="text-sm font-medium">{user.provider || "Local"}</p>
-                </div>
               </div>
               
               <div>
@@ -149,8 +149,16 @@ export function UserDetailsDialog({
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Profile Complete</label>
                   <div className="mt-1">
-                    <Badge variant={user.profileComplete ? "default" : "secondary"}>
-                      {user.profileComplete ? "Complete" : "Incomplete"}
+                    <Badge variant={(() => {
+                      const fields = [user.username, user.email, user.fullName, user.phone, user.dateofBirth, user.address, user.pandetails];
+                      const completeness = Math.round((fields.filter(f => f && f.trim() !== '').length / fields.length) * 100);
+                      return completeness === 100 ? "default" : "secondary";
+                    })()}>
+                      {(() => {
+                        const fields = [user.username, user.email, user.fullName, user.phone, user.dateofBirth, user.address, user.pandetails];
+                        const completeness = Math.round((fields.filter(f => f && f.trim() !== '').length / fields.length) * 100);
+                        return completeness === 100 ? "Complete" : `${completeness}% Complete`;
+                      })()}
                     </Badge>
                   </div>
                 </div>
@@ -170,10 +178,15 @@ export function UserDetailsDialog({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">PAN Details</label>
-                  <p className="text-sm font-medium flex items-center gap-2">
+                  <div className="text-sm font-medium flex items-center gap-2">
                     <CreditCard className="h-3 w-3" />
                     {user.pandetails || "Not provided"}
-                  </p>
+                    {user.pandetails && (
+                      <Badge variant="outline" className="text-xs">
+                        {user.pandetails.length >= 10 ? "✓ Verified" : "⚠ Unverified"}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Aadhaar Card</label>
@@ -218,41 +231,49 @@ export function UserDetailsDialog({
               <CardContent className="space-y-3">
                 {subscriptions.map((subscription) => {
                   const isActive = subscription.isActive || subscription.status === 'active';
+                  const isPremiumBundle = subscription.productType === 'Bundle';
                   return (
                     <div key={subscription._id} className={`p-3 rounded-lg border ${
-                      isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                      isActive ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
                     }`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           {isActive ? (
                             <CheckCircle className="h-4 w-4 text-green-600" />
                           ) : (
-                            <XCircle className="h-4 w-4 text-gray-600" />
+                            <XCircle className="h-4 w-4 text-red-600" />
                           )}
                           <div>
-                            <p className="font-medium text-sm">
-                              {(() => {
-                                if (subscription.productType === 'Bundle') {
-                                  if (typeof subscription.productId === 'object' && subscription.productId?.name) {
-                                    return String(subscription.productId.name);
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm">
+                                {(() => {
+                                  if (subscription.productType === 'Bundle') {
+                                    if (typeof subscription.productId === 'object' && subscription.productId?.name) {
+                                      return String(subscription.productId.name);
+                                    }
+                                    return 'Bundle';
+                                  } else {
+                                    if (typeof subscription.portfolio === 'object' && subscription.portfolio?.name) {
+                                      return String(subscription.portfolio.name);
+                                    }
+                                    return 'Portfolio';
                                   }
-                                  return 'Bundle';
-                                } else {
-                                  if (typeof subscription.portfolio === 'object' && subscription.portfolio?.name) {
-                                    return String(subscription.portfolio.name);
-                                  }
-                                  return 'Portfolio';
+                                })()
                                 }
-                              })()
-                              }
-                            </p>
+                              </p>
+                              {isPremiumBundle && typeof subscription.productId === 'object' && (subscription.productId as any)?.category === 'premium' && (
+                                <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 text-xs">
+                                  Premium
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                               {subscription.productType} • Created {formatDistanceToNow(new Date(subscription.createdAt), { addSuffix: true })}
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <Badge variant={isActive ? "default" : "secondary"}>
+                        <div className="text-right flex flex-col items-end gap-1">
+                          <Badge variant={isActive ? "default" : "destructive"} className={isActive ? "bg-green-600 dark:bg-green-700" : "bg-red-600 dark:bg-red-700"}>
                             {subscription.status || (isActive ? 'Active' : 'Inactive')}
                           </Badge>
                           {subscription.expiryDate && (
