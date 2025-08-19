@@ -260,8 +260,7 @@ export function PortfolioFormDialog({
     return holding.status === 'Sell' ? sum : sum + holding.allocatedAmount;
   }, 0);
   const holdingsValue = initialData?.holdingsValue || 0;
-  const calculatedCashBalance = Number(minInvestment || 0) - totalActualInvestment;
-  const cashBalance = initialData?.cashBalance ?? (isNaN(calculatedCashBalance) ? 0 : calculatedCashBalance);
+  const cashBalance = initialData?.cashBalance || 0;
   const remainingWeight = 100 - totalWeightUsed;
   
 
@@ -762,7 +761,7 @@ export function PortfolioFormDialog({
 
 
 
-      // Calculate portfolio values
+      // Calculate portfolio values - only for new portfolios
       const calculatedCashBalance = Number(minInvestment || 0) - totalActualInvestment;
       const calculatedCurrentValue = Number(minInvestment || 0);
 
@@ -788,9 +787,11 @@ export function PortfolioFormDialog({
         CAGRSinceInception: cagrSinceInception,
         oneYearGains,
         compareWith,
-        // Add missing fields that backend expects
-        cashBalance: calculatedCashBalance,
-        currentValue: calculatedCurrentValue,
+        // Add missing fields that backend expects - only for new portfolios
+        ...(initialData ? {} : {
+          cashBalance: calculatedCashBalance,
+          currentValue: calculatedCurrentValue,
+        }),
       };
       
       console.log("=== PORTFOLIO SUBMISSION DEBUG ===");

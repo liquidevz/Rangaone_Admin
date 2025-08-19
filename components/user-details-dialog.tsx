@@ -11,20 +11,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, Calendar, MapPin, CreditCard, FileText, Shield, Clock } from "lucide-react";
+import { User, Mail, Phone, Calendar, MapPin, CreditCard, FileText, Shield, Clock, Package, CheckCircle, XCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { User as UserType } from "@/lib/api-users";
+import type { Subscription } from "@/lib/api";
 
 interface UserDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: UserType | null;
+  subscriptions?: Subscription[];
 }
 
 export function UserDetailsDialog({
   open,
   onOpenChange,
   user,
+  subscriptions = [],
 }: UserDetailsDialogProps) {
   if (!user) return null;
 
@@ -202,6 +205,59 @@ export function UserDetailsDialog({
               )}
             </CardContent>
           </Card>
+
+          {/* Subscriptions */}
+          {subscriptions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Subscriptions ({subscriptions.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {subscriptions.map((subscription) => {
+                  const isActive = subscription.isActive || subscription.status === 'active';
+                  return (
+                    <div key={subscription._id} className={`p-3 rounded-lg border ${
+                      isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {isActive ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-gray-600" />
+                          )}
+                          <div>
+                            <p className="font-medium text-sm">
+                              {subscription.productType === 'Bundle' 
+                                ? (typeof subscription.productId === 'object' ? subscription.productId.name : 'Bundle')
+                                : (typeof subscription.portfolio === 'object' ? subscription.portfolio.name : 'Portfolio')
+                              }
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {subscription.productType} • Created {formatDistanceToNow(new Date(subscription.createdAt), { addSuffix: true })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={isActive ? "default" : "secondary"}>
+                            {subscription.status || (isActive ? 'Active' : 'Inactive')}
+                          </Badge>
+                          {subscription.expiryDate && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Expires: {formatDate(subscription.expiryDate)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Timestamps */}
           <Card>

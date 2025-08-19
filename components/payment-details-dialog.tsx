@@ -11,6 +11,16 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { PaymentHistory } from "@/lib/api";
+import { Bundle } from "@/lib/api-bundles";
+
+// Enhanced payment history interface to match the one in subscriptions page
+interface EnhancedPaymentHistory extends Omit<PaymentHistory, 'subscription'> {
+  bundle?: Bundle;
+  isBundle?: boolean;
+  subscription?: any;
+  paymentType?: string;
+  expiryDate?: string;
+}
 import { 
   CreditCard, 
   User, 
@@ -27,7 +37,7 @@ import {
 interface PaymentDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  payment: PaymentHistory | null;
+  payment: EnhancedPaymentHistory | null;
 }
 
 export function PaymentDetailsDialog({
@@ -171,20 +181,33 @@ export function PaymentDetailsDialog({
                   </div>
                 )}
 
-                {portfolio && (
-                  <div className="flex items-start gap-2">
-                    <Briefcase className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <div>
-                      <span className="text-sm font-medium">Portfolio:</span>
-                      <div className="text-sm">
-                        <div className="font-medium">{portfolio.name}</div>
-                        <div className="text-muted-foreground">
-                          {portfolio.PortfolioCategory || "Standard"}
-                        </div>
-                      </div>
+                <div className="flex items-start gap-2">
+                  <Briefcase className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <div>
+                    <span className="text-sm font-medium">
+                      {payment.isBundle ? "Bundle:" : "Portfolio:"}
+                    </span>
+                    <div className="text-sm">
+                      {payment.isBundle && payment.bundle ? (
+                        <>
+                          <div className="font-medium">{payment.bundle.name}</div>
+                          <div className="text-muted-foreground">
+                            Bundle ({payment.bundle.category})
+                          </div>
+                        </>
+                      ) : portfolio ? (
+                        <>
+                          <div className="font-medium">{portfolio.name}</div>
+                          <div className="text-muted-foreground">
+                            {portfolio.PortfolioCategory || "Standard"}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-muted-foreground">Unknown Product</div>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
 
                 <div className="flex items-center gap-2">
                   <Hash className="h-4 w-4 text-muted-foreground" />
@@ -194,6 +217,31 @@ export function PaymentDetailsDialog({
               </div>
             </div>
           </div>
+
+          {/* Bundle Contents */}
+          {payment.isBundle && payment.bundle && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg">Bundle Contents</h3>
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="grid gap-2">
+                    {payment.bundle.portfolios.map((portfolio, index) => {
+                      const portfolioName = typeof portfolio === 'string'
+                        ? `Portfolio ${portfolio.substring(0, 8)}...`
+                        : portfolio.name || 'Unknown Portfolio';
+                      return (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <Briefcase className="h-3 w-3 text-muted-foreground" />
+                          <span>{portfolioName}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 

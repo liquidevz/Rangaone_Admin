@@ -16,7 +16,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import {
   fetchPaymentHistory,
@@ -25,9 +34,12 @@ import {
   type PaymentHistory,
   type Subscription,
 } from "@/lib/api";
+import { fetchBundles, type Bundle } from "@/lib/api-bundles";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertCircle,
+  ChevronDown,
+  ChevronRight,
   CreditCard,
   PlusCircle,
   RefreshCw,
@@ -35,20 +47,31 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+
+// Enhanced payment history interface to include bundle information
+interface EnhancedPaymentHistory extends Omit<PaymentHistory, 'subscription'> {
+  bundle?: Bundle;
+  isBundle?: boolean;
+  subscription?: Subscription | string;
+  paymentType?: string;
+  expiryDate?: string;
+}
 
 export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<EnhancedPaymentHistory[]>([]);
+  const [bundles, setBundles] = useState<Bundle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("subscriptions");
+
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] =
     useState<Subscription | null>(null);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentHistory | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<EnhancedPaymentHistory | null>(null);
   const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [orderData, setOrderData] = useState<{
     orderId: string;
     amount: number;
@@ -63,52 +86,127 @@ export default function SubscriptionsPage() {
 
   console.log("SubscriptionsPage component rendered", subscriptions);
 
-  // Update the loadData function to handle errors better
+  // Enhanced loadData function to handle bundles
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    console.log("Starting to load data...");
+    
     try {
       // Fetch subscriptions first
       let subscriptionsData: Subscription[] = [];
       let usingMockSubscriptions = false;
+      
+      console.log("Fetching subscriptions...");
       try {
         subscriptionsData = await fetchSubscriptions();
+        console.log("Subscriptions fetched:", subscriptionsData);
       } catch (error) {
         console.error("Error loading subscriptions:", error);
-        toast({
-          title: "Failed to load subscriptions",
-          description: "Using mock data instead",
-          variant: "destructive",
-        });
-        // Use empty array as fallback
         subscriptionsData = [];
         usingMockSubscriptions = true;
       }
 
-      // Then fetch payment history
-      let paymentHistoryData: PaymentHistory[] = [];
-      let usingMockPayments = false;
+      // Fetch bundles
+      let bundlesData: Bundle[] = [];
+      console.log("Fetching bundles...");
       try {
-        paymentHistoryData = await fetchPaymentHistory();
+        bundlesData = await fetchBundles();
+        console.log("Bundles fetched:", bundlesData);
+      } catch (error) {
+        console.error("Error loading bundles:", error);
+        bundlesData = [];
+      }
+
+      // Fetch payment history and enhance with bundle information
+      let paymentHistoryData: EnhancedPaymentHistory[] = [];
+      let usingMockPayments = false;
+      
+      console.log("Fetching payment history...");
+      try {
+        const rawPaymentHistory = await fetchPaymentHistory();
+        console.log("Raw payment history:", rawPaymentHistory);
+        
+        // Enhance payment history with bundle and subscription information
+        paymentHistoryData = Array.isArray(rawPaymentHistory) ? rawPaymentHistory.map((payment) => {
+          // Find the corresponding subscription to get product type info
+          const relatedSubscription = subscriptionsData.find(sub => 
+            (sub._id || sub.id) === payment.subscription ||
+            (typeof payment.subscription === 'string' && (sub._id || sub.id) === payment.subscription)
+          );
+          
+          let isBundle = false;
+          let associatedBundle = null;
+          
+          // Check if subscription has productType Bundle
+          if (relatedSubscription?.productType === "Bundle" && relatedSubscription.productId) {
+            isBundle = true;
+            // Create bundle object from subscription productId
+            associatedBundle = {
+              _id: relatedSubscription.productId._id || relatedSubscription.productId.id,
+              name: relatedSubscription.productId.name,
+              description: relatedSubscription.productId.description || "Bundle subscription",
+              portfolios: relatedSubscription.productId.portfolios || [],
+              category: relatedSubscription.productId.category || "premium"
+            };
+          } else {
+            // Fallback: Check if portfolio is part of any bundle
+            const portfolioId = typeof payment.portfolio === 'string' 
+              ? payment.portfolio 
+              : payment.portfolio?.id || payment.portfolio?._id;
+            
+            associatedBundle = bundlesData.find(bundle => 
+              bundle.portfolios.some(p => {
+                const pId = typeof p === 'string' ? p : p.id || (p as any)._id;
+                return pId === portfolioId;
+              })
+            );
+            isBundle = !!associatedBundle;
+          }
+          
+          return {
+            ...payment,
+            bundle: associatedBundle,
+            isBundle,
+            subscription: relatedSubscription || payment.subscription,
+            paymentType: isBundle ? "Bundle" : "Portfolio",
+            expiryDate: relatedSubscription?.expiryDate
+          };
+        }) : [];
+        
+        console.log("Enhanced payment history:", paymentHistoryData);
       } catch (error) {
         console.error("Error loading payment history:", error);
-        // This shouldn't happen now with our fallback, but just in case
         paymentHistoryData = [];
         usingMockPayments = true;
       }
 
-      console.log("Fetched subscriptions:", paymentHistoryData);
+      console.log("Final data:", { 
+        subscriptionsCount: subscriptionsData.length, 
+        bundlesCount: bundlesData.length, 
+        paymentHistoryCount: paymentHistoryData.length 
+      });
+      
       setSubscriptions(subscriptionsData);
+      setBundles(bundlesData);
       setPaymentHistory(paymentHistoryData);
       setUsingMockData({
         subscriptions: usingMockSubscriptions,
         payments: usingMockPayments,
       });
+      
+      // Show success message if data was loaded
+      if (paymentHistoryData.length > 0 || subscriptionsData.length > 0) {
+        toast({
+          title: "Data loaded successfully",
+          description: `Found ${paymentHistoryData.length} payment records and ${subscriptionsData.length} subscriptions`,
+        });
+      }
+      
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
         title: "Failed to load data",
-        description:
-          error instanceof Error ? error.message : "An error occurred",
+        description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
       setUsingMockData({ subscriptions: true, payments: true });
@@ -145,7 +243,11 @@ export default function SubscriptionsPage() {
 
     try {
       if (newStatus === "cancelled") {
-        const result = await cancelSubscription(selectedSubscription.id);
+        const subscriptionId = selectedSubscription._id || selectedSubscription.id || "";
+        if (!subscriptionId) {
+          throw new Error("Invalid subscription ID");
+        }
+        const result = await cancelSubscription(subscriptionId);
         toast({
           title: "Subscription Cancelled",
           description: result.message || "The subscription has been successfully cancelled",
@@ -170,9 +272,19 @@ export default function SubscriptionsPage() {
     }
   };
 
-  const handlePaymentClick = (payment: PaymentHistory) => {
+  const handlePaymentClick = (payment: EnhancedPaymentHistory) => {
     setSelectedPayment(payment);
     setPaymentDetailsOpen(true);
+  };
+
+  const toggleRowExpansion = (paymentId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(paymentId)) {
+      newExpanded.delete(paymentId);
+    } else {
+      newExpanded.add(paymentId);
+    }
+    setExpandedRows(newExpanded);
   };
 
   const getStatusColor = (status: string) => {
@@ -209,170 +321,251 @@ export default function SubscriptionsPage() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const subscriptionColumns: ColumnDef<Subscription>[] = [
-    {
-      accessorKey: "id",
-      header: "ID",
-      cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original.id || (row.original as any)._id}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "userName",
-      header: "User Name",
-      cell: ({ row }) => (
-        <div className="font-medium truncate max-w-[150px]">
-          {row.original.user?.username || row.original.user?.email || "Unknown User"}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "portfolioName",
-      header: "Portfolio Name",
-      cell: ({ row }) => (
-        <div className="font-medium truncate max-w-[200px]" title={row.original.portfolio?.name}>
-          {row.original.portfolio?.name || "Unknown Portfolio"}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => {
-        return (
-          <Badge
-            className={getStatusColor(
-              row.original.isActive ? "active" : "inactive"
-            )}
-          >
-            {row.original.isActive ? "Active" : "Inactive"}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: "lastPaidAt",
-      header: "Payment Date",
-      cell: ({ row }) => {
-        return <div>{row.original.lastPaidAt || "N/A"}</div>;
-      },
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        const subscription = row.original;
 
-        return (
-          <div className="flex items-center justify-end space-x-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => openStatusDialog(subscription, "cancelled")}
-              title="Cancel Subscription"
-            >
-              <XCircle className="h-4 w-4" />
-              <span className="sr-only">Cancel</span>
-            </Button>
-          </div>
-        );
-      },
-    },
-  ];
 
-  const paymentHistoryColumns: ColumnDef<PaymentHistory>[] = [
-    {
-      accessorKey: "_id",
-      header: "ID",
-      cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[100px]">
-          {row.original._id}
+  // Custom subscriptions table component
+  const SubscriptionsTable = () => {
+    console.log("SubscriptionsTable rendering with:", {
+      paymentHistoryLength: paymentHistory.length,
+      subscriptionsLength: subscriptions.length,
+      isLoading
+    });
+    
+    if (isLoading) {
+      return (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
         </div>
-      ),
-    },
-    {
-      accessorKey: "userName",
-      header: "User Name",
-      cell: ({ row }) => {
-        const user = row.original.user;
-        const displayName = typeof user === 'object' && user 
-          ? (user.username || user.email || "Unknown User")
-          : "Unknown User";
-        return (
-          <div className="font-medium truncate max-w-[150px]" title={displayName}>
-            {displayName}
-        </div>
-        );
-      },
-    },
-    {
-      accessorKey: "portfolioName",
-      header: "Portfolio Name",
-      cell: ({ row }) => {
-        const portfolio = row.original.portfolio;
-        const displayName = typeof portfolio === 'object' && portfolio 
-          ? portfolio.name 
-          : "Unknown Portfolio";
-        return (
-          <div className="font-medium truncate max-w-[200px]" title={displayName}>
-            {displayName}
-        </div>
-        );
-      },
-    },
-    {
-      accessorKey: "amount",
-      header: "Amount",
-      cell: ({ row }) => {
-        const amount = row.getValue("amount") as number;
-        const currency = row.original.currency;
-        const formattedAmount = new Intl.NumberFormat('en-IN', {
-          style: 'currency',
-          currency: currency || 'INR',
-        }).format(amount);
-        return (
-          <div className="font-medium text-green-600">
-            {formattedAmount}
+      );
+    }
+
+    if (paymentHistory.length === 0 && subscriptions.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <CreditCard className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
+          <h3 className="mt-4 text-lg font-semibold">No Data Found</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            No payment history or subscriptions found.
+          </p>
+          <div className="mt-4 text-xs text-muted-foreground">
+            Debug: Subscriptions: {subscriptions.length}, Payments: {paymentHistory.length}
           </div>
-        );
-      },
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => {
-        const status = row.getValue("status") as string;
-        return status ? (
-          <Badge className={getPaymentStatusColor(status)}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        );
-      },
-    },
-    {
-      accessorKey: "createdAt",
-      header: "Date",
-      cell: ({ row }) => (
-        <div>{formatDate(row.getValue("createdAt") as string)}</div>
-      ),
-    },
-    {
-      accessorKey: "orderId",
-      header: "Order ID",
-      cell: ({ row }) => (
-        <button
-          onClick={() => handlePaymentClick(row.original)}
-          className="font-mono text-xs truncate max-w-[100px] text-blue-600 hover:text-blue-800 hover:underline text-left"
-          title="Click to view payment details"
-        >
-          {row.getValue("orderId")}
-        </button>
-      ),
-    },
-  ];
+        </div>
+      );
+    }
+
+    // Show subscriptions if no payment history but subscriptions exist
+    if (paymentHistory.length === 0 && subscriptions.length > 0) {
+      return (
+        <div className="w-full overflow-x-auto">
+          <div className="border rounded-lg">
+            {/* Header */}
+            <div className="grid grid-cols-12 gap-4 p-4 bg-muted/30 border-b text-sm font-medium text-muted-foreground">
+              <div className="col-span-3">SUBSCRIPTION</div>
+              <div className="col-span-2">USER</div>
+              <div className="col-span-2">PRODUCT</div>
+              <div className="col-span-2">STATUS</div>
+              <div className="col-span-2">EXPIRY</div>
+              <div className="col-span-1">ACTIONS</div>
+            </div>
+            
+            {/* Subscription Rows */}
+            {subscriptions.map((subscription) => (
+              <div key={subscription._id || subscription.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/20 items-center">
+                {/* Subscription ID */}
+                <div className="col-span-3 text-sm font-mono">
+                  {subscription._id || subscription.id}
+                </div>
+                
+                {/* User */}
+                <div className="col-span-2 text-sm">
+                  {typeof subscription.user === 'object' ? subscription.user.name || subscription.user.email : subscription.user}
+                </div>
+                
+                {/* Product */}
+                <div className="col-span-2 text-sm">
+                  {subscription.productType === 'Bundle' 
+                    ? (typeof subscription.productId === 'object' ? subscription.productId.name : 'Bundle')
+                    : (typeof subscription.portfolio === 'object' ? subscription.portfolio.name : 'Portfolio')
+                  }
+                </div>
+                
+                {/* Status */}
+                <div className="col-span-2">
+                  <Badge className={getStatusColor(subscription.status)} variant="secondary">
+                    {subscription.status}
+                  </Badge>
+                </div>
+                
+                {/* Expiry */}
+                <div className="col-span-2 text-sm">
+                  {formatDate(subscription.expiryDate)}
+                </div>
+                
+                {/* Actions */}
+                <div className="col-span-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openStatusDialog(subscription, subscription.status === 'active' ? 'cancelled' : 'active')}
+                    className="text-xs"
+                  >
+                    {subscription.status === 'active' ? 'Cancel' : 'Activate'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full overflow-x-auto">
+        <div className="border rounded-lg">
+          {/* Header */}
+          <div className="grid grid-cols-12 gap-4 p-4 bg-muted/30 border-b text-sm font-medium text-muted-foreground">
+            <div className="col-span-2">DATE</div>
+            <div className="col-span-2">ORDERID/TXNID</div>
+            <div className="col-span-4">ITEMS</div>
+            <div className="col-span-2 text-right">AMOUNT</div>
+            <div className="col-span-1">STATUS</div>
+            <div className="col-span-1">ACTIONS</div>
+          </div>
+          
+          {/* Rows */}
+          {paymentHistory.map((payment) => {
+            const isExpanded = expandedRows.has(payment._id);
+            
+            // Determine display name based on bundle or portfolio
+            let displayName = "Unknown Item";
+            let hasExpandableContent = false;
+            
+            if (payment.isBundle && payment.bundle) {
+              displayName = payment.bundle.name;
+              hasExpandableContent = true;
+            } else if (typeof payment.portfolio === 'object' && payment.portfolio) {
+              displayName = payment.portfolio.name;
+            }
+            
+            const formattedDate = new Date(payment.createdAt).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: true
+            });
+
+            return (
+              <React.Fragment key={payment._id}>
+                <div className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/20 items-center">
+                  {/* Date */}
+                  <div className="col-span-2 text-sm">
+                    {new Date(payment.createdAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit'
+                    })} {new Date(payment.createdAt).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: true
+                    })}
+                  </div>
+                  
+                  {/* Order ID */}
+                  <div className="col-span-2">
+                    <div className="text-sm font-mono">{payment.orderId}</div>
+                    <div className="text-xs text-muted-foreground font-mono">
+                      {payment.paymentId}
+                    </div>
+                  </div>
+                  
+                  {/* Items */}
+                  <div className="col-span-4">
+                    <div className="flex items-center gap-2">
+                      {hasExpandableContent && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0"
+                          onClick={() => toggleRowExpansion(payment._id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                        </Button>
+                      )}
+                      <div className="text-sm">
+                        • {displayName} ({payment.paymentType || "Portfolio"}) (₹{payment.amount})
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Amount */}
+                  <div className="col-span-2 text-right">
+                    <div className="text-lg font-semibold">₹{payment.amount}</div>
+                  </div>
+                  
+                  {/* Status */}
+                  <div className="col-span-1">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-green-600">Success</div>
+                      <div className="text-xs text-blue-600">Invoice</div>
+                    </div>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="col-span-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePaymentClick(payment)}
+                      className="text-xs"
+                    >
+                      View
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Expanded Content */}
+                {hasExpandableContent && payment.bundle && isExpanded && (
+                  <div className="border-b bg-muted/10">
+                    <div className="p-4 pl-8">
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Bundle Contents:</h4>
+                        <div className="grid gap-1 ml-4">
+                          {payment.bundle.portfolios.map((portfolio, index) => {
+                            const portfolioName = typeof portfolio === 'string'
+                              ? `Portfolio ${portfolio.substring(0, 8)}...`
+                              : portfolio.name || 'Unknown Portfolio';
+                            return (
+                              <div key={index} className="text-sm text-muted-foreground">
+                                • {portfolioName}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {payment.expiryDate && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            Expires: {new Date(payment.expiryDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -401,125 +594,58 @@ export default function SubscriptionsPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-none sm:inline-flex">
-          <TabsTrigger value="subscriptions" className="text-xs sm:text-sm">Subscriptions</TabsTrigger>
-          <TabsTrigger value="payments" className="text-xs sm:text-sm">Payment History</TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscriptions</CardTitle>
+          <CardDescription>
+            View and manage user subscriptions
+            {usingMockData.payments && (
+              <span className="block mt-1 text-xs text-amber-500">
+                Note: Showing mock data as the API is not available
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {usingMockData.payments && (
+            <Alert variant="warning" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Using Mock Data</AlertTitle>
+              <AlertDescription>
+                The subscription data shown is mock data. The API returned an
+                HTML response instead of JSON.
+              </AlertDescription>
+            </Alert>
+          )}
 
-        <TabsContent value="subscriptions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Subscriptions</CardTitle>
-              <CardDescription>
-                View and manage user subscriptions
-                {usingMockData.subscriptions && (
-                  <span className="block mt-1 text-xs text-amber-500">
-                    Note: Showing mock data as the subscriptions API is not
-                    available
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {usingMockData.subscriptions && (
-                <Alert variant="warning" className="mb-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Using Mock Data</AlertTitle>
-                  <AlertDescription>
-                    The subscription data shown is mock data. The API returned
-                    an HTML response instead of JSON.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                </div>
-              ) : subscriptions.length === 0 ? (
-                <div className="text-center py-8">
-                  <CreditCard className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-4 text-lg font-semibold">
-                    No Subscriptions Found
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    There are no subscriptions in the system yet.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => setCreateDialogOpen(true)}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Create New Order
-                  </Button>
-                </div>
-              ) : (
-                <div className="w-full overflow-x-auto">
-                  <div className="min-w-[800px]">
-                    <DataTable columns={subscriptionColumns} data={subscriptions} />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payments">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment History</CardTitle>
-              <CardDescription>
-                View payment history for all subscriptions
-                {usingMockData.payments && (
-                  <span className="block mt-1 text-xs text-amber-500">
-                    Note: Showing mock data as the payment history API is not
-                    available
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {usingMockData.payments && (
-                <Alert variant="warning" className="mb-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Using Mock Data</AlertTitle>
-                  <AlertDescription>
-                    The payment history shown is mock data. The API returned an
-                    HTML response instead of JSON.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                </div>
-              ) : paymentHistory.length === 0 ? (
-                <div className="text-center py-8">
-                  <CreditCard className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-4 text-lg font-semibold">
-                    No Payment History
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    There are no payment records in the system yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="w-full overflow-x-auto">
-                  <div className="min-w-[900px]">
-                    <DataTable
-                      columns={paymentHistoryColumns}
-                      data={paymentHistory}
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              <p className="mt-2 text-sm text-muted-foreground">Loading subscription data...</p>
+            </div>
+          ) : paymentHistory.length === 0 && subscriptions.length === 0 ? (
+            <div className="text-center py-8">
+              <CreditCard className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
+              <h3 className="mt-4 text-lg font-semibold">
+                No Subscriptions Found
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                There are no subscription records in the system yet.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => loadData()}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry Loading
+              </Button>
+            </div>
+          ) : (
+            <SubscriptionsTable />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Create Order Dialog */}
       <SubscriptionFormDialog

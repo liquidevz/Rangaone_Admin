@@ -171,14 +171,21 @@ export interface Config {
 
 // Subscription Types
 export interface Subscription {
-  id: string;
+  _id: string;
+  id?: string;
   isActive: boolean;
   lastPaidAt?: string;
+  lastRenewed?: string;
+  expiryDate?: string;
   missedCycles?: number;
   createdAt: string;
   updatedAt: string;
   user?: User;
   portfolio?: Portfolio;
+  productType?: "Portfolio" | "Bundle";
+  productId?: Portfolio | any; // Can be Portfolio or Bundle
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface PaymentHistory {
@@ -261,11 +268,12 @@ export const createPortfolio = async (portfolioData: CreatePortfolioRequest): Pr
  */
 export const updatePortfolio = async (id: string, portfolioData: Partial<CreatePortfolioRequest>): Promise<Portfolio> => {
   if (!id) throw new Error("Invalid portfolio ID");
-  // Use the exact same structure as working stock operations
+  // For portfolio updates, don't include stockAction to avoid interfering with cash balance calculations
+  // The server will handle cash balance updates based on the actual holdings changes
   const requestBody = {
-    stockAction: "replace",
-    holdings: portfolioData.holdings || [],
-    ...portfolioData
+    ...portfolioData,
+    // Remove stockAction for general portfolio updates to prevent cash balance interference
+    // Holdings updates should be done through specific stock operation endpoints
   };
   console.log('UPDATE PORTFOLIO REQUEST BODY:', JSON.stringify(requestBody, null, 2));
   const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {
@@ -490,7 +498,8 @@ export const fetchSubscriptions = async (): Promise<Subscription[]> => {
   const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/subscriptions`);
   if (!response.ok) throw new Error((await response.json()).message || "Failed to fetch subscriptions");
   const data = await response.json();
-  return data?.subscriptions || [];
+  // Handle both array response and object with subscriptions property
+  return Array.isArray(data) ? data : (data?.subscriptions || []);
 };
 
 /**

@@ -1,7 +1,7 @@
 // app/api/bot/[...path]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const BOT_API_BASE_URL = process.env.TELEGRAM_BOT_API_URL || 'http://localhost:3000';
+const BOT_API_BASE_URL = process.env.TELEGRAM_BOT_API_URL || 'https://subscription-manager-tg-bot.onrender.com';
 
 export async function GET(
   request: NextRequest,
@@ -41,7 +41,7 @@ async function proxyRequest(
   method: string
 ) {
   try {
-    const url = `${BOT_API_BASE_URL}/${path.join('/')}`;
+    const url = `${BOT_API_BASE_URL}/api/${path.join('/')}`;
     const searchParams = request.nextUrl.searchParams;
     const fullUrl = searchParams.toString() ? `${url}?${searchParams}` : url;
 

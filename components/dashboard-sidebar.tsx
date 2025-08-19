@@ -71,6 +71,11 @@ const sidebarItems: SidebarItem[] = [
     icon: Users,
   },
   {
+    title: "Users & Subscriptions",
+    href: "/dashboard/users-subscriptions",
+    icon: Users,
+  },
+  {
     title: "Notifications",
     href: "/dashboard/notifications",
     icon: Mail,

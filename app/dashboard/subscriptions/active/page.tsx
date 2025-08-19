@@ -81,7 +81,11 @@ export default function ActiveSubscriptionsPage() {
     if (!selectedSubscription) return;
 
     try {
-      const result = await cancelSubscription(selectedSubscription.id);
+      const subscriptionId = selectedSubscription._id || selectedSubscription.id || "";
+      if (!subscriptionId) {
+        throw new Error("Invalid subscription ID");
+      }
+      const result = await cancelSubscription(subscriptionId);
       toast({
         title: "Subscription Cancelled",
         description: result.message || "The subscription has been successfully cancelled",
