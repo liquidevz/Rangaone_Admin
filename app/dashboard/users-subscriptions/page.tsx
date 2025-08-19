@@ -308,7 +308,9 @@ export default function UsersSubscriptionsPage() {
             <div className="text-xs text-muted-foreground flex items-center gap-1">
               Profile: {user.profileCompleteness || 0}% complete
               {(user.profileCompleteness || 0) < 100 && (
-                <AlertCircle className="h-3 w-3 text-amber-500" title="Profile incomplete" />
+                <span title="Profile incomplete">
+                  <AlertCircle className="h-3 w-3 text-amber-500" />
+                </span>
               )}
             </div>
           </div>
