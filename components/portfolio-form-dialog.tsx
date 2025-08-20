@@ -1468,7 +1468,7 @@ export function PortfolioFormDialog({
         setEditingHolding(null);
         return;
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData?.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
