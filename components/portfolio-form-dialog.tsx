@@ -1445,11 +1445,20 @@ export function PortfolioFormDialog({
           throw new Error('Admin authentication required');
         }
         
+        // Map status to stockAction
+        let stockActionType = "update";
+        if (status === "Fresh-Buy" || status === "addon-buy") {
+          stockActionType = "buy";
+        } else if (status === "Sell" || status === "partial-sell") {
+          stockActionType = "sell";
+        } else if (status === "Hold") {
+          stockActionType = "hold";
+        }
+        
         const requestBody = {
-          stockAction: "replace",
+          stockAction: stockActionType,
           holdings: [{
-            symbol: originalHolding.symbol,
-            status: status
+            symbol: originalHolding.symbol
           }]
         };
         
