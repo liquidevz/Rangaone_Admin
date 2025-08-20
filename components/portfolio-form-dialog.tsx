@@ -1171,8 +1171,11 @@ export function PortfolioFormDialog({
       
       switch (updated.action) {
         case 'buy':
+          updated.status = 'Fresh-Buy';
+          updated.newWeight = originalWeight;
+          break;
         case 'addon':
-          updated.status = updated.action === 'buy' ? 'Fresh-Buy' : 'addon-buy';
+          updated.status = 'addon-buy';
           updated.newWeight = originalWeight;
           break;
         case 'partial-sell':
@@ -1289,8 +1292,8 @@ export function PortfolioFormDialog({
     const { index, newWeight, status, action, pnlPreview } = editingHolding;
     const originalHolding = editingHolding.originalHolding;
     
-    // For existing portfolios, use API for buy/sell operations
-    if (initialData && initialData.id && (action === 'buy' || action === 'addon' || action === 'sell' || action === 'partial-sell')) {
+    // For existing portfolios, use API for buy/sell operations only
+    if (initialData && initialData.id && (action === 'buy' || action === 'addon' || action === 'sell' || action === 'partial-sell') && status !== 'Hold') {
       try {
         const adminToken = getAdminAccessToken();
         if (!adminToken) {
@@ -1445,22 +1448,25 @@ export function PortfolioFormDialog({
           throw new Error('Admin authentication required');
         }
         
-        // Map status to stockAction
-        let stockActionType = "update";
-        if (status === "Fresh-Buy" || status === "addon-buy") {
-          stockActionType = "buy";
-        } else if (status === "Sell" || status === "partial-sell") {
-          stockActionType = "sell";
-        } else if (status === "Hold") {
-          stockActionType = "hold";
+        // Just update local state for status changes
+        const updatedHoldings = [...holdings];
+        updatedHoldings[index] = {
+          ...originalHolding,
+          status: status
+        };
+        setHoldings(updatedHoldings);
+        
+        toast({
+          title: "Success",
+          description: `Status updated to ${status}`,
+        });
+        
+        if (onDataChange) {
+          setTimeout(() => onDataChange(), 100);
         }
         
-        const requestBody = {
-          stockAction: stockActionType,
-          holdings: [{
-            symbol: originalHolding.symbol
-          }]
-        };
+        setEditingHolding(null);
+        return;
         
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
           method: 'PATCH',

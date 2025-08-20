@@ -4,9 +4,11 @@
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, Edit, Trash2, Plus, RefreshCw, LogIn, BarChart3, DollarSign, TrendingUp } from "lucide-react"
+import { Eye, Edit, Trash2, Plus, RefreshCw, LogIn, BarChart3, DollarSign, TrendingUp, Calendar, Filter } from "lucide-react"
 import { DataTable } from "@/components/ui/data-table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useToast } from "@/hooks/use-toast"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -22,6 +24,7 @@ import {
   type Portfolio,
   type CreatePortfolioRequest,
 } from "@/lib/api"
+import { fetchChartData, fetchPortfolioPerformance } from "@/lib/api-chart-data"
 import { isAuthenticated } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -36,6 +39,10 @@ export default function PortfoliosPage() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null)
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(true)
+  const [startDate, setStartDate] = useState<string>("")
+  const [endDate, setEndDate] = useState<string>("")
+  const [portfolioPerformance, setPortfolioPerformance] = useState<Record<string, any>>({})
+  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -54,6 +61,11 @@ export default function PortfoliosPage() {
       }
       const data = await fetchPortfolios()
       setPortfolios(data)
+      
+      // Load performance data for each portfolio if date filters are set
+      if (startDate && endDate && data.length > 0) {
+        await loadPortfolioPerformance(data)
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load portfolios"
       setError(errorMessage)
@@ -68,11 +80,77 @@ export default function PortfoliosPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [toast])
+  }, [toast, startDate, endDate])
+
+  const loadPortfolioPerformance = async (portfolioList: Portfolio[] = portfolios) => {
+    if (!startDate || !endDate || portfolioList.length === 0) {
+      setPortfolioPerformance({})
+      return
+    }
+
+    setIsLoadingPerformance(true)
+    const performanceData: Record<string, any> = {}
+
+    try {
+      // Load chart data for each portfolio to calculate percentage changes
+      for (const portfolio of portfolioList) {
+        const portfolioId = portfolio.id || portfolio._id
+        if (portfolioId) {
+          try {
+            const chartData = await fetchChartData(portfolioId, startDate, endDate, 1000)
+            if (chartData.data.length >= 2) {
+              const sortedData = chartData.data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+              const firstEntry = sortedData[0]
+              const lastEntry = sortedData[sortedData.length - 1]
+              
+              const portfolioChange = ((lastEntry.portfolioValue - firstEntry.portfolioValue) / firstEntry.portfolioValue) * 100
+              const indexChange = ((lastEntry.compareIndexValue - firstEntry.compareIndexValue) / firstEntry.compareIndexValue) * 100
+              
+              performanceData[portfolioId] = {
+                portfolioChange: portfolioChange,
+                indexChange: indexChange,
+                startValue: firstEntry.portfolioValue,
+                endValue: lastEntry.portfolioValue,
+                startIndexValue: firstEntry.compareIndexValue,
+                endIndexValue: lastEntry.compareIndexValue,
+                dataPoints: sortedData.length
+              }
+            }
+          } catch (err) {
+            console.error(`Error loading performance for portfolio ${portfolioId}:`, err)
+          }
+        }
+      }
+      setPortfolioPerformance(performanceData)
+    } catch (err) {
+      console.error("Error loading portfolio performance:", err)
+      toast({
+        title: "Error",
+        description: "Failed to load portfolio performance data",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingPerformance(false)
+    }
+  }
 
   useEffect(() => {
     loadPortfolios()
   }, [loadPortfolios])
+
+  const handleApplyFilters = () => {
+    if (startDate && endDate) {
+      loadPortfolioPerformance()
+    } else {
+      setPortfolioPerformance({})
+    }
+  }
+
+  const clearFilters = () => {
+    setStartDate("")
+    setEndDate("")
+    setPortfolioPerformance({})
+  }
 
   const handleAddPortfolio = async (portfolioData: CreatePortfolioRequest) => {
     try {
@@ -219,20 +297,74 @@ export default function PortfoliosPage() {
       size: 120,
       cell: ({ row }: { row: { original: Portfolio } }) => {
         const { CAGRSinceInception, oneYearGains } = row.original
+        const portfolioId = row.original.id || row.original._id
+        const perfData = portfolioPerformance[portfolioId || '']
+        
         return (
           <div className="text-sm">
-            {CAGRSinceInception && (
-              <div className="font-medium text-blue-600 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                CAGR: {CAGRSinceInception}%
+            {perfData && startDate && endDate ? (
+              <div>
+                <div className={`font-medium flex items-center gap-1 ${
+                  perfData.portfolioChange > 0 ? 'text-green-600' : perfData.portfolioChange < 0 ? 'text-red-600' : 'text-gray-600'
+                }`}>
+                  <TrendingUp className="h-3 w-3" />
+                  P: {perfData.portfolioChange > 0 ? '+' : ''}{perfData.portfolioChange.toFixed(2)}%
+                </div>
+                <div className={`text-xs pt-1 ${
+                  perfData.indexChange > 0 ? 'text-green-600' : perfData.indexChange < 0 ? 'text-red-600' : 'text-gray-600'
+                }`}>
+                  I: {perfData.indexChange > 0 ? '+' : ''}{perfData.indexChange.toFixed(2)}%
+                </div>
+              </div>
+            ) : (
+              <div>
+                {CAGRSinceInception && (
+                  <div className="font-medium text-blue-600 flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    CAGR: {CAGRSinceInception}%
+                  </div>
+                )}
+                {oneYearGains && (
+                  <div className="text-muted-foreground pt-1">
+                    1Y: {oneYearGains}%
+                  </div>
+                )}
+                {!CAGRSinceInception && !oneYearGains && <div className="text-muted-foreground">-</div>}
               </div>
             )}
-            {oneYearGains && (
-              <div className="text-muted-foreground pt-1">
-                1Y: {oneYearGains}%
+          </div>
+        )
+      },
+    }] : []),
+    ...(isMobile ? [{
+      accessorKey: "mobilePerformance",
+      header: "% Change",
+      size: 90,
+      cell: ({ row }: { row: { original: Portfolio } }) => {
+        const portfolioId = row.original.id || row.original._id
+        const perfData = portfolioPerformance[portfolioId || '']
+        
+        if (perfData && startDate && endDate) {
+          return (
+            <div className="text-xs">
+              <div className={`font-medium ${
+                perfData.portfolioChange > 0 ? 'text-green-600' : perfData.portfolioChange < 0 ? 'text-red-600' : 'text-gray-600'
+              }`}>
+                P: {perfData.portfolioChange > 0 ? '+' : ''}{perfData.portfolioChange.toFixed(1)}%
               </div>
-            )}
-            {!CAGRSinceInception && !oneYearGains && <div className="text-muted-foreground">-</div>}
+              <div className={`${
+                perfData.indexChange > 0 ? 'text-green-600' : perfData.indexChange < 0 ? 'text-red-600' : 'text-gray-600'
+              }`}>
+                I: {perfData.indexChange > 0 ? '+' : ''}{perfData.indexChange.toFixed(1)}%
+              </div>
+            </div>
+          )
+        }
+        
+        const { CAGRSinceInception } = row.original
+        return (
+          <div className="text-xs text-muted-foreground">
+            {CAGRSinceInception ? `${CAGRSinceInception}%` : '-'}
           </div>
         )
       },
@@ -292,9 +424,146 @@ export default function PortfoliosPage() {
 
           {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
 
+          {/* Date Filter Card */}
           <Card>
-            <CardHeader><CardTitle>All Portfolios</CardTitle><CardDescription>Click a portfolio name for details or use the actions to manage.</CardDescription></CardHeader>
-            <CardContent><DataTable columns={columns} data={portfolios} searchColumn="name" isLoading={isLoading} /></CardContent>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Performance Comparison
+              </CardTitle>
+              <CardDescription>
+                Calculate percentage change for portfolio value and index value between two dates
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Start Date</label>
+                  <Input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={(e) => setStartDate(e.target.value)}
+                    placeholder="Start date"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">End Date</label>
+                  <Input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={(e) => setEndDate(e.target.value)}
+                    placeholder="End date"
+                  />
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button 
+                    onClick={handleApplyFilters} 
+                    disabled={!startDate || !endDate || isLoadingPerformance}
+                    className="flex-1"
+                    size={isMobile ? "sm" : "default"}
+                  >
+                    <Calendar className={`mr-2 h-4 w-4 ${isLoadingPerformance ? 'animate-spin' : ''}`} />
+                    {isMobile ? 'Apply' : 'Apply Filters'}
+                  </Button>
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    variant="outline" 
+                    onClick={clearFilters}
+                    className="flex-1"
+                    size={isMobile ? "sm" : "default"}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              {startDate && endDate && Object.keys(portfolioPerformance).length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <div className="p-3 sm:p-4 bg-muted rounded-lg">
+                    <div className={`font-medium mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                      Performance Summary ({startDate} to {endDate})
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs">
+                      <div className="text-center">
+                        <div className="font-medium text-blue-600">Portfolios</div>
+                        <div className={`${isMobile ? 'text-base' : 'text-lg'}`}>
+                          {Object.keys(portfolioPerformance).length}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-medium text-green-600">{isMobile ? 'Avg P' : 'Avg Portfolio'}</div>
+                        <div className={`${isMobile ? 'text-base' : 'text-lg'}`}>
+                          {Object.values(portfolioPerformance).length > 0 ? 
+                            `${(Object.values(portfolioPerformance).reduce((sum: number, p: any) => sum + p.portfolioChange, 0) / Object.values(portfolioPerformance).length).toFixed(2)}%` : 
+                            'N/A'
+                          }
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-medium text-purple-600">{isMobile ? 'Avg I' : 'Avg Index'}</div>
+                        <div className={`${isMobile ? 'text-base' : 'text-lg'}`}>
+                          {Object.values(portfolioPerformance).length > 0 ? 
+                            `${(Object.values(portfolioPerformance).reduce((sum: number, p: any) => sum + p.indexChange, 0) / Object.values(portfolioPerformance).length).toFixed(2)}%` : 
+                            'N/A'
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Individual Portfolio Performance Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(portfolioPerformance).map(([portfolioId, perfData]: [string, any]) => {
+                      const portfolio = portfolios.find(p => (p.id || p._id) === portfolioId)
+                      return (
+                        <div key={portfolioId} className="p-3 border rounded-lg bg-card">
+                          <div className="font-medium text-sm mb-2 truncate">{portfolio?.name || 'Unknown'}</div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span>Portfolio:</span>
+                              <span className={`font-medium ${
+                                perfData.portfolioChange > 0 ? 'text-green-600' : perfData.portfolioChange < 0 ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                {perfData.portfolioChange > 0 ? '+' : ''}{perfData.portfolioChange.toFixed(2)}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Index:</span>
+                              <span className={`font-medium ${
+                                perfData.indexChange > 0 ? 'text-green-600' : perfData.indexChange < 0 ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                {perfData.indexChange > 0 ? '+' : ''}{perfData.indexChange.toFixed(2)}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Value:</span>
+                              <span>₹{perfData.startValue?.toLocaleString()} → ₹{perfData.endValue?.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Data Points:</span>
+                              <span>{perfData.dataPoints}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>All Portfolios</CardTitle>
+              <CardDescription>
+                {startDate && endDate ? 
+                  `Portfolio performance comparison from ${startDate} to ${endDate}. Click a portfolio name for details.` :
+                  'Click a portfolio name for details or use the actions to manage.'
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent><DataTable columns={columns} data={portfolios} searchColumn="name" isLoading={isLoading || isLoadingPerformance} /></CardContent>
           </Card>
         </div>
       </div>

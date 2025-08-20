@@ -44,6 +44,10 @@ export default function PriceHistoryPage() {
   const [endDate, setEndDate] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(100);
+  const [showCalculateDialog, setShowCalculateDialog] = useState(false);
+  const [calculateStartDate, setCalculateStartDate] = useState<string>("");
+  const [calculateEndDate, setCalculateEndDate] = useState<string>("");
+  const [calculationResult, setCalculationResult] = useState<any>(null);
   const [newEntry, setNewEntry] = useState<CreateChartDataRequest>({
     portfolio: "",
     date: new Date().toISOString(),
@@ -201,6 +205,40 @@ export default function PriceHistoryPage() {
     }
   };
 
+  const handleCalculateChange = async () => {
+    if (!calculateStartDate || !calculateEndDate || !selectedPortfolio || selectedPortfolio === "all") {
+      toast({ title: "Error", description: "Please select portfolio and both dates", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      const data = await fetchChartData(selectedPortfolio, calculateStartDate, calculateEndDate, 1000);
+      if (data.data.length >= 1) {
+        const sortedData = data.data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const startEntry = sortedData.find(entry => entry.dateOnly.split('T')[0] === calculateStartDate) || sortedData[0];
+        const endEntry = sortedData.find(entry => entry.dateOnly.split('T')[0] === calculateEndDate) || sortedData[sortedData.length - 1];
+        
+        const portfolioChange = ((endEntry.portfolioValue - startEntry.portfolioValue) / startEntry.portfolioValue) * 100;
+        const indexChange = ((endEntry.compareIndexValue - startEntry.compareIndexValue) / startEntry.compareIndexValue) * 100;
+        
+        setCalculationResult({
+          portfolioChange,
+          indexChange,
+          startValue: startEntry.portfolioValue,
+          endValue: endEntry.portfolioValue,
+          startIndexValue: startEntry.compareIndexValue,
+          endIndexValue: endEntry.compareIndexValue,
+          startDate: startEntry.dateOnly.split('T')[0],
+          endDate: endEntry.dateOnly.split('T')[0]
+        });
+      } else {
+        toast({ title: "Error", description: "Not enough data points for calculation", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to calculate percentage change", variant: "destructive" });
+    }
+  };
+
 
 
   useEffect(() => {
@@ -292,6 +330,14 @@ export default function PriceHistoryPage() {
           >
             <Trash className={`mr-2 h-4 w-4 ${isCleaningUp ? "animate-spin" : ""}`} />
             Cleanup
+          </Button>
+          <Button 
+            onClick={() => setShowCalculateDialog(true)}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Calculate %
           </Button>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
@@ -403,6 +449,57 @@ export default function PriceHistoryPage() {
               )}
             </DialogContent>
           </Dialog>
+          
+          <Dialog open={showCalculateDialog} onOpenChange={setShowCalculateDialog}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Calculate % Change</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Start Date</label>
+                  <Input 
+                    type="date" 
+                    value={calculateStartDate} 
+                    onChange={(e) => setCalculateStartDate(e.target.value)} 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">End Date</label>
+                  <Input 
+                    type="date" 
+                    value={calculateEndDate} 
+                    onChange={(e) => setCalculateEndDate(e.target.value)} 
+                  />
+                </div>
+                <Button onClick={handleCalculateChange} className="w-full">
+                  Calculate
+                </Button>
+                {calculationResult && (
+                  <div className="mt-4 p-3 bg-muted rounded-lg space-y-2">
+                    <div className="text-sm font-medium">Results ({calculationResult.startDate} to {calculationResult.endDate})</div>
+                    <div className="flex justify-between text-sm">
+                      <span>Portfolio:</span>
+                      <span className={`font-medium ${
+                        calculationResult.portfolioChange > 0 ? 'text-green-600' : calculationResult.portfolioChange < 0 ? 'text-red-600' : 'text-gray-600'
+                      }`}>
+                        {calculationResult.portfolioChange > 0 ? '+' : ''}{calculationResult.portfolioChange.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Index:</span>
+                      <span className={`font-medium ${
+                        calculationResult.indexChange > 0 ? 'text-green-600' : calculationResult.indexChange < 0 ? 'text-red-600' : 'text-gray-600'
+                      }`}>
+                        {calculationResult.indexChange > 0 ? '+' : ''}{calculationResult.indexChange.toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <Button 
             onClick={() => loadChartData()} 
             disabled={isLoading}
@@ -424,16 +521,14 @@ export default function PriceHistoryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Portfolio</label>
-              <Select value={selectedPortfolio || "all"} onValueChange={(value) => {
-                const newValue = value === "all" ? "" : value;
-                setSelectedPortfolio(newValue);
+              <Select value={selectedPortfolio} onValueChange={(value) => {
+                setSelectedPortfolio(value);
                 setCurrentPage(1);
               }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All portfolios" />
+                  <SelectValue placeholder="Select portfolio" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All portfolios</SelectItem>
                   {portfolios.map((portfolio) => (
                     <SelectItem key={portfolio.id || portfolio._id} value={portfolio.id || portfolio._id || 'unknown'}>
                       {portfolio.name}
@@ -524,7 +619,11 @@ export default function PriceHistoryPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Chart Data Entries
+            Chart Data Entries - {(() => {
+              if (!selectedPortfolio) return 'All Portfolios';
+              const portfolio = portfolios.find(p => (p.id || p._id) === selectedPortfolio);
+              return portfolio?.name || 'Unknown Portfolio';
+            })()}
           </CardTitle>
           <CardDescription>
             Manage chart data with Create, Read, Update, Delete operations
@@ -548,44 +647,24 @@ export default function PriceHistoryPage() {
                 </div>
               </div>
               
-              <div className="w-full overflow-x-auto">
-                <Table>
+              <div className="w-full overflow-hidden">
+                <Table className="w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Portfolio</TableHead>
-                      <TableHead>Portfolio Value</TableHead>
-                      <TableHead>Cash Remaining</TableHead>
-                      <TableHead>Index Value</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="w-24">Date</TableHead>
+                      <TableHead className="w-24">Portfolio Value</TableHead>
+                      <TableHead className="w-20">Portfolio %</TableHead>
+                      <TableHead className="w-24">Index Value</TableHead>
+                      <TableHead className="w-20">Index %</TableHead>
+                      <TableHead className="w-24">Cash Remaining</TableHead>
+                      <TableHead className="w-20">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {chartData.data.map((point) => (
                       <TableRow key={point._id || `${point.portfolio}-${point.dateOnly}`}>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <div className="font-medium">{point.dateOnly}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {new Date(point.date).toLocaleTimeString('en-IN', { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {(() => {
-                              const portfolioId = typeof point.portfolio === 'string' ? point.portfolio : (point.portfolio as any)?.id || (point.portfolio as any)?._id;
-                              const portfolio = portfolios.find(p => (p.id || p._id) === portfolioId);
-                              return portfolio?.name || portfolioId || 'Unknown';
-                            })()}
-                          </Badge>
+                          <div className="font-medium text-sm">{point.dateOnly.split('T')[0]}</div>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-blue-600">
@@ -593,9 +672,21 @@ export default function PriceHistoryPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium text-green-600">
-                            {formatCurrency(point.cashRemaining || 0)}
-                          </div>
+                          {(() => {
+                            const currentIndex = chartData.data.indexOf(point);
+                            const previousPoint = chartData.data[currentIndex + 1];
+                            if (!previousPoint || !point.portfolioValue || !previousPoint.portfolioValue) {
+                              return <span className="text-muted-foreground">N/A</span>;
+                            }
+                            const change = ((point.portfolioValue - previousPoint.portfolioValue) / previousPoint.portfolioValue) * 100;
+                            return (
+                              <div className={`font-medium ${
+                                change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                {change > 0 ? '+' : ''}{change.toFixed(2)}%
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-purple-600">
@@ -606,15 +697,25 @@ export default function PriceHistoryPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <Badge variant={point.dataVerified ? "default" : "destructive"}>
-                              {point.dataVerified ? "Verified" : "Unverified"}
-                            </Badge>
-                            {point.dataQualityIssues.length > 0 && (
-                              <Badge variant="outline" className="text-xs">
-                                {point.dataQualityIssues.length} issues
-                              </Badge>
-                            )}
+                          {(() => {
+                            const currentIndex = chartData.data.indexOf(point);
+                            const previousPoint = chartData.data[currentIndex + 1];
+                            if (!previousPoint || !point.compareIndexValue || !previousPoint.compareIndexValue) {
+                              return <span className="text-muted-foreground">N/A</span>;
+                            }
+                            const change = ((point.compareIndexValue - previousPoint.compareIndexValue) / previousPoint.compareIndexValue) * 100;
+                            return (
+                              <div className={`font-medium ${
+                                change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                {change > 0 ? '+' : ''}{change.toFixed(2)}%
+                              </div>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium text-green-600">
+                            {formatCurrency(point.cashRemaining || 0)}
                           </div>
                         </TableCell>
                         <TableCell>
