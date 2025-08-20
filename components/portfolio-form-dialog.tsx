@@ -1467,28 +1467,6 @@ export function PortfolioFormDialog({
         
         setEditingHolding(null);
         return;
-        
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData?.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${adminToken}`,
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update holding status');
-        }
-
-        toast({
-          title: "Success",
-          description: `Status updated to ${status}`,
-        });
-        
-        if (onDataChange) {
-          setTimeout(() => onDataChange(), 100);
-        }
       } catch (error) {
         toast({
           title: "Failed to Update Status",
