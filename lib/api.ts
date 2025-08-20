@@ -270,12 +270,10 @@ export const createPortfolio = async (portfolioData: CreatePortfolioRequest): Pr
  */
 export const updatePortfolio = async (id: string, portfolioData: Partial<CreatePortfolioRequest>): Promise<Portfolio> => {
   if (!id) throw new Error("Invalid portfolio ID");
-  // For portfolio updates, don't include stockAction to avoid interfering with cash balance calculations
-  // The server will handle cash balance updates based on the actual holdings changes
+  // Server always expects stockAction for PATCH requests
   const requestBody = {
     ...portfolioData,
-    // Remove stockAction for general portfolio updates to prevent cash balance interference
-    // Holdings updates should be done through specific stock operation endpoints
+    stockAction: "update"
   };
   console.log('UPDATE PORTFOLIO REQUEST BODY:', JSON.stringify(requestBody, null, 2));
   const response = await fetchWithAuth(`${API_BASE_URL}/api/portfolios/${id}`, {

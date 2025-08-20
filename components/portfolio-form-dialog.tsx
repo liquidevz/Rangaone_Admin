@@ -773,7 +773,8 @@ export function PortfolioFormDialog({
         minInvestment: Number(minInvestment),
         monthlyContribution: monthlyContribution ? Number(monthlyContribution) : undefined,
         durationMonths: 24, // Default duration
-        holdings: portfolioHoldings,
+        // Only include holdings for new portfolios, not updates
+        ...(initialData ? {} : { holdings: portfolioHoldings }),
         PortfolioCategory: portfolioCategory,
         downloadLinks: downloadLinks.length > 0 ? downloadLinks : undefined,
         youTubeLinks: youTubeLinks.length > 0 ? youTubeLinks : undefined,
@@ -1009,8 +1010,7 @@ export function PortfolioFormDialog({
           description: `${newHolding.symbol} added successfully`,
         });
         
-        // Close dialog and refresh parent data
-        onOpenChange(false);
+        // Don't close dialog, just refresh data
         if (onDataChange) {
           setTimeout(() => onDataChange(), 100);
         }
@@ -1109,8 +1109,7 @@ export function PortfolioFormDialog({
           description: `${removedHolding.symbol} removed successfully`,
         });
         
-        // Close dialog and refresh parent data
-        onOpenChange(false);
+        // Don't close dialog, just refresh data
         if (onDataChange) {
           setTimeout(() => onDataChange(), 100);
         }
@@ -1421,8 +1420,7 @@ export function PortfolioFormDialog({
         
         setEditingHolding(null);
         
-        // Close dialog and refresh parent data
-        onOpenChange(false);
+        // Don't close dialog, just refresh data
         if (onDataChange) {
           setTimeout(() => onDataChange(), 100);
         }
@@ -1439,32 +1437,78 @@ export function PortfolioFormDialog({
       }
     }
 
-    // For local operations (non-sell actions or new portfolios)
-    const investmentPrice = editingHolding.latestPrice || originalHolding.buyPrice;
-    const editBase = cashBalance + holdingsValue;
-    const recomputed = calculateInvestmentDetails(newWeight, investmentPrice, editBase);
-    const accurateWeight = Number(((recomputed.actualInvestmentAmount / editBase) * 100).toFixed(2));
+    // For local operations (non-sell actions or new portfolios) - save to backend
+    if (initialData && initialData.id) {
+      try {
+        const adminToken = getAdminAccessToken();
+        if (!adminToken) {
+          throw new Error('Admin authentication required');
+        }
+        
+        const requestBody = {
+          stockAction: "replace",
+          holdings: [{
+            symbol: originalHolding.symbol,
+            status: status
+          }]
+        };
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify(requestBody)
+        });
 
-    const updatedHoldings = [...holdings];
-    const updatedHolding: ExtendedHolding = {
-      ...originalHolding,
-      weight: accurateWeight,
-      status: status,
-      buyPrice: investmentPrice,
-      quantity: recomputed.quantity,
-      minimumInvestmentValueStock: recomputed.actualInvestmentAmount,
-      allocatedAmount: recomputed.allocatedAmount,
-      leftoverAmount: Number(recomputed.leftoverAmount.toFixed(2)),
-      currentMarketPrice: editingHolding.latestPrice,
-    };
-    updatedHoldings[index] = updatedHolding;
-    setHoldings(updatedHoldings);
+        if (!response.ok) {
+          throw new Error('Failed to update holding status');
+        }
 
-    const actionText = action.charAt(0).toUpperCase() + action.slice(1).replace('-', ' ');
-    toast({
-      title: "Success",
-      description: `${actionText} completed. New weight: ${newWeight.toFixed(2)}%`,
-    });
+        toast({
+          title: "Success",
+          description: `Status updated to ${status}`,
+        });
+        
+        if (onDataChange) {
+          setTimeout(() => onDataChange(), 100);
+        }
+      } catch (error) {
+        toast({
+          title: "Failed to Update Status",
+          description: error instanceof Error ? error.message : "An error occurred",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // For new portfolios, update local state
+      const investmentPrice = editingHolding.latestPrice || originalHolding.buyPrice;
+      const editBase = cashBalance + holdingsValue;
+      const recomputed = calculateInvestmentDetails(newWeight, investmentPrice, editBase);
+      const accurateWeight = Number(((recomputed.actualInvestmentAmount / editBase) * 100).toFixed(2));
+
+      const updatedHoldings = [...holdings];
+      const updatedHolding: ExtendedHolding = {
+        ...originalHolding,
+        weight: accurateWeight,
+        status: status,
+        buyPrice: investmentPrice,
+        quantity: recomputed.quantity,
+        minimumInvestmentValueStock: recomputed.actualInvestmentAmount,
+        allocatedAmount: recomputed.allocatedAmount,
+        leftoverAmount: Number(recomputed.leftoverAmount.toFixed(2)),
+        currentMarketPrice: editingHolding.latestPrice,
+      };
+      updatedHoldings[index] = updatedHolding;
+      setHoldings(updatedHoldings);
+
+      const actionText = action.charAt(0).toUpperCase() + action.slice(1).replace('-', ' ');
+      toast({
+        title: "Success",
+        description: `${actionText} completed. New weight: ${newWeight.toFixed(2)}%`,
+      });
+    }
 
     setEditingHolding(null);
   };
