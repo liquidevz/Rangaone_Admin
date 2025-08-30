@@ -147,7 +147,7 @@ export async function createCoupon(data: CreateCouponRequest): Promise<{ success
   return response.json();
 }
 
-export async function updateCoupon(id: string, data: Partial<Coupon>): Promise<{ success: boolean; coupon: Coupon }> {
+export async function updateCoupon(id: string, data: CreateCouponRequest): Promise<{ success: boolean; coupon: Coupon }> {
   const token = getAdminAccessToken();
   if (!token) throw new Error('Admin authentication required');
 
