@@ -49,8 +49,11 @@ const bundleFormSchema = z.object({
     message: "Category must be either basic or premium.",
   }),
   monthlyPrice: z.number().min(0).optional().nullable(),
+  monthlyemandateprice: z.number().min(0).optional().nullable(),
   quarterlyPrice: z.number().min(0).optional().nullable(),
+  quarterlyemandateprice: z.number().min(0).optional().nullable(),
   yearlyPrice: z.number().min(0).optional().nullable(),
+  yearlyemandateprice: z.number().min(0).optional().nullable(),
 }).refine(
   (data) => {
     const hasMonthly = data.monthlyPrice != null && data.monthlyPrice > 0;
@@ -121,8 +124,11 @@ export function BundleFormDialog({
       portfolios: [],
       category: "basic",
       monthlyPrice: null,
+      monthlyemandateprice: null,
       quarterlyPrice: null,
+      quarterlyemandateprice: null,
       yearlyPrice: null,
+      yearlyemandateprice: null,
     },
   })
 
@@ -275,8 +281,11 @@ export function BundleFormDialog({
           portfolios: portfolioIds,
           category: initialData.category || "basic",
           monthlyPrice: initialData.monthlyPrice || null,
+          monthlyemandateprice: initialData.monthlyemandateprice || null,
           quarterlyPrice: initialData.quarterlyPrice || null,
+          quarterlyemandateprice: initialData.quarterlyemandateprice || null,
           yearlyPrice: initialData.yearlyPrice || null,
+          yearlyemandateprice: initialData.yearlyemandateprice || null,
         })
       } else {
         console.log("No initial data, resetting form to defaults");
@@ -286,8 +295,11 @@ export function BundleFormDialog({
           portfolios: [],
           category: "basic",
           monthlyPrice: null,
+          monthlyemandateprice: null,
           quarterlyPrice: null,
+          quarterlyemandateprice: null,
           yearlyPrice: null,
+          yearlyemandateprice: null,
         })
       }
     }
@@ -308,8 +320,11 @@ export function BundleFormDialog({
         portfolios: [],
         category: "basic",
         monthlyPrice: null,
+        monthlyemandateprice: null,
         quarterlyPrice: null,
+        quarterlyemandateprice: null,
         yearlyPrice: null,
+        yearlyemandateprice: null,
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
@@ -549,79 +564,157 @@ export function BundleFormDialog({
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="monthlyPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Monthly Price (₹)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            placeholder="Enter monthly price"
-                            {...field}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              field.onChange(value === "" ? null : parseFloat(value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="quarterlyPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quarterly Price (₹)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            placeholder="Enter quarterly price"
-                            {...field}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              field.onChange(value === "" ? null : parseFloat(value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="yearlyPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Yearly Price (₹)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            placeholder="Enter yearly price"
-                            {...field}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              field.onChange(value === "" ? null : parseFloat(value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="monthlyPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monthly Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="Enter monthly price"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value === "" ? null : parseFloat(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="monthlyemandateprice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monthly E-Mandate Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="Enter monthly e-mandate price"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value === "" ? null : parseFloat(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="quarterlyPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quarterly Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="Enter quarterly price"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value === "" ? null : parseFloat(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="quarterlyemandateprice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quarterly E-Mandate Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="Enter quarterly e-mandate price"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value === "" ? null : parseFloat(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="yearlyPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Yearly Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="Enter yearly price"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value === "" ? null : parseFloat(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="yearlyemandateprice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Yearly E-Mandate Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="Enter yearly e-mandate price"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value === "" ? null : parseFloat(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
               <DialogFooter className="pt-4">

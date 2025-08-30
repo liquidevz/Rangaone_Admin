@@ -138,6 +138,7 @@ export function PortfolioFormDialog({
   const [minInvestment, setMinInvestment] = useState("");
   const [monthlyContribution, setMonthlyContribution] = useState("");
   const [subscriptionFees, setSubscriptionFees] = useState<ExtendedSubscriptionFee[]>([]);
+  const [emandateSubscriptionFees, setEmandateSubscriptionFees] = useState<ExtendedSubscriptionFee[]>([]);
 
   // Portfolio Characteristics State
   const [portfolioCategory, setPortfolioCategory] = useState("Basic");
@@ -502,6 +503,27 @@ export function PortfolioFormDialog({
           }
         }
 
+        // Handle e-mandate subscription fees
+        if (Array.isArray(initialData.emandateSubriptionFees)) {
+          console.log("Processing e-mandate subscription fees:", initialData.emandateSubriptionFees);
+          
+          const extendedEmandateFees: ExtendedSubscriptionFee[] = initialData.emandateSubriptionFees.map(fee => {
+            const actualPrice = (fee as any).actualPrice || fee.price;
+            const discountPrice = fee.price;
+            const discountPercentage = actualPrice > 0 ? Math.round(((actualPrice - discountPrice) / actualPrice) * 100) : 0;
+            
+            return {
+              ...fee,
+              actualPrice: actualPrice,
+              discountPrice: discountPrice,
+              discountPercentage: discountPercentage,
+            };
+          });
+          
+          console.log("Extended e-mandate subscription fees:", extendedEmandateFees);
+          setEmandateSubscriptionFees(extendedEmandateFees);
+        }
+
         // Portfolio Characteristics
         setPortfolioCategory(initialData.PortfolioCategory || "Basic");
         setTimeHorizon(initialData.timeHorizon || "");
@@ -601,6 +623,7 @@ export function PortfolioFormDialog({
         setMinInvestment("");
         setMonthlyContribution("");
         setSubscriptionFees([]);
+        setEmandateSubscriptionFees([]);
         setPortfolioCategory("Basic");
         setTimeHorizon("");
         setRebalancing("");
@@ -770,6 +793,7 @@ export function PortfolioFormDialog({
         name,
         description: filteredDescriptions,
         subscriptionFee: subscriptionFees,
+        emandateSubriptionFees: emandateSubscriptionFees.length > 0 ? emandateSubscriptionFees : undefined,
         minInvestment: Number(minInvestment),
         monthlyContribution: monthlyContribution ? Number(monthlyContribution) : undefined,
         durationMonths: 24, // Default duration
@@ -1546,6 +1570,46 @@ export function PortfolioFormDialog({
     setSubscriptionFees(updated);
   };
 
+  const addEmandateSubscriptionFee = () => {
+    setEmandateSubscriptionFees([...emandateSubscriptionFees, { 
+      type: "monthly", 
+      price: 0,
+      actualPrice: 0,
+      discountPrice: 0,
+      discountPercentage: 0,
+    }]);
+  };
+
+  const updateEmandateSubscriptionFee = (index: number, field: keyof ExtendedSubscriptionFee, value: string | number) => {
+    const updated = [...emandateSubscriptionFees];
+    if (field === "price" || field === "actualPrice" || field === "discountPrice" || field === "discountPercentage") {
+      updated[index] = { ...updated[index], [field]: Number(value) };
+      
+      // Auto-calculate discount percentage when actual or discount price changes
+      if (field === "actualPrice" || field === "discountPrice") {
+        const actual = field === "actualPrice" ? Number(value) : updated[index].actualPrice;
+        const discount = field === "discountPrice" ? Number(value) : updated[index].discountPrice;
+        
+        if (actual > 0) {
+          updated[index].discountPercentage = Math.round(((actual - discount) / actual) * 100);
+        }
+        
+        // Update the main price field to be the discount price
+        updated[index].price = discount;
+      }
+    } else {
+      const typeValue = value as "monthly" | "quarterly" | "yearly";
+      updated[index] = { ...updated[index], [field]: typeValue };
+    }
+    setEmandateSubscriptionFees(updated);
+  };
+
+  const removeEmandateSubscriptionFee = (index: number) => {
+    const updated = [...emandateSubscriptionFees];
+    updated.splice(index, 1);
+    setEmandateSubscriptionFees(updated);
+  };
+
   const addYouTubeLink = () => {
     setYouTubeLinks([...youTubeLinks, { link: "" }]);
   };
@@ -1801,7 +1865,7 @@ export function PortfolioFormDialog({
 
                   {/* Subscription Fees section */}
                   <div className="space-y-3 border p-4 rounded-md bg-muted">
-                    <Label>Subscription Fees *</Label>
+                    <Label>Regular Subscription Fees *</Label>
                     {subscriptionFees.map((fee, index) => (
                       <div key={index} className="grid grid-cols-1 gap-4">
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
@@ -1873,7 +1937,86 @@ export function PortfolioFormDialog({
                       disabled={isSubmitting}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Subscription Fee
+                      Add Regular Subscription Fee
+                    </Button>
+                  </div>
+
+                  {/* E-Mandate Subscription Fees section */}
+                  <div className="space-y-3 border p-4 rounded-md bg-muted">
+                    <Label>E-Mandate Subscription Fees</Label>
+                    <p className="text-sm text-muted-foreground">Optional: Add e-mandate specific pricing for automated payments</p>
+                    {emandateSubscriptionFees.map((fee, index) => (
+                      <div key={index} className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+                        <div>
+                          <Label className="text-sm">Type</Label>
+                          <Select
+                            value={fee.type}
+                            onValueChange={(value) => updateEmandateSubscriptionFee(index, "type", value)}
+                            disabled={isSubmitting}
+                          >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                              <SelectItem value="quarterly">Quarterly</SelectItem>
+                              <SelectItem value="yearly">Yearly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                            <Label className="text-sm">Actual Price (₹)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                              value={fee.actualPrice}
+                              onChange={(e) => updateEmandateSubscriptionFee(index, "actualPrice", e.target.value)}
+                              placeholder="Enter Price"
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                          <div>
+                            <Label className="text-sm">Discount Price (₹)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={fee.discountPrice}
+                              onChange={(e) => updateEmandateSubscriptionFee(index, "discountPrice", e.target.value)}
+                              placeholder="Enter Discount Price"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm">Discount Percentage (%)</Label>
+                            <Input
+                              type="text"
+                              value={fee.discountPercentage + "%"}
+                              placeholder="Automatic Reflecting"
+                              disabled={true}
+                              className="bg-gray-100"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeEmandateSubscriptionFee(index)}
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addEmandateSubscriptionFee}
+                      disabled={isSubmitting}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add E-Mandate Subscription Fee
                     </Button>
                   </div>
 

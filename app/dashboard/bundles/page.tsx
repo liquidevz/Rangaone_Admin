@@ -367,24 +367,47 @@ export default function BundlesPage() {
       id: "pricing",
       header: "Pricing",
       cell: ({ row }) => {
-        const { monthlyPrice, quarterlyPrice, yearlyPrice } = row.original
+        const { 
+          monthlyPrice, 
+          monthlyemandateprice, 
+          quarterlyPrice, 
+          quarterlyemandateprice, 
+          yearlyPrice, 
+          yearlyemandateprice 
+        } = row.original
         const prices = []
         
         if (monthlyPrice) prices.push(`Monthly: ₹${monthlyPrice}`)
+        if (monthlyemandateprice) prices.push(`Monthly E-Mandate: ₹${monthlyemandateprice}`)
         if (quarterlyPrice) prices.push(`Quarterly: ₹${quarterlyPrice}`)
+        if (quarterlyemandateprice) prices.push(`Quarterly E-Mandate: ₹${quarterlyemandateprice}`)
         if (yearlyPrice) prices.push(`Yearly: ₹${yearlyPrice}`)
+        if (yearlyemandateprice) prices.push(`Yearly E-Mandate: ₹${yearlyemandateprice}`)
         
         return (
           <div className="text-sm">
             {prices.length > 0 ? (
-              <div className="space-y-1.5">
-                {prices.slice(0, 2).map((price, index) => (
-                  <div key={index} className="text-muted-foreground/90 font-medium">{price}</div>
-                ))}
-                {prices.length > 2 && (
-                  <div className="text-xs text-muted-foreground/70">+{prices.length - 2} more</div>
-                )}
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="space-y-1.5 cursor-pointer">
+                      {prices.slice(0, 2).map((price, index) => (
+                        <div key={index} className="text-muted-foreground/90 font-medium">{price}</div>
+                      ))}
+                      {prices.length > 2 && (
+                        <div className="text-xs text-muted-foreground/70">+{prices.length - 2} more</div>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="start" className="max-w-[300px]">
+                    <div className="space-y-1">
+                      {prices.map((price, index) => (
+                        <div key={index} className="text-sm">{price}</div>
+                      ))}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : (
               <div className="text-muted-foreground/70 italic">No pricing set</div>
             )}

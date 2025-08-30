@@ -21,8 +21,11 @@ export interface Bundle {
   portfolios: Array<string | Portfolio | PortfolioReference>;
   category: "basic" | "premium";
   monthlyPrice?: number | null;
+  monthlyemandateprice?: number | null;
   quarterlyPrice?: number | null;
+  quarterlyemandateprice?: number | null;
   yearlyPrice?: number | null;
+  yearlyemandateprice?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -33,8 +36,11 @@ export interface CreateBundleRequest {
   portfolios: Array<string | PortfolioReference>;
   category: "basic" | "premium";
   monthlyPrice?: number | null;
+  monthlyemandateprice?: number | null;
   quarterlyPrice?: number | null;
+  quarterlyemandateprice?: number | null;
   yearlyPrice?: number | null;
+  yearlyemandateprice?: number | null;
 }
 
 // Helper function to safely extract portfolio ID
@@ -66,7 +72,8 @@ export const getPortfolioName = (
 // Helper function to get primary subscription fee
 export const getPortfolioPrimaryFee = (
   portfolioItem: string | Portfolio | PortfolioReference,
-  portfolioLookup: Record<string, Portfolio> = {}
+  portfolioLookup: Record<string, Portfolio> = {},
+  preferEmandate: boolean = false
 ): number => {
   let portfolio: Portfolio | undefined;
   
@@ -76,18 +83,27 @@ export const getPortfolioPrimaryFee = (
     portfolio = portfolioItem as Portfolio;
   }
   
-  if (!portfolio || !Array.isArray(portfolio.subscriptionFee) || portfolio.subscriptionFee.length === 0) {
+  if (!portfolio) {
+    return 0;
+  }
+  
+  // Choose fee array based on preference
+  const feeArray = preferEmandate && Array.isArray(portfolio.emandateSubriptionFees) && portfolio.emandateSubriptionFees.length > 0
+    ? portfolio.emandateSubriptionFees
+    : portfolio.subscriptionFee;
+  
+  if (!Array.isArray(feeArray) || feeArray.length === 0) {
     return 0;
   }
   
   // First try to find monthly fee
-  const monthlyFee = portfolio.subscriptionFee.find(fee => fee.type === 'monthly');
+  const monthlyFee = feeArray.find(fee => fee.type === 'monthly');
   if (monthlyFee) {
     return monthlyFee.price;
   }
   
   // Otherwise return the first fee
-  return portfolio.subscriptionFee[0].price;
+  return feeArray[0].price;
 };
 
 // Bundle API Functions

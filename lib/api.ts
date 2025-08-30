@@ -59,6 +59,7 @@ export interface Portfolio {
   cashBalance: number;
   currentValue: number;
   subscriptionFee: SubscriptionFee[];
+  emandateSubriptionFees?: SubscriptionFee[];
   minInvestment: number;
   durationMonths: number;
   PortfolioCategory: string;
@@ -87,6 +88,7 @@ export interface CreatePortfolioRequest {
   name: string;
   description: DescriptionItem[];
   subscriptionFee: SubscriptionFee[];
+  emandateSubriptionFees?: SubscriptionFee[];
   minInvestment: number;
   durationMonths: number;
   holdings?: PortfolioHolding[];
