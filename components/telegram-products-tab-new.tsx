@@ -38,7 +38,6 @@ export function ProductsTab() {
   }>({
     name: '',
     description: '',
-    id: '',
     portfolio_id: '',
     bundle_id: '',
   });
@@ -118,7 +117,6 @@ export function ProductsTab() {
        const productData = {
          name: formData.name,
          description: formData.description,
-         id: sourceId,
        };
 
       
@@ -134,7 +132,7 @@ export function ProductsTab() {
       });
       
       setIsCreateDialogOpen(false);
-      setFormData({ name: '', description: '', id: '', portfolio_id: '', bundle_id: '' });
+      setFormData({ name: '', description: '', portfolio_id: '', bundle_id: '' });
       setSelectedType('portfolio');
     } catch (error) {
       console.error('Error creating product:', error);
@@ -239,7 +237,7 @@ export function ProductsTab() {
           setIsCreateDialogOpen(open);
                      if (open) {
              // Reset form when opening dialog
-             setFormData({ name: '', description: '', id: '', portfolio_id: '', bundle_id: '' });
+             setFormData({ name: '', description: '', portfolio_id: '', bundle_id: '' });
              setSelectedType('portfolio');
            }
         }}>
@@ -263,7 +261,7 @@ export function ProductsTab() {
                   value={selectedType} 
                                      onValueChange={(value: 'portfolio' | 'bundle') => {
                      setSelectedType(value);
-                     setFormData({ name: '', description: '', id: '', portfolio_id: '', bundle_id: '' });
+                     setFormData({ name: '', description: '', portfolio_id: '', bundle_id: '' });
                    }}
                       >
                         <SelectTrigger>

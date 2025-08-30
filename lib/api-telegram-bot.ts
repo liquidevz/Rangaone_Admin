@@ -62,7 +62,6 @@ export interface SubscriptionsResponse {
 export interface CreateProductRequest {
   name: string;
   description: string;
-  id: string;
 }
 
 export interface UpdateProductRequest {

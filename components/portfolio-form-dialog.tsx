@@ -1171,12 +1171,24 @@ export function PortfolioFormDialog({
       console.error(`Failed to fetch latest price for ${holding.symbol}:`, error);
     }
 
+    // Map status to action for proper form initialization
+    const getActionFromStatus = (status: string) => {
+      switch (status) {
+        case 'Fresh-Buy': return 'buy';
+        case 'addon-buy': return 'addon';
+        case 'partial-sell': return 'partial-sell';
+        case 'Sell': return 'sell';
+        case 'Hold':
+        default: return 'hold';
+      }
+    };
+
     setEditingHolding({
       index,
       originalHolding: holding,
       newWeight: holding.weight,
       status: holding.status as "Hold" | "Fresh-Buy" | "partial-sell" | "Sell" | "addon-buy",
-      action: "hold",
+      action: getActionFromStatus(holding.status) as "buy" | "sell" | "partial-sell" | "addon" | "hold",
       weightChange: 0,
       latestPrice,
       isUpdatingPrice: false,
@@ -1472,7 +1484,34 @@ export function PortfolioFormDialog({
           throw new Error('Admin authentication required');
         }
         
-        // Just update local state for status changes
+        // Update status in backend
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify({
+            stockAction: "update",
+            holdings: [{
+              symbol: originalHolding.symbol,
+              status: status,
+              buyPrice: originalHolding.buyPrice || 1,
+              quantity: originalHolding.quantity || 1,
+              minimumInvestmentValueStock: originalHolding.minimumInvestmentValueStock || 1,
+              weight: originalHolding.weight,
+              sector: originalHolding.sector,
+              stockCapType: originalHolding.stockCapType || 'large cap'
+            }]
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to update status: ${errorText}`);
+        }
+
+        // Update local state after successful API call
         const updatedHoldings = [...holdings];
         updatedHoldings[index] = {
           ...originalHolding,
