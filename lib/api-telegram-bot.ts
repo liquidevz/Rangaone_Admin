@@ -101,17 +101,31 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
       ...options,
     });
     
-         if (!response.ok) {
-       const errorData = await response.json().catch(() => ({}));
-       console.error('API Error Response:', errorData);
-       console.error('Validation errors:', errorData.errors);
-       if (errorData.errors && typeof errorData.errors === 'object') {
-         Object.entries(errorData.errors).forEach(([field, errors]) => {
-           console.error(`Field "${field}" errors:`, errors);
-         });
-       }
-       throw new Error(errorData.message || errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
-     }
+    if (!response.ok) {
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        // If JSON parsing fails, create a basic error object
+        errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+      }
+      
+      console.error('API Error Response:', errorData);
+      
+      // Only log validation errors if they exist
+      if (errorData.errors) {
+        console.error('Validation errors:', errorData.errors);
+        if (typeof errorData.errors === 'object') {
+          Object.entries(errorData.errors).forEach(([field, errors]) => {
+            console.error(`Field "${field}" errors:`, errors);
+          });
+        }
+      }
+      
+      // Return a more user-friendly error message
+      const errorMessage = errorData.message || errorData.error || errorData.detail || `Server error (${response.status})`;
+      throw new Error(errorMessage);
+    }
     
     return await response.json();
   } catch (error) {
@@ -158,7 +172,12 @@ export const getGroups = async (): Promise<TelegramGroup[]> => {
 };
 
 export const getUnmappedGroups = async (): Promise<TelegramGroup[]> => {
-  return await apiRequest('/api/groups/unmapped');
+  try {
+    return await apiRequest('/api/groups/unmapped');
+  } catch (error) {
+    console.warn('Failed to fetch unmapped groups:', error);
+    return [];
+  }
 };
 
 // Mapping API

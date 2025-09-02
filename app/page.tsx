@@ -7,21 +7,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { getAdminAccessToken } from "@/lib/auth";
+
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Home() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
   
   useEffect(() => {
     setMounted(true);
-    const token = getAdminAccessToken();
-    if (token) {
-      setIsAuthenticated(true);
-    }
   }, []);
   
   if (!mounted) return null;
@@ -43,15 +38,9 @@ export default function Home() {
           />
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            {isAuthenticated ? (
-              <Link href="/dashboard">
-                <Button>Dashboard</Button>
-              </Link>
-            ) : (
-              <Link href="/login">
-                <Button>Sign In</Button>
-              </Link>
-            )}
+            <Link href="/login">
+              <Button>Sign In</Button>
+            </Link>
           </div>
         </div>
       </header>
