@@ -102,7 +102,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     });
     
     if (!response.ok) {
-      let errorData = {};
+      let errorData: any = {};
       try {
         errorData = await response.json();
       } catch (e) {
