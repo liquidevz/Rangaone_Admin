@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { RichTextEditor } from "@/components/rich-text-editor";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Package, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, Package, RefreshCw, Trash2, Link } from "lucide-react";
 import {
   Product,
   CreateProductRequest,
@@ -20,6 +20,9 @@ import {
   getProducts,
   createProduct,
   deleteProduct,
+  mapProductToGroup,
+  getGroups,
+  TelegramGroup,
 } from "@/lib/api-telegram-bot";
 import { fetchPortfolios, type Portfolio } from "@/lib/api";
 import { fetchBundles, type Bundle } from "@/lib/api-bundles";
@@ -29,8 +32,12 @@ export function ProductsTab() {
   const [products, setProducts] = useState<Product[]>([]);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [groups, setGroups] = useState<TelegramGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isMapDialogOpen, setIsMapDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [mapFormData, setMapFormData] = useState({ telegram_group_id: '', telegram_group_name: '' });
   const [selectedType, setSelectedType] = useState<'portfolio' | 'bundle'>('portfolio');
   const [formData, setFormData] = useState<CreateProductRequest & { 
     portfolio_id?: string; 
@@ -45,11 +52,18 @@ export function ProductsTab() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-       const [productsData, portfoliosData, bundlesData] = await Promise.all([
-         getProducts().catch(() => []),
+       console.log('Loading products from API...');
+       const [productsData, portfoliosData, bundlesData, groupsData] = await Promise.all([
+         getProducts().catch((error) => {
+           console.error('Failed to load products:', error);
+           return [];
+         }),
         fetchPortfolios().catch(() => []),
         fetchBundles().catch(() => []),
+        getGroups().catch(() => []),
        ]);
+       
+       console.log('Products loaded from API:', productsData);
        
        // Clean and validate data - ensure only real API data
        const cleanPortfolios = portfoliosData.filter(p => p && p.name && (p.id || p._id));
@@ -58,6 +72,7 @@ export function ProductsTab() {
       setProducts(productsData);
       setPortfolios(cleanPortfolios);
       setBundles(cleanBundles);
+      setGroups(groupsData);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -115,20 +130,22 @@ export function ProductsTab() {
        }
        
        const productData = {
-         name: formData.name,
-         description: formData.description,
+         name: formData.name.trim(),
+         description: formData.description.trim(),
        };
 
-      
+       console.log('Creating product with data:', productData);
       
              // Call the actual API to create the product
        const newProduct = await createProduct(productData);
+       console.log('Product created successfully:', newProduct);
 
-       setProducts(prevProducts => [newProduct, ...prevProducts]);
+       // Refresh the products list from the server
+       await loadData();
       
       toast({
         title: "Success",
-        description: `Product "${formData.name}" created successfully! Check the table below to see your new product.`,
+        description: `Product "${formData.name}" created successfully!`,
       });
       
       setIsCreateDialogOpen(false);
@@ -139,6 +156,40 @@ export function ProductsTab() {
       toast({
         title: "Error",
         description: "Failed to create product",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMapProduct = async () => {
+    if (!selectedProduct || !mapFormData.telegram_group_id || !mapFormData.telegram_group_name) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await mapProductToGroup(selectedProduct.id, {
+        telegram_group_id: mapFormData.telegram_group_id,
+        telegram_group_name: mapFormData.telegram_group_name,
+      });
+
+      toast({
+        title: "Success",
+        description: `Product mapped to group successfully`,
+      });
+
+      setIsMapDialogOpen(false);
+      setMapFormData({ telegram_group_id: '', telegram_group_name: '' });
+      await loadData();
+    } catch (error) {
+      console.error('Error mapping product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to map product to group",
         variant: "destructive",
       });
     }
@@ -334,12 +385,12 @@ export function ProductsTab() {
               </div>
               <div>
                 <Label htmlFor="description">Description</Label>
-                <RichTextEditor
+                <Textarea
                   id="description"
                   value={formData.description}
-                  onChange={(content) => setFormData({ ...formData, description: content })}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Product description (auto-filled from selection)"
-                  height={120}
+                  rows={4}
                 />
               </div>
               
@@ -462,8 +513,18 @@ export function ProductsTab() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-              <Button
-                variant="outline"
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setIsMapDialogOpen(true);
+                          }}
+                        >
+                          <Link className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => handleDeleteProduct(product.id)}
                         >
@@ -525,6 +586,43 @@ export function ProductsTab() {
            )}
         </DialogContent>
        </Dialog> */}
+      {/* Map Product Dialog */}
+      <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Map Product to Telegram Group</DialogTitle>
+            <DialogDescription>
+              Map "{selectedProduct?.name}" to a Telegram group
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="group-id">Telegram Group ID</Label>
+              <Input
+                id="group-id"
+                value={mapFormData.telegram_group_id}
+                onChange={(e) => setMapFormData({ ...mapFormData, telegram_group_id: e.target.value })}
+                placeholder="-1001234567890"
+              />
+            </div>
+            <div>
+              <Label htmlFor="group-name">Group Name</Label>
+              <Input
+                id="group-name"
+                value={mapFormData.telegram_group_name}
+                onChange={(e) => setMapFormData({ ...mapFormData, telegram_group_name: e.target.value })}
+                placeholder="Your Group Name"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsMapDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleMapProduct}>Map Product</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

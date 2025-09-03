@@ -93,6 +93,14 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   
   try {
     console.log(`Making request to: ${url}`);
+    console.log('Request options:', {
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      body: options.body
+    });
     
     const response = await fetch(url, {
       headers: {
@@ -100,6 +108,9 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
       },
       ...options,
     });
+    
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       let errorData: any = {};
@@ -127,7 +138,9 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
       throw new Error(errorMessage);
     }
     
-    return await response.json();
+    const responseData = await response.json();
+    console.log('API Response data:', responseData);
+    return responseData;
   } catch (error) {
     console.error('Telegram Bot API Error:', error);
     throw error;
@@ -147,9 +160,16 @@ export const getProduct = async (productId: string): Promise<Product> => {
 };
 
 export const createProduct = async (data: CreateProductRequest): Promise<Product> => {
+  // Add required ID field based on API docs
+  const productData = {
+    id: `product_${Date.now()}`, // Generate unique ID
+    name: data.name,
+    description: data.description
+  };
+  
   return await apiRequest('/api/products', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify(productData),
   });
 };
 
