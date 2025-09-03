@@ -10,20 +10,29 @@ interface AuthContextType {
   loading: boolean
 }
 
-const AuthContext = createContext<AuthContextType>({
-  isLoggedIn: false,
-  loading: true,
-})
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
     const checkAuth = async () => {
 
 
@@ -97,9 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
 
     return () => clearInterval(refreshInterval)
-  }, [pathname, router])
+  }, [mounted, pathname, router])
 
-  return <AuthContext.Provider value={{ isLoggedIn, loading }}>{children}</AuthContext.Provider>
+  // Don't render until mounted to prevent hydration issues
+  if (!mounted) {
+    return null
+  }
+
+  const contextValue: AuthContextType = {
+    isLoggedIn,
+    loading
+  }
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
 export { AuthContext }

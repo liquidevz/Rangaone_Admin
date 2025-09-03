@@ -49,8 +49,15 @@ const CacheContext = createContext<CacheContextType | null>(null)
 
 export function CacheProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    
     // Cleanup expired cache on initialization
     cache.cleanup()
     setIsInitialized(true)
@@ -61,7 +68,7 @@ export function CacheProvider({ children }: { children: ReactNode }) {
     }, 5 * 60 * 1000) // Every 5 minutes
 
     return () => clearInterval(cleanupInterval)
-  }, [])
+  }, [mounted])
 
   const savePageState = (page: string, state: PageState) => {
     cache.set(`${CACHE_KEYS.USERS_PAGE_STATE}_${page}`, state, {
@@ -153,7 +160,7 @@ export function CacheProvider({ children }: { children: ReactNode }) {
     clearAllCache
   }
 
-  if (!isInitialized) {
+  if (!mounted || !isInitialized) {
     return null // or a loading spinner
   }
 

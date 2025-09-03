@@ -1,7 +1,7 @@
 // app/api/bot/[...path]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const BOT_API_BASE_URL = process.env.TELEGRAM_BOT_API_URL || 'https://subscription-manager-tg-bot.onrender.com';
+const BOT_API_BASE_URL = process.env.TELEGRAM_BOT_API_URL || 'https://bot.rangaone.finance:5000:5000';
 
 export async function GET(
   request: NextRequest,
