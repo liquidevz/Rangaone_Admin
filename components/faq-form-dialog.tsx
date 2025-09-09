@@ -64,7 +64,7 @@ export function FAQFormDialog({
     defaultValues: {
       question: faq?.question || "",
       answer: typeof faq?.answer === 'string' ? faq.answer : JSON.stringify(faq?.answer || ""),
-      category: (faq?.category as any) || "General",
+      category: (faq?.category as any) || "Basic",
       tags: faq?.tags?.join(", ") || "",
     },
   });
@@ -152,9 +152,9 @@ export function FAQFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Basic">General</SelectItem>
-                      <SelectItem value="Premium">Account</SelectItem>
-                      <SelectItem value="Landing">Billing</SelectItem>
+                      <SelectItem value="Basic">Basic</SelectItem>
+                      <SelectItem value="Premium">Premium</SelectItem>
+                      <SelectItem value="Landing">Landing</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

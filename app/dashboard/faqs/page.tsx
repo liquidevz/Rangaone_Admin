@@ -187,10 +187,8 @@ export default function FAQsPage() {
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       case "Basic":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "Model Portfolio":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case "General":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+      case "Landing":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
@@ -341,10 +339,9 @@ export default function FAQsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="Premium">Premium</SelectItem>
             <SelectItem value="Basic">Basic</SelectItem>
-            <SelectItem value="Model Portfolio">Model Portfolio</SelectItem>
-            <SelectItem value="General">General</SelectItem>
+            <SelectItem value="Premium">Premium</SelectItem>
+            <SelectItem value="Landing">Landing</SelectItem>
           </SelectContent>
         </Select>
       </div>
