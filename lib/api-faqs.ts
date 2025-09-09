@@ -7,7 +7,7 @@ export interface FAQ {
   question: string;
   answer: any;
   tags?: string[];
-  category: "General" | "Account" | "Billing" | "Technical" | "Investments" | "Other";
+  category: "Basic" | "Premium" | "Landing";
   relatedFAQs?: string[];
   lastUpdatedBy?: string;
   createdAt: string;
@@ -18,7 +18,7 @@ export interface CreateFAQRequest {
   question: string;
   answer: any;
   tags?: string[];
-  category: "General" | "Account" | "Billing" | "Technical" | "Investments" | "Other";
+  category: "Basic" | "Premium" | "Landing";
   relatedFAQs?: string[];
 }
 

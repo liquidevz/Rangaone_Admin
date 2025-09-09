@@ -37,7 +37,7 @@ import * as z from "zod";
 const formSchema = z.object({
   question: z.string().min(1, "Question is required"),
   answer: z.string().min(1, "Answer is required"),
-  category: z.enum(["General", "Account", "Billing", "Technical", "Investments", "Other"]),
+  category: z.enum(["Basic", "Premium", "Landing"]),
   tags: z.string().optional(),
 });
 
@@ -152,12 +152,9 @@ export function FAQFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="General">General</SelectItem>
-                      <SelectItem value="Account">Account</SelectItem>
-                      <SelectItem value="Billing">Billing</SelectItem>
-                      <SelectItem value="Technical">Technical</SelectItem>
-                      <SelectItem value="Investments">Investments</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      <SelectItem value="Basic">General</SelectItem>
+                      <SelectItem value="Premium">Account</SelectItem>
+                      <SelectItem value="Landing">Billing</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
