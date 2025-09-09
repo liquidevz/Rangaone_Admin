@@ -45,6 +45,7 @@ export function ProductsTab() {
   }>({
     name: '',
     description: '',
+    price: 0,
     portfolio_id: '',
     bundle_id: '',
   });
@@ -52,10 +53,15 @@ export function ProductsTab() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-       console.log('Loading products from API...');
+       console.log('Loading products from Telegram API...');
        const [productsData, portfoliosData, bundlesData, groupsData] = await Promise.all([
          getProducts().catch((error) => {
-           console.error('Failed to load products:', error);
+           console.error('Failed to load Telegram products:', error);
+           toast({
+             title: "Warning",
+             description: `Failed to load Telegram products: ${error.message}`,
+             variant: "destructive",
+           });
            return [];
          }),
         fetchPortfolios().catch(() => []),
@@ -129,33 +135,38 @@ export function ProductsTab() {
          return;
        }
        
-       const productData = {
-         name: formData.name.trim(),
-         description: formData.description.trim(),
-       };
+      const productData = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: formData.price || 0,
+        category: 'telegram_product'
+      };
 
        console.log('Creating product with data:', productData);
       
-             // Call the actual API to create the product
-       const newProduct = await createProduct(productData);
-       console.log('Product created successfully:', newProduct);
+      // Call the actual API to create the product
+      console.log('Calling createProduct API with:', productData);
+      const newProduct = await createProduct(productData);
+      console.log('Product created successfully:', newProduct);
 
-       // Refresh the products list from the server
-       await loadData();
+      // Refresh the products list from the server to get the latest data
+      console.log('Refreshing products list...');
+      await loadData();
       
       toast({
         title: "Success",
-        description: `Product "${formData.name}" created successfully!`,
+        description: `Product "${formData.name}" created successfully! ${newProduct.id ? `ID: ${newProduct.id}` : ''}`,
       });
       
       setIsCreateDialogOpen(false);
-      setFormData({ name: '', description: '', portfolio_id: '', bundle_id: '' });
+      setFormData({ name: '', description: '', price: 0, portfolio_id: '', bundle_id: '' });
       setSelectedType('portfolio');
     } catch (error) {
       console.error('Error creating product:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to create product",
+        description: `Failed to create product: ${errorMessage}`,
         variant: "destructive",
       });
     }
@@ -172,7 +183,7 @@ export function ProductsTab() {
     }
 
     try {
-      await mapProductToGroup(selectedProduct.id, {
+      await mapProductToGroup(String(selectedProduct.id), {
         telegram_group_id: mapFormData.telegram_group_id,
         telegram_group_name: mapFormData.telegram_group_name,
       });
@@ -211,9 +222,10 @@ export function ProductsTab() {
       });
     } catch (error) {
       console.error('Error deleting product:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to delete product",
+        description: `Failed to delete product: ${errorMessage}`,
         variant: "destructive",
       });
     }
@@ -288,7 +300,7 @@ export function ProductsTab() {
           setIsCreateDialogOpen(open);
                      if (open) {
              // Reset form when opening dialog
-             setFormData({ name: '', description: '', portfolio_id: '', bundle_id: '' });
+             setFormData({ name: '', description: '', price: 0, portfolio_id: '', bundle_id: '' });
              setSelectedType('portfolio');
            }
         }}>
@@ -312,7 +324,7 @@ export function ProductsTab() {
                   value={selectedType} 
                                      onValueChange={(value: 'portfolio' | 'bundle') => {
                      setSelectedType(value);
-                     setFormData({ name: '', description: '', portfolio_id: '', bundle_id: '' });
+                     setFormData({ name: '', description: '', price: 0, portfolio_id: '', bundle_id: '' });
                    }}
                       >
                         <SelectTrigger>
@@ -395,6 +407,18 @@ export function ProductsTab() {
               </div>
               
               <div>
+                <Label htmlFor="price">Price</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                  placeholder="Product price"
+                />
+              </div>
+              
+              <div>
                 <Label htmlFor="id">Source ID</Label>
                 <Input
                   id="id"
@@ -468,9 +492,10 @@ export function ProductsTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
+                <TableHead>Product Details</TableHead>
+                <TableHead>Price & Category</TableHead>
+                <TableHead>Group Mapping</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead>Updated</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -490,27 +515,66 @@ export function ProductsTab() {
               ) : (
                 products.map((product) => (
                   <TableRow key={product.id}>
-                                         <TableCell>
-                       <div>
-                         <div className="font-medium">{product.name}</div>
-                         <div className="text-sm text-muted-foreground">{product.description}</div>
-                         <div className="text-xs text-blue-600 mt-1">
-                           Product ID: {product.id}
-                         </div>
-                         {(product as any).sourceType && (
-                           <div className="text-xs text-green-600 mt-1">
-                             Source: {(product as any).sourceType} (ID: {(product as any).sourceId})
-                           </div>
-                         )}
-                       </div>
-                     </TableCell>
+                    {/* Product Details */}
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">{product.description}</div>
+                        <div className="text-xs text-blue-600 mt-1">
+                          ID: {product.id}
+                        </div>
+                      </div>
+                    </TableCell>
                     
+                    {/* Price & Category */}
                     <TableCell>
-                      {new Date(product.created_at).toLocaleDateString()}
+                      <div>
+                        {product.price !== undefined && (
+                          <div className="text-sm font-medium">
+                            ${product.price}
+                          </div>
+                        )}
+                        {product.category && (
+                          <Badge variant="outline" className="text-xs mt-1">
+                            {product.category}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
+                    
+                    {/* Group Mapping Status */}
                     <TableCell>
-                      {new Date(product.updated_at).toLocaleDateString()}
+                      {product.telegram_group && Object.keys(product.telegram_group).length > 0 ? (
+                        <div>
+                          <Badge variant="default" className="bg-green-100 text-green-800 mb-1">
+                            Mapped
+                          </Badge>
+                          {product.telegram_group.name && (
+                            <div className="text-xs text-muted-foreground">
+                              {product.telegram_group.name}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="border-orange-500 text-orange-600">
+                          Unmapped
+                        </Badge>
+                      )}
                     </TableCell>
+                    
+                    {/* Created Date */}
+                    <TableCell>
+                      <div className="text-sm">
+                        {product.created_at ? new Date(product.created_at).toLocaleDateString() : ''}
+                      </div>
+                      {product.updated_at && product.updated_at !== product.created_at && (
+                        <div className="text-xs text-muted-foreground">
+                          Updated: {new Date(product.updated_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </TableCell>
+                    
+                    {/* Actions */}
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
@@ -520,6 +584,7 @@ export function ProductsTab() {
                             setSelectedProduct(product);
                             setIsMapDialogOpen(true);
                           }}
+                          title="Map to Telegram Group"
                         >
                           <Link className="h-3 w-3" />
                         </Button>
@@ -527,6 +592,7 @@ export function ProductsTab() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDeleteProduct(product.id)}
+                          title="Delete Product"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>

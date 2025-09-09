@@ -82,9 +82,10 @@ export function SubscriptionsTab() {
       setSubscriptionsData(subscriptionsResponse);
     } catch (error) {
       console.error("Failed to load subscriptions data:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to load subscriptions data",
+        description: `Failed to load subscriptions data: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -121,9 +122,11 @@ export function SubscriptionsTab() {
       setFormData({ email: '', product_id: undefined, product_name: undefined, expiration_datetime: '' });
       loadData(currentPage, searchTerm, statusFilter);
     } catch (error) {
+      console.error("Failed to create subscription:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to create subscription",
+        description: `Failed to create subscription: ${errorMessage}`,
         variant: "destructive",
       });
     }
@@ -133,16 +136,18 @@ export function SubscriptionsTab() {
     if (!confirm('Are you sure you want to cancel this subscription?')) return;
 
     try {
-      await cancelSubscriptionById(subscription.id);
+      await cancelSubscriptionById(String(subscription.id));
       toast({
         title: "Success",
         description: "Subscription cancelled successfully",
       });
       loadData(currentPage, searchTerm, statusFilter);
     } catch (error) {
+      console.error("Failed to cancel subscription:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to cancel subscription",
+        description: `Failed to cancel subscription: ${errorMessage}`,
         variant: "destructive",
       });
     }
@@ -215,7 +220,7 @@ export function SubscriptionsTab() {
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active');
   const expiredSubscriptions = subscriptions.filter(s => s.status === 'expired');
   const totalRevenue = products.reduce((sum, product) => {
-    const productSubscriptionCount = subscriptions.filter(s => s.product_id === product.id).length;
+    const productSubscriptionCount = subscriptions.filter(s => s.product_id === String(product.id)).length;
     return sum + (productSubscriptionCount * 0); // Price removed, using 0 as placeholder
   }, 0);
 
@@ -525,7 +530,7 @@ export function SubscriptionsTab() {
           <CardContent>
             <div className="space-y-4">
               {products.map((product) => {
-                const productSubscriptions = subscriptions.filter(s => s.product_id === product.id);
+                const productSubscriptions = subscriptions.filter(s => s.product_id === String(product.id));
                 const activeCount = productSubscriptions.filter(s => s.status === 'active').length;
                 const totalRevenue = productSubscriptions.length * 0; // Price removed, using 0 as placeholder
 

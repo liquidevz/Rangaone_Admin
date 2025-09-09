@@ -1,25 +1,28 @@
 // lib/api-telegram-bot.ts
 "use client";
 
-import { fetchWithAuth } from "@/lib/auth";
-import { TELEGRAM_API_BASE_URL } from "@/lib/config";
+import { fetchWithAuth, getAdminAccessToken } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/config";
 
-// Always use the Telegram API base URL
+// Use the same base URL as the main API (as confirmed by user)
 const getApiBaseUrl = () => {
-  return TELEGRAM_API_BASE_URL;
+  return API_BASE_URL;
 };
 
 // Log the API base URL for debugging (only in development)
 if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-  console.log('Telegram API Base URL:', TELEGRAM_API_BASE_URL);
-  console.log('Using proxy for development');
+  console.log('API Base URL:', API_BASE_URL);
+  console.log('getApiBaseUrl() returns:', getApiBaseUrl());
 }
 
 // Types based on the actual API documentation
 export interface Product {
-  id: string;
+  id: string | number;
   name: string;
   description: string;
+  price?: number;
+  category?: string;
+  telegram_group?: any;
   created_at: string;
   updated_at: string;
 }
@@ -62,11 +65,15 @@ export interface SubscriptionsResponse {
 export interface CreateProductRequest {
   name: string;
   description: string;
+  price?: number;
+  category?: string;
 }
 
 export interface UpdateProductRequest {
   name?: string;
   description?: string;
+  price?: number;
+  category?: string;
 }
 
 export interface MapProductRequest {
@@ -92,54 +99,65 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${baseUrl}${endpoint}`;
   
   try {
-    console.log(`Making request to: ${url}`);
-    console.log('Request options:', {
-      method: options.method || 'GET',
+    console.log('Making Telegram API request to:', url);
+    console.log('Request method:', options.method || 'GET');
+    console.log('Base URL:', baseUrl);
+    console.log('Endpoint:', endpoint);
+
+    // Get authentication token
+    const token = getAdminAccessToken();
+    console.log('Authentication token available:', !!token);
+    console.log('Token preview:', token ? `${token.substring(0, 10)}...` : 'No token');
+    
+    const requestConfig = {
       headers: {
         'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` }),
         ...options.headers
       },
-      body: options.body
-    });
-    
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
       ...options,
-    });
+    };
+
+    console.log('Request config:', requestConfig);
+    
+    const response = await fetch(url, requestConfig);
     
     console.log('Response status:', response.status);
     console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
-    if (!response.ok) {
-      let errorData: any = {};
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        // If JSON parsing fails, create a basic error object
-        errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
-      }
+    // Always try to get response data first
+    let responseData: any;
+    try {
+      responseData = await response.json();
+    } catch (e) {
+      console.error('Failed to parse response as JSON:', e);
+      responseData = { 
+        success: false, 
+        error: `HTTP ${response.status}: ${response.statusText}` 
+      };
+    }
+    
+    console.log('API Response data:', responseData);
+    
+    // Check if the response indicates an error (either HTTP status or success field)
+    if (!response.ok || responseData.success === false) {
+      console.error('API Error Response:', responseData);
       
-      console.error('API Error Response:', errorData);
-      
-      // Only log validation errors if they exist
-      if (errorData.errors) {
-        console.error('Validation errors:', errorData.errors);
-        if (typeof errorData.errors === 'object') {
-          Object.entries(errorData.errors).forEach(([field, errors]) => {
+      // Log validation errors if they exist
+      if (responseData.errors) {
+        console.error('Validation errors:', responseData.errors);
+        if (typeof responseData.errors === 'object') {
+          Object.entries(responseData.errors).forEach(([field, errors]) => {
             console.error(`Field "${field}" errors:`, errors);
           });
         }
       }
       
       // Return a more user-friendly error message
-      const errorMessage = errorData.message || errorData.error || errorData.detail || `Server error (${response.status})`;
+      const errorMessage = responseData.error || responseData.message || responseData.detail || `Server error (${response.status})`;
       throw new Error(errorMessage);
     }
     
-    const responseData = await response.json();
-    console.log('API Response data:', responseData);
     return responseData;
   } catch (error) {
     console.error('Telegram Bot API Error:', error);
@@ -149,69 +167,159 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
 // Products API
 export const getProducts = async (): Promise<Product[]> => {
-  const response = await apiRequest('/api/products');
+  const response = await apiRequest('/api/admin/telegram/products');
   console.log('getProducts response:', response);
-  // The API returns products directly, not wrapped in a data property
-  return response || [];
+  // API returns { success: true, data: [...], total: number }
+  return response.data || [];
 };
 
 export const getProduct = async (productId: string): Promise<Product> => {
-  return await apiRequest(`/api/products/${productId}`);
+  const response = await apiRequest(`/api/admin/telegram/products/${productId}`);
+  return response.data;
 };
 
 export const createProduct = async (data: CreateProductRequest): Promise<Product> => {
-  // Add required ID field based on API docs
+  // Format the request data according to the API schema
   const productData = {
-    id: `product_${Date.now()}`, // Generate unique ID
     name: data.name,
-    description: data.description
+    description: data.description,
+    price: data.price || 0,
+    category: data.category || 'telegram_product'
   };
   
-  return await apiRequest('/api/products', {
-    method: 'POST',
-    body: JSON.stringify(productData),
-  });
+  console.log('Creating product with data:', productData);
+  
+  try {
+    const response = await apiRequest('/api/admin/telegram/products', {
+      method: 'POST',
+      body: JSON.stringify(productData),
+    });
+    
+    console.log('Create product response:', response);
+    
+    // Handle successful response
+    if (response.success) {
+      // If the API returns the created product data, use it
+      if (response.data && Object.keys(response.data).length > 0) {
+        return {
+          ...response.data,
+          price: response.data.price || productData.price,
+          category: response.data.category || productData.category,
+        };
+      }
+      
+      // Otherwise, return a constructed product object
+      return {
+        id: Date.now(), // Temporary ID until we can fetch the real one
+        name: productData.name,
+        description: productData.description,
+        price: productData.price,
+        category: productData.category,
+        telegram_group: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    
+    // Handle error response
+    throw new Error(response.error || response.message || 'Failed to create product');
+  } catch (error) {
+    console.error('Create product error:', error);
+    throw error;
+  }
 };
 
 export const updateProduct = async (productId: string, data: UpdateProductRequest): Promise<Product> => {
-  return await apiRequest(`/api/products/${productId}`, {
+  const response = await apiRequest(`/api/admin/telegram/products/${productId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
+  
+  console.log('Update product response:', response);
+  // API returns { success: true, data: {}, message: "Product updated successfully" }
+  if (response.success) {
+    // Return updated product data or refetch it
+    return await getProduct(productId);
+  }
+  
+  throw new Error(response.message || 'Failed to update product');
 };
 
 export const deleteProduct = async (productId: string): Promise<void> => {
-  await apiRequest(`/api/products/${productId}`, {
+  const response = await apiRequest(`/api/admin/telegram/products/${productId}`, {
     method: 'DELETE',
   });
+  
+  console.log('Delete product response:', response);
+  // API returns { success: true, message: "Product deleted successfully" }
+  if (!response.success) {
+    throw new Error(response.message || 'Failed to delete product');
+  }
 };
 
 // Groups API
 export const getGroups = async (): Promise<TelegramGroup[]> => {
-  return await apiRequest('/api/groups');
+  const response = await apiRequest('/api/admin/telegram/groups');
+  return response.data || [];
 };
 
 export const getUnmappedGroups = async (): Promise<TelegramGroup[]> => {
   try {
-    return await apiRequest('/api/groups/unmapped');
+    const response = await apiRequest('/api/admin/telegram/groups/unmapped');
+    return response.data || [];
   } catch (error) {
     console.warn('Failed to fetch unmapped groups:', error);
     return [];
   }
 };
 
-// Mapping API
-export const mapProductToGroup = async (productId: string, data: MapProductRequest): Promise<TelegramGroup> => {
-  return await apiRequest(`/api/products/${productId}/map`, {
+export const createGroup = async (data: { name: string; description: string; telegram_group_id: string }): Promise<TelegramGroup> => {
+  const response = await apiRequest('/api/admin/telegram/groups', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  return response.data;
+};
+
+// Mapping API
+export const mapProductToGroup = async (productId: string, data: MapProductRequest): Promise<void> => {
+  console.log('mapProductToGroup called with:');
+  console.log('Product ID:', productId);
+  console.log('Data:', data);
+  console.log('Request body:', JSON.stringify(data));
+  
+  const response = await apiRequest(`/api/admin/telegram/products/${productId}/map`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  
+  console.log('Map product response:', response);
+  // API returns { success: true, data: {} }
+  if (!response.success) {
+    throw new Error(response.message || 'Failed to map product to group');
+  }
 };
 
 export const unmapProductFromGroup = async (productId: string): Promise<void> => {
-  await apiRequest(`/api/products/${productId}/unmap`, {
+  const response = await apiRequest(`/api/admin/telegram/products/${productId}/unmap`, {
     method: 'DELETE',
   });
+  
+  console.log('Unmap product response:', response);
+  // API returns { success: true, message: "string" }
+  if (!response.success) {
+    throw new Error(response.message || 'Failed to unmap product from group');
+  }
+};
+
+export const getProductGroupMapping = async (productId: string): Promise<{ telegram_group_id: string; telegram_group_name: string } | null> => {
+  try {
+    const response = await apiRequest(`/api/admin/telegram/products/${productId}/group`);
+    return response.data;
+  } catch (error) {
+    console.warn('Failed to get product group mapping:', error);
+    return null;
+  }
 };
 
 // Subscriptions API
@@ -223,7 +331,7 @@ export const getSubscriptions = async (params: {
   search?: string;
   status?: string;
   product_id?: string;
-  user_id?: number;
+  user_id?: string;
 } = {}): Promise<SubscriptionsResponse> => {
   const queryParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -233,43 +341,48 @@ export const getSubscriptions = async (params: {
   });
   
   const queryString = queryParams.toString();
-  const endpoint = queryString ? `/api/subscriptions?${queryString}` : '/api/subscriptions';
+  const endpoint = queryString ? `/api/admin/telegram/subscriptions?${queryString}` : '/api/admin/telegram/subscriptions';
   
   return await apiRequest(endpoint);
 };
 
 export const createSubscription = async (data: CreateSubscriptionRequest): Promise<{
+  data: any;
   message: string;
   invite_link: string;
   invite_expires_at: string;
   subscription_expires_at: string;
 }> => {
-  return await apiRequest('/api/subscribe', {
+  return await apiRequest('/api/admin/telegram/subscribe', {
     method: 'POST',
     body: JSON.stringify(data),
   });
 };
 
-export const cancelSubscription = async (data: CancelSubscriptionRequest): Promise<{ message: string }> => {
-  return await apiRequest('/api/subscriptions', {
+export const cancelSubscription = async (data: { email: string; product_id: string }): Promise<{ success: boolean; message: string }> => {
+  return await apiRequest('/api/admin/telegram/subscriptions', {
     method: 'DELETE',
     body: JSON.stringify(data),
   });
 };
 
-export const cancelSubscriptionById = async (subscriptionId: number): Promise<{ message: string }> => {
-  return await apiRequest(`/api/subscriptions/${subscriptionId}/cancel`, {
+export const cancelSubscriptionById = async (subscriptionId: string): Promise<{ success: boolean; message: string }> => {
+  return await apiRequest(`/api/admin/telegram/subscriptions/${subscriptionId}/cancel`, {
     method: 'POST',
   });
 };
 
+// Remove duplicate functions - already defined above
+
 // Users API
 export const getUsers = async (): Promise<User[]> => {
-  return await apiRequest('/api/users');
+  const response = await apiRequest('/api/admin/telegram/users');
+  return response.data || [];
 };
 
 // Webhook API
 export const testWebhook = async (): Promise<{
+  success: boolean;
   message: string;
   webhook_url: string;
   has_custom_certificate: boolean;
@@ -278,7 +391,7 @@ export const testWebhook = async (): Promise<{
   last_error_message: string | null;
   max_connections: number;
 }> => {
-  return await apiRequest('/api/telegram/webhook/test');
+  return await apiRequest('/api/admin/telegram/webhook/test');
 };
 
 // Health API
@@ -310,7 +423,8 @@ export interface KickUserResponse {
 export const kickUser = async (
   data: KickUserRequestByProduct | KickUserRequestByGroup
 ): Promise<KickUserResponse> => {
-  return await apiRequest('/api/telegram/kick-user', {
+  // Note: These endpoints may need to be implemented in the new API
+  return await apiRequest('/api/admin/telegram/kick-user', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -337,7 +451,8 @@ export interface RegenerateInviteResponse {
 export const regenerateInvite = async (
   data: RegenerateInviteRequestByProduct | RegenerateInviteRequestByGroup
 ): Promise<RegenerateInviteResponse> => {
-  return await apiRequest('/api/telegram/invite/regenerate', {
+  // Note: These endpoints may need to be implemented in the new API
+  return await apiRequest('/api/admin/telegram/invite/regenerate', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -377,8 +492,9 @@ export const getJoinedUsers = async (params: {
     }
   });
   const queryString = queryParams.toString();
-  const endpoint = queryString ? `/api/users/joined?${queryString}` : '/api/users/joined';
-  return await apiRequest(endpoint);
+  const endpoint = queryString ? `/api/admin/telegram/users/joined?${queryString}` : '/api/admin/telegram/users/joined';
+  const response = await apiRequest(endpoint);
+  return response.data || [];
 };
 
 // New: Convenience member lists
@@ -392,9 +508,11 @@ export interface GroupMemberRecord {
 }
 
 export const getProductMembers = async (productId: string): Promise<GroupMemberRecord[]> => {
-  return await apiRequest(`/api/products/${productId}/members`);
+  const response = await apiRequest(`/api/admin/telegram/products/${productId}/members`);
+  return response.data || [];
 };
 
 export const getGroupMembers = async (telegramGroupId: string): Promise<GroupMemberRecord[]> => {
-  return await apiRequest(`/api/groups/${telegramGroupId}/members`);
+  const response = await apiRequest(`/api/admin/telegram/groups/${telegramGroupId}/members`);
+  return response.data || [];
 };

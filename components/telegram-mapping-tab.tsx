@@ -47,14 +47,18 @@ export function MappingTab() {
         getUnmappedGroups(),
       ]);
       
+      console.log('Loaded groups:', groupsData);
+      console.log('Unmapped groups:', unmappedData);
+      
       setProducts(productsData);
       setAllGroups(groupsData);
       setUnmappedGroups(unmappedData);
     } catch (error) {
       console.error("Failed to load mapping data:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to load mapping data",
+        description: `Failed to load mapping data: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -76,7 +80,7 @@ export function MappingTab() {
       return;
     }
 
-    const selectedGroupData = unmappedGroups.find(g => g.id.toString() === selectedGroup);
+    const selectedGroupData = unmappedGroups.find(g => g.telegram_group_id === selectedGroup);
     
     if (!selectedGroupData) {
       toast({
@@ -90,8 +94,9 @@ export function MappingTab() {
     try {
       await mapProductToGroup(selectedProduct, {
         telegram_group_id: selectedGroupData.telegram_group_id,
-        telegram_group_name: selectedGroupData.telegram_group_name,
+        telegram_group_name: selectedGroupData.telegram_group_name
       });
+      
       toast({
         title: "Success",
         description: "Product mapped to group successfully",
@@ -101,42 +106,46 @@ export function MappingTab() {
       setSelectedGroup("");
       loadData();
     } catch (error) {
+      console.error('Mapping error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to map product to group",
+        description: `Failed to map product to group: ${errorMessage}`,
         variant: "destructive",
       });
     }
   };
 
-  const handleUnmapProduct = async (productId: string) => {
+  const handleUnmapProduct = async (productId: string | number) => {
     if (!confirm('Are you sure you want to unmap this product from its group?')) return;
 
     try {
-      await unmapProductFromGroup(productId);
+      await unmapProductFromGroup(String(productId));
       toast({
         title: "Success",
         description: "Product unmapped from group successfully",
       });
       loadData();
     } catch (error) {
+      console.error('Unmapping error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to unmap product from group",
+        description: `Failed to unmap product from group: ${errorMessage}`,
         variant: "destructive",
       });
     }
   };
 
   const mappedProducts = products.filter(p => {
-    return allGroups.some(g => g.product_id === p.id);
+    return allGroups.some(g => g.product_id === String(p.id));
   });
   const unmappedProducts = products.filter(p => {
-    return !allGroups.some(g => g.product_id === p.id);
+    return !allGroups.some(g => g.product_id === String(p.id));
   });
 
-  const getGroupForProduct = (productId: string) => {
-    return allGroups.find(g => g.product_id === productId);
+  const getGroupForProduct = (productId: string | number) => {
+    return allGroups.find(g => g.product_id === String(productId));
   };
 
   if (isLoading) {
@@ -244,11 +253,14 @@ export function MappingTab() {
                     <SelectValue placeholder="Choose a group" />
                   </SelectTrigger>
                   <SelectContent>
-                    {unmappedGroups.map((group) => (
-                      <SelectItem key={group.id} value={group.id.toString()}>
-                        {group.telegram_group_name}
-                      </SelectItem>
-                    ))}
+                    {unmappedGroups.map((group) => {
+                      console.log('Available group:', group);
+                      return (
+                        <SelectItem key={group.id} value={group.telegram_group_id}>
+                          {group.telegram_group_name} ({group.telegram_group_id})
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -321,7 +333,7 @@ export function MappingTab() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {group ? new Date(group.updated_at).toLocaleDateString() : 'N/A'}
+                        {group?.updated_at ? new Date(group.updated_at).toLocaleDateString() : ''}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -373,7 +385,7 @@ export function MappingTab() {
                     </TableCell>
                     
                     <TableCell>
-                      {new Date(product.created_at).toLocaleDateString()}
+                      {product.created_at ? new Date(product.created_at).toLocaleDateString() : ''}
                     </TableCell>
                   </TableRow>
                 ))}

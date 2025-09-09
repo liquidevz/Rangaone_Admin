@@ -71,9 +71,10 @@ export function GroupsTab() {
       }
     } catch (error) {
       console.error("Failed to load groups data:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to load groups data",
+        description: `Failed to load groups data: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -94,7 +95,12 @@ export function GroupsTab() {
       setGroupMembers(members);
     } catch (error) {
       console.error("Failed to load group members:", error);
-      toast({ title: "Error", description: "Failed to load group members", variant: "destructive" });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast({ 
+        title: "Error", 
+        description: `Failed to load group members: ${errorMessage}`, 
+        variant: "destructive" 
+      });
     } finally {
       setIsMembersLoading(false);
     }

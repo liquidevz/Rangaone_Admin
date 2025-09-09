@@ -2,7 +2,7 @@
 // Environment variables
 export const config = {
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "https://stocks-backend-cmjxc.ondigitalocean.app",
-  telegramApiBaseUrl: process.env.NEXT_PUBLIC_TELEGRAM_API_BASE_URL || "https://bot.rangaone.finance",
+  telegramApiBaseUrl: process.env.NEXT_PUBLIC_TELEGRAM_API_BASE_URL || "https://stocks-backend-cmjxc.ondigitalocean.app",
   appName: "Ranga One Wealth",
   defaultPageSize: 10,
   maxUploadSize: 5 * 1024 * 1024, // 5MB

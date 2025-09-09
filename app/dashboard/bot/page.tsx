@@ -14,11 +14,13 @@ import {
   LinkIcon,
   Activity,
   RefreshCw,
+  Globe,
 } from "lucide-react";
 import { ProductsTab } from "@/components/telegram-products-tab-new";
 import { GroupsTab } from "@/components/telegram-groups-tab";
 import { MappingTab } from "@/components/telegram-mapping-tab";
 import { SubscriptionsTab } from "@/components/telegram-subscriptions-tab";
+import { WebhookTab } from "@/components/telegram-webhook-tab";
 
 export default function BotManagementPage() {
   const { toast } = useToast();
@@ -28,7 +30,7 @@ export default function BotManagementPage() {
   // Load active tab from localStorage on component mount
   useEffect(() => {
     const savedTab = localStorage.getItem('bot-dashboard-active-tab');
-    if (savedTab && ['products', 'groups', 'mapping', 'subscriptions'].includes(savedTab)) {
+    if (savedTab && ['products', 'groups', 'mapping', 'subscriptions', 'webhook'].includes(savedTab)) {
       setActiveTab(savedTab);
     }
   }, []);
@@ -67,7 +69,7 @@ export default function BotManagementPage() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 gap-1">
           <TabsTrigger value="products" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
             <Package className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Products</span>
@@ -87,6 +89,11 @@ export default function BotManagementPage() {
             <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Subscriptions</span>
             <span className="sm:hidden">Sub</span>
+          </TabsTrigger>
+          <TabsTrigger value="webhook" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Globe className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Webhook</span>
+            <span className="sm:hidden">Hook</span>
           </TabsTrigger>
         </TabsList>
 
@@ -142,6 +149,20 @@ export default function BotManagementPage() {
             </CardHeader>
             <CardContent>
               <SubscriptionsTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="webhook">
+          <Card>
+            <CardHeader>
+              <CardTitle>Webhook Settings</CardTitle>
+              <CardDescription>
+                Test and monitor your Telegram webhook configuration
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <WebhookTab />
             </CardContent>
           </Card>
         </TabsContent>
