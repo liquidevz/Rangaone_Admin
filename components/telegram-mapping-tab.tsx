@@ -26,6 +26,7 @@ import {
   getUnmappedGroups,
   mapProductToGroup,
   unmapProductFromGroup,
+  getProductGroupMapping,
 } from "@/lib/api-telegram-bot";
 
 export function MappingTab() {
@@ -33,6 +34,7 @@ export function MappingTab() {
   const [products, setProducts] = useState<Product[]>([]);
   const [allGroups, setAllGroups] = useState<TelegramGroup[]>([]);
   const [unmappedGroups, setUnmappedGroups] = useState<TelegramGroup[]>([]);
+  const [productMappings, setProductMappings] = useState<Record<string, { telegram_group_id: string; telegram_group_name: string } | null>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isMapDialogOpen, setIsMapDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
@@ -47,12 +49,21 @@ export function MappingTab() {
         getUnmappedGroups(),
       ]);
       
-      console.log('Loaded groups:', groupsData);
-      console.log('Unmapped groups:', unmappedData);
-      
       setProducts(productsData);
       setAllGroups(groupsData);
       setUnmappedGroups(unmappedData);
+      
+      // Load group mappings for each product
+      const mappings: Record<string, { telegram_group_id: string; telegram_group_name: string } | null> = {};
+      for (const product of productsData) {
+        try {
+          const mapping = await getProductGroupMapping(String(product.id));
+          mappings[String(product.id)] = mapping;
+        } catch (error) {
+          mappings[String(product.id)] = null;
+        }
+      }
+      setProductMappings(mappings);
     } catch (error) {
       console.error("Failed to load mapping data:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -137,16 +148,8 @@ export function MappingTab() {
     }
   };
 
-  const mappedProducts = products.filter(p => {
-    return allGroups.some(g => g.product_id === String(p.id));
-  });
-  const unmappedProducts = products.filter(p => {
-    return !allGroups.some(g => g.product_id === String(p.id));
-  });
-
-  const getGroupForProduct = (productId: string | number) => {
-    return allGroups.find(g => g.product_id === String(productId));
-  };
+  const mappedProducts = products.filter(p => productMappings[String(p.id)]);
+  const unmappedProducts = products.filter(p => !productMappings[String(p.id)]);
 
   if (isLoading) {
     return (
@@ -309,9 +312,7 @@ export function MappingTab() {
                   </TableCell>
                 </TableRow>
               ) : (
-                mappedProducts.map((product) => {
-                  const group = getGroupForProduct(product.id);
-                  return (
+                mappedProducts.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
                         <div>
@@ -321,11 +322,11 @@ export function MappingTab() {
                       </TableCell>
 
                       <TableCell>
-                        {group ? (
+                        {productMappings[String(product.id)] ? (
                           <div>
-                            <div className="font-medium">{group.telegram_group_name}</div>
+                            <div className="font-medium">{productMappings[String(product.id)]?.telegram_group_name}</div>
                             <div className="text-sm text-muted-foreground font-mono">
-                              {group.telegram_group_id}
+                              {productMappings[String(product.id)]?.telegram_group_id}
                             </div>
                           </div>
                         ) : (
@@ -333,7 +334,7 @@ export function MappingTab() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {group?.updated_at ? new Date(group.updated_at).toLocaleDateString() : ''}
+                        {product.updated_at ? new Date(product.updated_at).toLocaleDateString() : ''}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -346,8 +347,7 @@ export function MappingTab() {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  );
-                })
+                ))
               )}
             </TableBody>
           </Table>

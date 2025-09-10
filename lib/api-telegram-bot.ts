@@ -523,7 +523,20 @@ export const syncWithTelegram = async (): Promise<{
   message: string;
   data: any;
 }> => {
-  return await apiRequest('/api/admin/telegram/sync-with-telegram', {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/api/admin/telegram/sync-with-telegram`;
+  console.log('Sync URL:', url);
+  
+  const response = await fetchWithAuth(url, {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
+  
+  console.log('Sync response status:', response.status);
+  const data = await response.json();
+  console.log('Sync response data:', data);
+  
+  return data;
 };

@@ -22,6 +22,7 @@ import {
   deleteProduct,
   mapProductToGroup,
   getGroups,
+  getProductGroupMapping,
   TelegramGroup,
 } from "@/lib/api-telegram-bot";
 import { fetchPortfolios, type Portfolio } from "@/lib/api";
@@ -33,6 +34,7 @@ export function ProductsTab() {
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [groups, setGroups] = useState<TelegramGroup[]>([]);
+  const [productMappings, setProductMappings] = useState<Record<string, { telegram_group_id: string; telegram_group_name: string } | null>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isMapDialogOpen, setIsMapDialogOpen] = useState(false);
@@ -79,6 +81,19 @@ export function ProductsTab() {
       setPortfolios(cleanPortfolios);
       setBundles(cleanBundles);
       setGroups(groupsData);
+      
+      // Load group mappings for each product
+      const mappings: Record<string, { telegram_group_id: string; telegram_group_name: string } | null> = {};
+      for (const product of productsData) {
+        try {
+          const mapping = await getProductGroupMapping(String(product.id));
+          mappings[String(product.id)] = mapping;
+        } catch (error) {
+          console.warn(`Failed to load mapping for product ${product.id}:`, error);
+          mappings[String(product.id)] = null;
+        }
+      }
+      setProductMappings(mappings);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -544,16 +559,17 @@ export function ProductsTab() {
                     
                     {/* Group Mapping Status */}
                     <TableCell>
-                      {product.telegram_group && Object.keys(product.telegram_group).length > 0 ? (
+                      {productMappings[String(product.id)] ? (
                         <div>
                           <Badge variant="default" className="bg-green-100 text-green-800 mb-1">
                             Mapped
                           </Badge>
-                          {product.telegram_group.name && (
-                            <div className="text-xs text-muted-foreground">
-                              {product.telegram_group.name}
-                            </div>
-                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {productMappings[String(product.id)]?.telegram_group_name}
+                          </div>
+                          <div className="text-xs text-blue-600">
+                            ID: {productMappings[String(product.id)]?.telegram_group_id}
+                          </div>
                         </div>
                       ) : (
                         <Badge variant="outline" className="border-orange-500 text-orange-600">
