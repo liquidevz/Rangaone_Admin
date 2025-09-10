@@ -17,8 +17,9 @@ import {
   Settings,
   ExternalLink,
   Copy,
+  RotateCcw,
 } from "lucide-react";
-import { testWebhook } from "@/lib/api-telegram-bot";
+import { testWebhook, syncWithTelegram } from "@/lib/api-telegram-bot";
 
 interface WebhookInfo {
   success: boolean;
@@ -35,6 +36,7 @@ export function WebhookTab() {
   const { toast } = useToast();
   const [webhookInfo, setWebhookInfo] = useState<WebhookInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [testToken, setTestToken] = useState("");
 
   const loadWebhookInfo = async () => {
@@ -78,6 +80,34 @@ export function WebhookTab() {
       title: "Copied",
       description: "Text copied to clipboard",
     });
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await syncWithTelegram();
+      if (result.success) {
+        toast({
+          title: "Sync Completed",
+          description: result.message || "All portfolios and bundles synced with Telegram successfully",
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: result.message || "Failed to sync with Telegram",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Sync error:", error);
+      toast({
+        title: "Sync Error",
+        description: error instanceof Error ? error.message : "An error occurred during sync",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const getStatusColor = (hasError: boolean, pendingCount: number) => {
@@ -298,6 +328,10 @@ export function WebhookTab() {
               <Button onClick={loadWebhookInfo} disabled={isLoading}>
                 <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
                 Test Webhook
+              </Button>
+              <Button onClick={handleSync} disabled={isSyncing} variant="secondary">
+                <RotateCcw className={`mr-2 h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+                {isSyncing ? "Syncing..." : "Sync with Telegram"}
               </Button>
               <Button variant="outline" onClick={() => setTestToken("")}>
                 Clear Token

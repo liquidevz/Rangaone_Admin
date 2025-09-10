@@ -516,3 +516,14 @@ export const getGroupMembers = async (telegramGroupId: string): Promise<GroupMem
   const response = await apiRequest(`/api/admin/telegram/groups/${telegramGroupId}/members`);
   return response.data || [];
 };
+
+// Sync API
+export const syncWithTelegram = async (): Promise<{
+  success: boolean;
+  message: string;
+  data: any;
+}> => {
+  return await apiRequest('/api/admin/telegram/sync-with-telegram', {
+    method: 'POST',
+  });
+};
