@@ -97,8 +97,8 @@ export function RichTextEditor({
           body_class: isDark ? 'dark-mode' : 'light-mode',
           placeholder: placeholder,
           branding: false,
-          resize: false,
-          statusbar: false,
+          resize: true,
+          statusbar: true,
           setup: (editor) => {
             // Apply theme styles immediately
             const applyThemeStyles = () => {

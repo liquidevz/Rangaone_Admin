@@ -46,7 +46,8 @@ export function SimpleRichEditor({
           skin: 'oxide-dark',
           content_css: 'dark',
           branding: false,
-          statusbar: false,
+          resize: true,
+          statusbar: true,
           block_formats: 'Paragraph=p;Heading 1=h1;Heading 2=h2;Heading 3=h3',
           content_style: `
             body { 
