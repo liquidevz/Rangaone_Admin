@@ -386,7 +386,7 @@ export default function FAQsPage() {
           if (!open) setFaqToEdit(null);
         }}
         onSubmit={handleCreateFAQ}
-        faq={faqToEdit}
+        faq={faqToEdit || undefined}
       />
 
       {faqToEdit && (
