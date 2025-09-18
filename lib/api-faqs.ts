@@ -5,9 +5,9 @@ export interface FAQ {
   id: string;
   _id?: string;
   question: string;
-  answer: any;
+  answer: string | string[] | object;
   tags?: string[];
-  category: "Basic" | "Premium" | "Landing";
+  category: string;
   relatedFAQs?: string[];
   lastUpdatedBy?: string;
   createdAt: string;
@@ -16,9 +16,9 @@ export interface FAQ {
 
 export interface CreateFAQRequest {
   question: string;
-  answer: any;
+  answer: string | string[] | object;
   tags?: string[];
-  category: "Basic" | "Premium" | "Landing";
+  category: string;
   relatedFAQs?: string[];
 }
 
@@ -87,12 +87,12 @@ export const createFAQ = async (data: CreateFAQRequest): Promise<FAQ> => {
 
 export const updateFAQ = async (id: string, data: Partial<CreateFAQRequest>): Promise<FAQ> => {
   const response = await fetchWithAuth(`${API_BASE_URL}/api/faqs/${id}`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
   
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({ message: 'Failed to update FAQ' }));
     throw new Error(error.message || 'Failed to update FAQ');
   }
   

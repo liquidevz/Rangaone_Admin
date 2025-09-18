@@ -37,7 +37,8 @@ import * as z from "zod";
 const formSchema = z.object({
   question: z.string().min(1, "Question is required"),
   answer: z.string().min(1, "Answer is required"),
-  category: z.enum(["Basic", "Premium", "Landing"]),
+  answerType: z.enum(["string", "list", "sections"]),
+  category: z.string().min(1, "Category is required"),
   tags: z.string().optional(),
 });
 
@@ -63,8 +64,9 @@ export function FAQFormDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       question: faq?.question || "",
-      answer: typeof faq?.answer === 'string' ? faq.answer : JSON.stringify(faq?.answer || ""),
-      category: (faq?.category as any) || "Basic",
+      answer: typeof faq?.answer === 'string' ? faq.answer : JSON.stringify(faq?.answer || "", null, 2),
+      answerType: Array.isArray(faq?.answer) ? "list" : typeof faq?.answer === 'object' ? "sections" : "string",
+      category: faq?.category || "Account",
       tags: faq?.tags?.join(", ") || "",
     },
   });
@@ -73,14 +75,31 @@ export function FAQFormDialog({
     try {
       setIsSubmitting(true);
       
+      let processedAnswer: string | string[] | object;
+      
+      if (values.answerType === "string") {
+        processedAnswer = values.answer;
+      } else if (values.answerType === "list") {
+        try {
+          const parsed = JSON.parse(values.answer);
+          processedAnswer = Array.isArray(parsed) ? parsed : values.answer.split('\n').filter(Boolean);
+        } catch {
+          processedAnswer = values.answer.split('\n').filter(Boolean);
+        }
+      } else {
+        try {
+          processedAnswer = JSON.parse(values.answer);
+        } catch {
+          processedAnswer = values.answer;
+        }
+      }
+      
       const submitData: CreateFAQRequest = {
         question: values.question,
-        answer: values.answer,
+        answer: processedAnswer,
         category: values.category,
         tags: values.tags ? values.tags.split(",").map(tag => tag.trim()).filter(Boolean) : [],
       };
-      
-      console.log('Submitting FAQ data:', JSON.stringify(submitData, null, 2));
 
       await onSubmit(submitData);
       form.reset();
@@ -121,22 +140,52 @@ export function FAQFormDialog({
             
             <FormField
               control={form.control}
-              name="answer"
+              name="answerType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Answer</FormLabel>
-                  <FormControl>
-                    <RichTextEditor
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Enter the FAQ answer with formatting..."
-                      height={150}
-                      disabled={false}
-                    />
-                  </FormControl>
+                  <FormLabel>Answer Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select answer format" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="string">Simple Text</SelectItem>
+                      <SelectItem value="list">Step List</SelectItem>
+                      <SelectItem value="sections">Sections</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="answer"
+              render={({ field }) => {
+                const answerType = form.watch("answerType");
+                const placeholder = answerType === "string" 
+                  ? "Enter a simple answer..."
+                  : answerType === "list"
+                  ? `["Step 1", "Step 2", "Step 3"] or one item per line`
+                  : `{"section1": {"title": "Title", "content": ["Item 1", "Item 2"]}}`;
+                
+                return (
+                  <FormItem>
+                    <FormLabel>Answer</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder={placeholder}
+                        className="min-h-[120px] font-mono text-sm"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             
             <FormField
@@ -152,9 +201,12 @@ export function FAQFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="General">General</SelectItem>
+                      <SelectItem value="Account">Account</SelectItem>
+                      <SelectItem value="Investments">Investments</SelectItem>
+                      <SelectItem value="Billing">Billing</SelectItem>
                       <SelectItem value="Basic">Basic</SelectItem>
                       <SelectItem value="Premium">Premium</SelectItem>
-                      <SelectItem value="Landing">Landing</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

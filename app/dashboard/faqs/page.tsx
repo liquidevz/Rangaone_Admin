@@ -35,6 +35,7 @@ import type { ColumnDef, Row } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import {
   AlertCircle,
+  Copy,
   Edit,
   MoreVertical,
   Plus,
@@ -143,6 +144,15 @@ export default function FAQsPage() {
     }
   };
 
+  const handleDuplicateFAQ = (faq: FAQ) => {
+    setFaqToEdit({
+      ...faq,
+      id: '',
+      question: `${faq.question} (Copy)`,
+    });
+    setIsCreateDialogOpen(true);
+  };
+
   const handleUpdateFAQ = async (faqData: CreateFAQRequest) => {
     if (!faqToEdit) return;
 
@@ -182,17 +192,18 @@ export default function FAQsPage() {
   };
 
   const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "Premium":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
-      case "Basic":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "Landing":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
-    }
+    const colors = [
+      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+      "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+      "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
+    ];
+    const hash = category.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    return colors[hash % colors.length];
   };
+
+  const uniqueCategories = [...new Set(faqs.map(faq => faq.category))].sort();
 
   const columns: ColumnDef<FAQ>[] = [
     {
@@ -279,6 +290,10 @@ export default function FAQsPage() {
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDuplicateFAQ(faq)}>
+                <Copy className="mr-2 h-4 w-4" />
+                Duplicate
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFaqToDelete(faq)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
@@ -339,9 +354,9 @@ export default function FAQsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="Basic">Basic</SelectItem>
-            <SelectItem value="Premium">Premium</SelectItem>
-            <SelectItem value="Landing">Landing</SelectItem>
+            {uniqueCategories.map(category => (
+              <SelectItem key={category} value={category}>{category}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -366,8 +381,12 @@ export default function FAQsPage() {
 
       <FAQFormDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) setFaqToEdit(null);
+        }}
         onSubmit={handleCreateFAQ}
+        faq={faqToEdit}
       />
 
       {faqToEdit && (
