@@ -40,7 +40,7 @@ export function usePageState<T extends Record<string, any> = Record<string, any>
     }
 
     // Merge URL params if enabled
-    if (syncWithUrl) {
+    if (syncWithUrl && searchParams) {
       const urlParams: Record<string, any> = {}
       searchParams.forEach((value, key) => {
         // Try to parse as JSON, fallback to string

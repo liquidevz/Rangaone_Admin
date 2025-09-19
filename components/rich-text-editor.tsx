@@ -63,7 +63,7 @@ export function RichTextEditor({
   }
 
   return (
-    <div className={cn("tinymce-wrapper", className)}>
+    <div className={cn("tinymce-wrapper relative", className)} style={{ zIndex: 1 }}>
       <Editor
         key={key}
         apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY}
@@ -79,10 +79,12 @@ export function RichTextEditor({
             'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
             'insertdatetime', 'media', 'table', 'help', 'wordcount'
           ],
-          toolbar: 'undo redo | blocks | ' +
+          toolbar: 'undo redo | formatselect fontsize | ' +
             'bold italic forecolor | alignleft aligncenter ' +
-            'alignright alignjustify | bullist numlist outdent indent | ' +
+            'alignright alignjustify | bullist numlist | ' +
             'removeformat | help',
+          block_formats: 'Paragraph=p; Heading 1=h1; Heading 2=h2; Heading 3=h3; Heading 4=h4; Heading 5=h5; Heading 6=h6',
+          fontsize_formats: '8px 10px 12px 14px 16px 18px 20px 22px 24px 26px 28px 32px 36px 48px 72px',
           content_style: `
             body { 
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
@@ -99,133 +101,24 @@ export function RichTextEditor({
           branding: false,
           resize: true,
           statusbar: true,
+
           setup: (editor) => {
-            // Apply theme styles immediately
-            const applyThemeStyles = () => {
-              console.log('Applying TinyMCE theme styles:', currentTheme, 'isDark:', isDark);
-              
-              // Remove existing styles
-              const existingStyles = document.querySelectorAll('style[data-tinymce-theme]');
-              existingStyles.forEach(style => style.remove());
-              
-              const style = document.createElement('style');
-              style.setAttribute('data-tinymce-theme', currentTheme || 'light');
-              
-              if (isDark) {
-                console.log('Applying dark theme styles');
-                style.textContent = `
-                  .tox.tox-tinymce { 
-                    background: #09090b !important; 
-                    border: 1px solid #27272a !important; 
-                    color-scheme: dark !important;
-                    border-radius: 6px !important;
-                  }
-                  .tox .tox-toolbar, .tox .tox-toolbar__primary { 
-                    background: #09090b !important; 
-                    border-color: #27272a !important; 
-                  }
-                  .tox .tox-tbtn { 
-                    color: #a1a1aa !important; 
-                    background: transparent !important;
-                    border-radius: 4px !important;
-                  }
-                  .tox .tox-tbtn svg { 
-                    fill: #a1a1aa !important; 
-                  }
-                  .tox .tox-tbtn:hover { 
-                    background: #18181b !important; 
-                    color: #fafafa !important; 
-                  }
-                  .tox .tox-tbtn:hover svg { 
-                    fill: #fafafa !important; 
-                  }
-                  .tox .tox-tbtn--enabled, .tox .tox-tbtn--enabled:hover {
-                    background: #3f3f46 !important;
-                    color: #fafafa !important;
-                  }
-                  .tox .tox-tbtn--enabled svg {
-                    fill: #fafafa !important;
-                  }
-                  .tox .tox-edit-area__iframe { 
-                    background: #09090b !important; 
-                  }
-                  .tox .tox-toolbar__group {
-                    border-color: #27272a !important;
-                  }
-                  .tox .tox-menubar {
-                    background: #09090b !important;
-                    border-color: #27272a !important;
-                  }
-                  .tox .tox-statusbar {
-                    background: #09090b !important;
-                    border-color: #27272a !important;
-                    color: #a1a1aa !important;
-                  }
-                `;
-              } else {
-                console.log('Applying light theme styles');
-                style.textContent = `
-                  .tox.tox-tinymce { 
-                    background: #ffffff !important; 
-                    border: 1px solid #e4e4e7 !important; 
-                    color-scheme: light !important;
-                    border-radius: 6px !important;
-                  }
-                  .tox .tox-toolbar, .tox .tox-toolbar__primary { 
-                    background: #ffffff !important; 
-                    border-color: #e4e4e7 !important;
-                  }
-                  .tox .tox-tbtn { 
-                    color: #52525b !important; 
-                    background: transparent !important;
-                    border-radius: 4px !important;
-                  }
-                  .tox .tox-tbtn svg { 
-                    fill: #52525b !important; 
-                  }
-                  .tox .tox-tbtn:hover { 
-                    background: #f4f4f5 !important; 
-                    color: #18181b !important;
-                  }
-                  .tox .tox-tbtn:hover svg { 
-                    fill: #18181b !important; 
-                  }
-                  .tox .tox-tbtn--enabled, .tox .tox-tbtn--enabled:hover {
-                    background: #e4e4e7 !important;
-                    color: #18181b !important;
-                  }
-                  .tox .tox-tbtn--enabled svg {
-                    fill: #18181b !important;
-                  }
-                  .tox .tox-edit-area__iframe { 
-                    background: #ffffff !important; 
-                  }
-                  .tox .tox-toolbar__group {
-                    border-color: #e4e4e7 !important;
-                  }
-                  .tox .tox-menubar {
-                    background: #ffffff !important;
-                    border-color: #e4e4e7 !important;
-                  }
-                  .tox .tox-statusbar {
-                    background: #ffffff !important;
-                    border-color: #e4e4e7 !important;
-                    color: #52525b !important;
-                  }
-                `;
-              }
-              document.head.appendChild(style);
-              console.log('TinyMCE theme styles applied');
-            };
-            
             editor.on('init', () => {
-              console.log('TinyMCE editor initialized');
-              applyThemeStyles();
+              const style = document.createElement('style');
+              style.textContent = `
+                .tox .tox-collection, .tox .tox-menu {
+                  z-index: 99999 !important;
+                  pointer-events: auto !important;
+                }
+                .tox .tox-collection__item, .tox .tox-menu__item {
+                  pointer-events: auto !important;
+                  cursor: pointer !important;
+                }
+              `;
+              document.head.appendChild(style);
             });
-            editor.on('focus', applyThemeStyles);
             
-            // Apply styles immediately if editor is already ready
-            setTimeout(applyThemeStyles, 100);
+
           }
         }}
       />
