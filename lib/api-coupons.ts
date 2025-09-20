@@ -151,13 +151,24 @@ export async function updateCoupon(id: string, data: CreateCouponRequest): Promi
   const token = getAdminAccessToken();
   if (!token) throw new Error('Admin authentication required');
 
+  // Transform data to match API specification
+  const updateData = {
+    code: data.code,
+    discountType: data.discountType,
+    discountValue: data.discountValue,
+    title: data.title,
+    description: data.description,
+    status: 'active',
+    validUntil: new Date(data.validUntil).toISOString()
+  };
+
   const response = await fetch(`${API_BASE_URL}/api/admin/coupons/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(updateData)
   });
 
   if (!response.ok) {

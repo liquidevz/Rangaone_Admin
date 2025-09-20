@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, Edit, Trash2, Plus, RefreshCw, LogIn, BarChart3, DollarSign, TrendingUp, Calendar, Filter } from "lucide-react"
+import { Eye, Edit, Trash2, Plus, RefreshCw, LogIn, BarChart3, DollarSign, TrendingUp, Calendar, Filter, Download } from "lucide-react"
 import { DataTable } from "@/components/ui/data-table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog"
 import { PortfolioDetailsDialog } from "@/components/portfolio-details-dialog"
-import { ConfirmDialog } from "@/components/confirm-dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import {
   fetchPortfolios,
   deletePortfolio,
@@ -29,6 +29,7 @@ import { isAuthenticated } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { downloadPortfolios } from "@/lib/download-utils"
 
 export default function PortfoliosPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -36,6 +37,7 @@ export default function PortfoliosPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null)
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(true)
@@ -194,6 +196,7 @@ export default function PortfoliosPage() {
       return
     }
     try {
+      setIsDeleting(true)
       await deletePortfolio(selectedPortfolio._id)
       toast({ title: "Success", description: "Portfolio deleted successfully." })
       setIsDeleteDialogOpen(false)
@@ -204,6 +207,8 @@ export default function PortfoliosPage() {
         description: err instanceof Error ? err.message : "An unknown error occurred",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -417,6 +422,21 @@ export default function PortfoliosPage() {
             </div>
             <div className="flex items-center gap-2">
               {!isUserAuthenticated && <Button onClick={() => router.push("/login")}><LogIn className="mr-2 h-4 w-4" /> Log In</Button>}
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  try {
+                    downloadPortfolios(portfolios, 'csv');
+                    toast({ title: "Download started", description: "Portfolios data is being downloaded as CSV" });
+                  } catch (error) {
+                    toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+                  }
+                }}
+                disabled={portfolios.length === 0}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download CSV
+              </Button>
               <Button variant="outline" onClick={loadPortfolios} disabled={isLoading}><RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />Refresh</Button>
               <Button onClick={() => setIsAddDialogOpen(true)} disabled={!isUserAuthenticated}><Plus className="mr-2 h-4 w-4" /> Add Portfolio</Button>
             </div>
@@ -573,7 +593,16 @@ export default function PortfoliosPage() {
       {selectedPortfolio && (
         <>
           <PortfolioFormDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} onSubmit={handleEditPortfolio} initialData={selectedPortfolio} title="Edit Portfolio" description={`Update details for ${selectedPortfolio.name}.`} onDataChange={loadPortfolios} />
-          <ConfirmDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} title={`Delete Portfolio: ${selectedPortfolio.name}`} description="Are you sure you want to delete this portfolio? This action is permanent." onConfirm={handleDeletePortfolio} />
+          <DeleteConfirmationDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={setIsDeleteDialogOpen}
+            title="Delete Portfolio"
+            description="This will permanently delete the portfolio and all associated data including tips, performance history, and holdings."
+            resourceName={selectedPortfolio.name}
+            resourceType="portfolio"
+            onConfirm={handleDeletePortfolio}
+            isLoading={isDeleting}
+          />
           <PortfolioDetailsDialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen} portfolio={selectedPortfolio} />
         </>
       )}

@@ -1,7 +1,7 @@
 // app/dashboard/faqs/page.tsx
 "use client";
 
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { FAQFormDialog } from "@/components/faq-form-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Download,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePageState } from "@/hooks/use-page-state";
@@ -49,6 +50,7 @@ import { useCache } from "@/components/cache-provider";
 import { CACHE_KEYS } from "@/lib/cache";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { downloadFAQs } from "@/lib/download-utils";
 
 interface FAQsPageState {
   searchQuery: string;
@@ -64,6 +66,7 @@ export default function FAQsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [faqToEdit, setFaqToEdit] = useState<FAQ | null>(null);
   const [faqToDelete, setFaqToDelete] = useState<FAQ | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { cacheData, getCachedData, invalidateCache } = useCache();
@@ -174,11 +177,13 @@ export default function FAQsPage() {
     if (!faqToDelete) return;
 
     try {
+      setIsDeleting(true);
       await deleteFAQ(faqToDelete.id);
       setFaqs((prev) => prev.filter((faq) => faq.id !== faqToDelete.id));
       toast({
         title: "FAQ deleted successfully",
       });
+      setFaqToDelete(null);
     } catch (err) {
       console.error("Error deleting FAQ:", err);
       toast({
@@ -187,7 +192,7 @@ export default function FAQsPage() {
         variant: "destructive",
       });
     } finally {
-      setFaqToDelete(null);
+      setIsDeleting(false);
     }
   };
 
@@ -322,6 +327,23 @@ export default function FAQsPage() {
             variant="outline"
             size="sm"
             onClick={() => {
+              try {
+                downloadFAQs(filteredFaqs, 'csv');
+                toast({ title: "Download started", description: "FAQs data is being downloaded as CSV" });
+              } catch (error) {
+                toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+              }
+            }}
+            disabled={filteredFaqs.length === 0}
+            className="w-full sm:w-auto"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
               invalidateCache(CACHE_KEYS.USERS_DATA.replace('users', 'faqs'));
               loadFAQs(false);
             }}
@@ -401,14 +423,15 @@ export default function FAQsPage() {
         />
       )}
 
-      <ConfirmDialog
+      <DeleteConfirmationDialog
         open={!!faqToDelete}
         onOpenChange={(open) => !open && setFaqToDelete(null)}
         onConfirm={handleDeleteFAQ}
         title="Delete FAQ"
-        description={`Are you sure you want to delete "${faqToDelete?.question}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
+        description="This will permanently delete the FAQ and all associated data."
+        resourceName={faqToDelete?.question}
+        resourceType="FAQ"
+        isLoading={isDeleting}
       />
     </div>
   );

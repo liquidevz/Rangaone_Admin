@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { CouponFormDialog } from "@/components/coupon-form-dialog";
-import { Plus, Search, Edit, Trash2, Eye, Percent, IndianRupee } from "lucide-react";
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
+import { Plus, Search, Edit, Trash2, Eye, Percent, IndianRupee, Download } from "lucide-react";
 import {
   fetchCoupons,
   createCoupon,
@@ -19,6 +20,7 @@ import {
   type Coupon,
   type CreateCouponRequest,
 } from "@/lib/api-coupons";
+import { downloadCoupons } from "@/lib/download-utils";
 
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -30,6 +32,8 @@ export default function CouponsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [deletingCoupon, setDeletingCoupon] = useState<Coupon | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const loadCoupons = async () => {
@@ -86,11 +90,14 @@ export default function CouponsPage() {
     }
   };
 
-  const handleDeleteCoupon = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this coupon?")) return;
+  const handleDeleteCoupon = async () => {
+    if (!deletingCoupon) return;
+    
     try {
-      await deleteCoupon(id);
+      setIsDeleting(true);
+      await deleteCoupon(deletingCoupon._id);
       toast({ title: "Success", description: "Coupon deleted successfully" });
+      setDeletingCoupon(null);
       loadCoupons();
     } catch (error) {
       toast({
@@ -98,6 +105,8 @@ export default function CouponsPage() {
         description: error instanceof Error ? error.message : "Failed to delete coupon",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -121,10 +130,27 @@ export default function CouponsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Coupons</h1>
           <p className="text-muted-foreground">Manage discount coupons and promotional codes</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Coupon
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => {
+              try {
+                downloadCoupons(coupons, 'csv');
+                toast({ title: "Download started", description: "Coupons data is being downloaded as CSV" });
+              } catch (error) {
+                toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+              }
+            }}
+            disabled={coupons.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download CSV
+          </Button>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Coupon
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -228,7 +254,7 @@ export default function CouponsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDeleteCoupon(coupon._id)}
+                            onClick={() => setDeletingCoupon(coupon)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -280,6 +306,17 @@ export default function CouponsPage() {
         initialData={editingCoupon || undefined}
         title="Edit Coupon"
         description="Update coupon details and settings"
+      />
+
+      <DeleteConfirmationDialog
+        open={!!deletingCoupon}
+        onOpenChange={(open) => !open && setDeletingCoupon(null)}
+        onConfirm={handleDeleteCoupon}
+        title="Delete Coupon"
+        description={`This will permanently delete the coupon and all associated data.`}
+        resourceName={deletingCoupon?.code}
+        resourceType="coupon"
+        isLoading={isDeleting}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 // app\dashboard\users\page.tsx  
 "use client";
 
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ import {
   FileX,
   Server,
   CreditCard,
+  Download,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -41,6 +43,7 @@ import { usePageState } from "@/hooks/use-page-state";
 import { useCache } from "@/components/cache-provider";
 import { CACHE_KEYS } from "@/lib/cache";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
+import { downloadUsers } from "@/lib/download-utils";
 
 interface UsersPageState {
   searchQuery: string;
@@ -58,6 +61,7 @@ export default function UsersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [userToBan, setUserToBan] = useState<User | null>(null);
   const [userToUnban, setUserToUnban] = useState<User | null>(null);
   const [userToView, setUserToView] = useState<User | null>(null);
@@ -185,6 +189,7 @@ export default function UsersPage() {
     if (!userToDelete) return;
 
     try {
+      setIsDeleting(true);
       await deleteUser(userToDelete._id);
       const updatedUsers = users.filter((user) => user._id !== userToDelete._id);
       setUsers(updatedUsers);
@@ -195,6 +200,7 @@ export default function UsersPage() {
       toast({
         title: "User deleted successfully",
       });
+      setUserToDelete(null);
     } catch (err) {
       console.error("Error deleting user:", err);
       toast({
@@ -204,7 +210,7 @@ export default function UsersPage() {
         variant: "destructive",
       });
     } finally {
-      setUserToDelete(null);
+      setIsDeleting(false);
     }
   };
 
@@ -498,6 +504,23 @@ export default function UsersPage() {
             variant="outline"
             size="sm"
             onClick={() => {
+              try {
+                downloadUsers(users, 'csv');
+                toast({ title: "Download started", description: "Users data is being downloaded as CSV" });
+              } catch (error) {
+                toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+              }
+            }}
+            disabled={loading || users.length === 0}
+            className="w-full sm:w-auto"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
               invalidateCache(CACHE_KEYS.USERS_DATA);
               loadUsers(false);
             }}
@@ -559,16 +582,15 @@ export default function UsersPage() {
       )}
 
       {/* Delete User Confirmation */}
-      <ConfirmDialog
+      <DeleteConfirmationDialog
         open={!!userToDelete}
         onOpenChange={(open) => !open && setUserToDelete(null)}
         onConfirm={handleDeleteUser}
         title="Delete User"
-        description={`Are you sure you want to delete ${
-          userToDelete?.username || userToDelete?.email
-        }? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
+        description="This will permanently delete the user account and all associated data."
+        resourceName={userToDelete?.username || userToDelete?.email}
+        resourceType="user"
+        isLoading={isDeleting}
       />
 
       {/* Ban User Confirmation */}

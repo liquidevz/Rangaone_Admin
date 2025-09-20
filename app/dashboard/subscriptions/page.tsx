@@ -1,6 +1,7 @@
 // app\dashboard\subscriptions\page.tsx  
 "use client";
 
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PaymentVerificationDialog } from "@/components/payment-verification-dialog";
 import { PaymentDetailsDialog } from "@/components/payment-details-dialog";
@@ -45,9 +46,11 @@ import {
   RefreshCw,
   XCircle,
   Users,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useCallback, useEffect, useState } from "react";
+import { downloadSubscriptions, downloadPaymentHistory } from "@/lib/download-utils";
 
 // Enhanced payment history interface to include bundle information
 interface EnhancedPaymentHistory extends Omit<PaymentHistory, 'subscription'> {
@@ -67,6 +70,7 @@ export default function SubscriptionsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [selectedSubscription, setSelectedSubscription] =
     useState<Subscription | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<EnhancedPaymentHistory | null>(null);
@@ -243,6 +247,7 @@ export default function SubscriptionsPage() {
 
     try {
       if (newStatus === "cancelled") {
+        setIsCancelling(true);
         const subscriptionId = selectedSubscription._id || selectedSubscription.id || "";
         if (!subscriptionId) {
           throw new Error("Invalid subscription ID");
@@ -269,6 +274,8 @@ export default function SubscriptionsPage() {
           error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -584,6 +591,29 @@ export default function SubscriptionsPage() {
           </p>
         </div>
         <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:space-x-2">
+          <Button 
+            onClick={() => {
+              try {
+                if (paymentHistory.length > 0) {
+                  downloadPaymentHistory(paymentHistory, 'csv');
+                  toast({ title: "Download started", description: "Payment history is being downloaded as CSV" });
+                } else if (subscriptions.length > 0) {
+                  downloadSubscriptions(subscriptions, 'csv');
+                  toast({ title: "Download started", description: "Subscriptions data is being downloaded as CSV" });
+                } else {
+                  throw new Error('No data available');
+                }
+              } catch (error) {
+                toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+              }
+            }}
+            variant="outline" 
+            className="w-full sm:w-auto"
+            disabled={paymentHistory.length === 0 && subscriptions.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download CSV
+          </Button>
           <Button onClick={() => loadData()} variant="outline" className="w-full sm:w-auto">
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
@@ -670,22 +700,36 @@ export default function SubscriptionsPage() {
       />
 
       {/* Status Update Confirmation Dialog */}
-      <ConfirmDialog
-        open={statusDialogOpen}
-        onOpenChange={setStatusDialogOpen}
-        onConfirm={handleUpdateStatus}
-        title={`${newStatus === "active" ? "Activate" : "Cancel"} Subscription`}
-        description={`Are you sure you want to ${
-          newStatus === "active" ? "activate" : "cancel"
-        } this subscription? This will ${
-          newStatus === "active" ? "enable" : "disable"
-        } access to the portfolio.${
-          newStatus === "cancelled" ? " Note: Yearly subscriptions may have a commitment period during which cancellation is not allowed." : ""
-        }`}
-        confirmText={
-          newStatus === "active" ? "Activate" : "Cancel Subscription"
-        }
-      />
+      {newStatus === "cancelled" ? (
+        <DeleteConfirmationDialog
+          open={statusDialogOpen}
+          onOpenChange={setStatusDialogOpen}
+          onConfirm={handleUpdateStatus}
+          title="Cancel Subscription"
+          description="This will permanently cancel the subscription and disable access to the portfolio. Yearly subscriptions may have a commitment period during which cancellation is not allowed."
+          resourceName={selectedSubscription ? 
+            (typeof selectedSubscription.portfolio === 'object' && selectedSubscription.portfolio ? 
+              selectedSubscription.portfolio.name : 
+              (selectedSubscription.productType === 'Bundle' && typeof selectedSubscription.productId === 'object' && selectedSubscription.productId ? 
+                selectedSubscription.productId.name : 
+                'subscription'
+              )
+            ) : 'subscription'
+          }
+          resourceType="subscription"
+          confirmText="cancel"
+          isLoading={isCancelling}
+        />
+      ) : (
+        <ConfirmDialog
+          open={statusDialogOpen}
+          onOpenChange={setStatusDialogOpen}
+          onConfirm={handleUpdateStatus}
+          title="Activate Subscription"
+          description="Are you sure you want to activate this subscription? This will enable access to the portfolio."
+          confirmText="Activate"
+        />
+      )}
 
       {/* Payment Details Dialog */}
       <PaymentDetailsDialog

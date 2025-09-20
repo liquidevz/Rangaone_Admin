@@ -15,6 +15,7 @@ import {
   type CreateStockSymbolRequest,
   type StockSymbolsResponse,
 } from "@/lib/api-stock-symbols";
+import { downloadData } from "@/lib/download-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StockSymbolFormDialog } from "@/components/stock-symbol-form-dialog";
 import { StockSearch } from "@/components/stock-search";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertCircle,
@@ -46,6 +47,7 @@ import {
   Settings,
   Pause,
   Play,
+  Download,
 } from "lucide-react";
 
 // Real-time configuration
@@ -79,6 +81,7 @@ export default function StockSymbolsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<StockSymbol | null>(null);
   
   // Live stock search states
@@ -391,6 +394,7 @@ export default function StockSymbolsPage() {
     if (!selectedStockSymbol) return;
 
     try {
+      setIsDeleting(true);
       const id = selectedStockSymbol._id || selectedStockSymbol.id;
       if (!id) {
         throw new Error("Stock symbol ID is missing");
@@ -413,6 +417,8 @@ export default function StockSymbolsPage() {
         description: error instanceof Error ? error.message : "Failed to delete stock symbol",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -607,6 +613,40 @@ export default function StockSymbolsPage() {
           </p>
         </div>
         <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              try {
+                downloadData(displayData, {
+                  filename: `stock-symbols-${new Date().toISOString().split('T')[0]}`,
+                  format: 'csv',
+                  excludeFields: ['__v'],
+                  customHeaders: {
+                    '_id': 'ID',
+                    'symbol': 'Symbol',
+                    'name': 'Company Name',
+                    'exchange': 'Exchange',
+                    'currentPrice': 'Current Price',
+                    'previousPrice': 'Previous Price',
+                    'sector': 'Sector',
+                    'industry': 'Industry',
+                    'marketCap': 'Market Cap',
+                    'createdAt': 'Created Date',
+                    'updatedAt': 'Updated Date'
+                  }
+                });
+                toast({ title: "Download started", description: "Stock symbols data is being downloaded as CSV" });
+              } catch (error) {
+                toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+              }
+            }}
+            disabled={displayData.length === 0}
+            className="w-full sm:w-auto"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download CSV
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -1170,12 +1210,15 @@ export default function StockSymbolsPage() {
         mode="edit"
       />
 
-      <ConfirmDialog
+      <DeleteConfirmationDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         title="Delete Stock Symbol"
-        description={`Are you sure you want to delete "${selectedStockSymbol?.symbol}"? This action cannot be undone.`}
+        description="This will permanently delete the stock symbol and all associated data."
+        resourceName={selectedStockSymbol?.symbol}
+        resourceType="stock symbol"
         onConfirm={handleDeleteStockSymbol}
+        isLoading={isDeleting}
       />
     </div>
   );

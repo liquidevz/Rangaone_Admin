@@ -4,12 +4,12 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, Edit, Trash2, Plus, RefreshCw, Briefcase } from "lucide-react"
+import { Eye, Edit, Trash2, Plus, RefreshCw, Briefcase, Download } from "lucide-react"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useToast } from "@/hooks/use-toast"
 import { BundleFormDialog } from "@/components/bundle-form-dialog"
-import { ConfirmDialog } from "@/components/confirm-dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import {
   fetchBundles,
   fetchBundleWithPortfolioDetails,
@@ -26,6 +26,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { downloadBundles } from "@/lib/download-utils"
 
 export default function BundlesPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -34,6 +35,7 @@ export default function BundlesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null)
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(true)
   const { toast } = useToast()
@@ -253,6 +255,7 @@ export default function BundlesPage() {
     }
 
     try {
+      setIsDeleting(true)
       // Call the API to delete the bundle
       await deleteBundle(bundleId)
       
@@ -274,7 +277,8 @@ export default function BundlesPage() {
         description: `Failed to delete bundle: ${errorMessage}`,
         variant: "destructive",
       })
-
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -478,6 +482,23 @@ export default function BundlesPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => {
+              try {
+                downloadBundles(bundles, 'csv');
+                toast({ title: "Download started", description: "Bundles data is being downloaded as CSV" });
+              } catch (error) {
+                toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+              }
+            }}
+            disabled={bundles.length === 0}
+            className="text-muted-foreground hover:text-foreground w-full sm:w-auto"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={loadBundles}
             disabled={isLoading}
             className="text-muted-foreground hover:text-foreground w-full sm:w-auto"
@@ -537,12 +558,15 @@ export default function BundlesPage() {
         mode="edit"
       />
 
-      <ConfirmDialog
+      <DeleteConfirmationDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         title="Delete Bundle"
-        description={`Are you sure you want to delete the bundle "${selectedBundle?.name}"? This action cannot be undone.`}
+        description="This will permanently delete the bundle and all associated data."
+        resourceName={selectedBundle?.name}
+        resourceType="bundle"
         onConfirm={handleDeleteBundle}
+        isLoading={isDeleting}
       />
     </div>
   )

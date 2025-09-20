@@ -7,7 +7,7 @@ import { PlusCircle, Pencil, Trash2, RefreshCw, Mail, Upload, MoreHorizontal, Fi
 import { Button } from "@/components/ui/button"
 import { fetchConfigs, createConfig, updateConfig, deleteConfig, type Config } from "@/lib/api"
 import { ConfigFormDialog } from "@/components/config-form-dialog"
-import { ConfirmDialog } from "@/components/confirm-dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { SmtpTestDialog } from "@/components/smtp-test-dialog"
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [smtpTestDialogOpen, setSmtpTestDialogOpen] = useState(false)
   const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false)
   const [selectedConfig, setSelectedConfig] = useState<Config | null>(null)
@@ -111,6 +112,7 @@ export default function SettingsPage() {
     if (!selectedConfig) return
 
     try {
+      setIsDeleting(true)
       await deleteConfig(selectedConfig.key)
       toast({
         title: "Configuration Deleted",
@@ -125,6 +127,8 @@ export default function SettingsPage() {
         description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -387,13 +391,15 @@ export default function SettingsPage() {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
+      <DeleteConfirmationDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteConfig}
         title="Delete Configuration"
-        description={`Are you sure you want to delete the configuration "${selectedConfig?.key}"? This action cannot be undone.`}
-        confirmText="Delete"
+        description="This will permanently delete the configuration setting and all associated data."
+        resourceName={selectedConfig?.key}
+        resourceType="configuration"
+        isLoading={isDeleting}
       />
 
       {/* SMTP Test Dialog */}

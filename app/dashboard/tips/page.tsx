@@ -1,7 +1,7 @@
 // app\dashboard\tips\page.tsx  
 "use client";
 
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { TipFormDialog } from "@/components/tip-form-dialog";
 import { TipDetailsModal } from "@/components/tip-details-modal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -64,6 +64,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { downloadTips } from "@/lib/download-utils";
 
 // Stock Details Cell Component
 function StockDetailsCell({ tip }: { tip: Tip }) {
@@ -132,6 +133,7 @@ export default function TipsManagementPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
   const [portfolioFilter, setPortfolioFilter] = useState<string>("all");
@@ -297,6 +299,7 @@ export default function TipsManagementPage() {
     if (!selectedTip) return;
 
     try {
+      setIsDeleting(true);
       await deleteTip(selectedTip.id);
 
       toast({
@@ -315,6 +318,8 @@ export default function TipsManagementPage() {
           error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -933,6 +938,23 @@ export default function TipsManagementPage() {
             
             <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto">
               <Button
+                onClick={() => {
+                  try {
+                    downloadTips(filteredTips, 'csv');
+                    toast({ title: "Download started", description: "Tips data is being downloaded as CSV" });
+                  } catch (error) {
+                    toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={filteredTips.length === 0}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download CSV
+              </Button>
+              <Button
                 onClick={() => setCreateDialogOpen(true)}
                 size="sm"
                 className="w-full sm:w-auto"
@@ -1002,12 +1024,15 @@ export default function TipsManagementPage() {
             description="Modify an existing investment tip"
           />
 
-          <ConfirmDialog
+          <DeleteConfirmationDialog
             open={deleteDialogOpen}
             onOpenChange={setDeleteDialogOpen}
             title="Delete Tip"
-            description="Are you sure you want to delete this tip? This action cannot be undone."
+            description="This will permanently delete the investment tip and all associated data."
+            resourceName={selectedTip?.title}
+            resourceType="tip"
             onConfirm={handleDeleteTip}
+            isLoading={isDeleting}
           />
 
           <TipDetailsModal

@@ -188,17 +188,19 @@ export function CouponFormDialog({
                   required
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="usageLimit">Usage Limit</Label>
-                <Input
-                  id="usageLimit"
-                  type="number"
-                  min="1"
-                  value={formData.usageLimit}
-                  onChange={(e) => setFormData({ ...formData, usageLimit: Number(e.target.value) })}
-                  disabled={isSubmitting}
-                />
-              </div>
+              {!initialData && (
+                <div className="grid gap-2">
+                  <Label htmlFor="usageLimit">Usage Limit</Label>
+                  <Input
+                    id="usageLimit"
+                    type="number"
+                    min="1"
+                    value={formData.usageLimit}
+                    onChange={(e) => setFormData({ ...formData, usageLimit: Number(e.target.value) })}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="grid gap-2">
@@ -225,17 +227,19 @@ export function CouponFormDialog({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="validFrom">Valid From *</Label>
-                <Input
-                  id="validFrom"
-                  type="date"
-                  value={formData.validFrom}
-                  onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
-                  disabled={isSubmitting}
-                  required
-                />
-              </div>
+              {!initialData && (
+                <div className="grid gap-2">
+                  <Label htmlFor="validFrom">Valid From *</Label>
+                  <Input
+                    id="validFrom"
+                    type="date"
+                    value={formData.validFrom}
+                    onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="validUntil">Valid Until *</Label>
                 <Input
@@ -249,77 +253,83 @@ export function CouponFormDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="minOrderValue">Min Order Value (₹)</Label>
-                <Input
-                  id="minOrderValue"
-                  type="number"
-                  min="0"
-                  value={formData.minOrderValue}
-                  onChange={(e) => setFormData({ ...formData, minOrderValue: Number(e.target.value) })}
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="maxDiscountAmount">Max Discount Amount (₹)</Label>
-                <Input
-                  id="maxDiscountAmount"
-                  type="number"
-                  min="0"
-                  value={formData.maxDiscountAmount}
-                  onChange={(e) => setFormData({ ...formData, maxDiscountAmount: Number(e.target.value) })}
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
+            {!initialData && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="minOrderValue">Min Order Value (₹)</Label>
+                    <Input
+                      id="minOrderValue"
+                      type="number"
+                      min="0"
+                      value={formData.minOrderValue}
+                      onChange={(e) => setFormData({ ...formData, minOrderValue: Number(e.target.value) })}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="maxDiscountAmount">Max Discount Amount (₹)</Label>
+                    <Input
+                      id="maxDiscountAmount"
+                      type="number"
+                      min="0"
+                      value={formData.maxDiscountAmount}
+                      onChange={(e) => setFormData({ ...formData, maxDiscountAmount: Number(e.target.value) })}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="applyToAll"
-                  checked={formData.applicableProducts.applyToAll}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      applicableProducts: { ...formData.applicableProducts, applyToAll: checked },
-                    })
-                  }
-                  disabled={isSubmitting}
-                />
-                <Label htmlFor="applyToAll">Apply to all products</Label>
-              </div>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="applyToAll"
+                      checked={formData.applicableProducts.applyToAll}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          applicableProducts: { ...formData.applicableProducts, applyToAll: checked },
+                        })
+                      }
+                      disabled={isSubmitting}
+                    />
+                    <Label htmlFor="applyToAll">Apply to all products</Label>
+                  </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="newUsersOnly"
-                  checked={formData.userRestrictions.newUsersOnly}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      userRestrictions: { ...formData.userRestrictions, newUsersOnly: checked },
-                    })
-                  }
-                  disabled={isSubmitting}
-                />
-                <Label htmlFor="newUsersOnly">New users only</Label>
-              </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="newUsersOnly"
+                      checked={formData.userRestrictions.newUsersOnly}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          userRestrictions: { ...formData.userRestrictions, newUsersOnly: checked },
+                        })
+                      }
+                      disabled={isSubmitting}
+                    />
+                    <Label htmlFor="newUsersOnly">New users only</Label>
+                  </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="oneUsePerUser"
-                  checked={formData.userRestrictions.oneUsePerUser}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      userRestrictions: { ...formData.userRestrictions, oneUsePerUser: checked },
-                    })
-                  }
-                  disabled={isSubmitting}
-                />
-                <Label htmlFor="oneUsePerUser">One use per user</Label>
-              </div>
-            </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="oneUsePerUser"
+                      checked={formData.userRestrictions.oneUsePerUser}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          userRestrictions: { ...formData.userRestrictions, oneUsePerUser: checked },
+                        })
+                      }
+                      disabled={isSubmitting}
+                    />
+                    <Label htmlFor="oneUsePerUser">One use per user</Label>
+                  </div>
+                </div>
+              </>
+            )}
+
+
           </div>
 
           <DialogFooter>

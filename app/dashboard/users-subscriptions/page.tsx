@@ -41,8 +41,10 @@ import {
   ChevronDown,
   ChevronRight,
   AlertCircle,
+  Download,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { downloadUsersWithSubscriptions } from "@/lib/download-utils";
 
 interface UserWithSubscriptions extends User {
   userSubscriptions: Subscription[];
@@ -415,6 +417,21 @@ export default function UsersSubscriptionsPage() {
           )}
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={() => {
+              try {
+                downloadUsersWithSubscriptions(usersWithSubscriptions, 'csv');
+                toast({ title: "Download started", description: "Users with subscriptions data is being downloaded as CSV" });
+              } catch (error) {
+                toast({ title: "Download failed", description: "No data to download", variant: "destructive" });
+              }
+            }}
+            variant="outline"
+            disabled={usersWithSubscriptions.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download CSV
+          </Button>
           <Button onClick={loadData} variant="outline">
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
