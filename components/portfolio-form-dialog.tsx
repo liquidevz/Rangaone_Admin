@@ -112,7 +112,7 @@ interface EditHoldingState {
     change: number;
     changePercent: number;
   };
-  pnlPreview?: PnLCalculation; // NEW: P&L calculation for sell operations
+  pnlPreview?: PnLCalculation;
 }
 
 export function PortfolioFormDialog({
@@ -1224,6 +1224,7 @@ export function PortfolioFormDialog({
           updated.weightChange = originalWeight;
           break;
         case 'hold':
+        default:
           updated.status = 'Hold';
           updated.newWeight = originalWeight;
           updated.weightChange = 0;
@@ -1359,9 +1360,7 @@ export function PortfolioFormDialog({
           };
         } else {
           // Sell operations
-          const sellQuantity = action === 'sell' ? 
-            (originalHolding.totalQuantityOwned || originalHolding.quantity) :
-            pnlPreview?.quantitySold || 0;
+          const sellQuantity = pnlPreview?.quantitySold || 0;
           const saleType = action === 'sell' ? 'complete' : 'partial';
           
           requestBody = {
@@ -1372,8 +1371,8 @@ export function PortfolioFormDialog({
             }]
           };
           
-          // Add quantity only for partial sells
-          if (saleType === 'partial') {
+          // Add quantity for partial sells
+          if (saleType === 'partial' && sellQuantity > 0) {
             requestBody.holdings[0].quantity = sellQuantity;
           }
         }
@@ -1421,7 +1420,7 @@ export function PortfolioFormDialog({
             allocatedAmount: (h.weight / 100) * portfolioValue,
             leftoverAmount: 0,
             originalWeight: h.weight,
-            status: h.status || 'Hold'
+            status: (action === 'partial-sell' && h.symbol === originalHolding.symbol) ? 'partial-sell' : (h.status || 'Hold')
           }));
           setHoldings(convertedHoldings);
         } else {
@@ -1457,6 +1456,34 @@ export function PortfolioFormDialog({
           }
         }
         
+        // Update status in database for partial sells
+        if (action === 'partial-sell') {
+          try {
+            await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminToken}`,
+              },
+              body: JSON.stringify({
+                stockAction: "update",
+                holdings: [{
+                  symbol: originalHolding.symbol,
+                  status: 'partial-sell',
+                  buyPrice: originalHolding.buyPrice || 1,
+                  quantity: originalHolding.quantity || 1,
+                  minimumInvestmentValueStock: originalHolding.minimumInvestmentValueStock || 1,
+                  weight: originalHolding.weight,
+                  sector: originalHolding.sector,
+                  stockCapType: originalHolding.stockCapType || 'large cap'
+                }]
+              })
+            });
+          } catch (error) {
+            console.error('Failed to update status:', error);
+          }
+        }
+        
         setEditingHolding(null);
         
         // Don't close dialog, just refresh data
@@ -1485,6 +1512,7 @@ export function PortfolioFormDialog({
         }
         
         // Update status in backend
+        console.log('Updating holding status to:', status);
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
           method: 'PATCH',
           headers: {
