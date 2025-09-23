@@ -9,9 +9,9 @@ import { CacheProvider } from "@/components/cache-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "Stock Admin Panel",
+  title: "Rangaone Admin",
   description: "Admin panel for stock management system",
-    generator: 'v0.dev'
+    generator: 'Liquidata'
 }
 
 export default function RootLayout({
