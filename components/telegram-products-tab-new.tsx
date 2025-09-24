@@ -493,7 +493,7 @@ export function ProductsTab() {
       )}
 
                     {/* Products Table */}
-        <div className="border rounded-lg">
+        <div className="border rounded-lg overflow-x-auto">
           {products.length > 0 && (
             <div className="p-4 border-b bg-green-50">
               <div className="flex items-center space-x-2">
@@ -507,11 +507,11 @@ export function ProductsTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product Details</TableHead>
-                <TableHead>Price & Category</TableHead>
-                <TableHead>Group Mapping</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="min-w-[200px]">Product Details</TableHead>
+                <TableHead className="min-w-[120px]">Price & Category</TableHead>
+                <TableHead className="min-w-[150px]">Group Mapping</TableHead>
+                <TableHead className="min-w-[100px]">Created</TableHead>
+                <TableHead className="min-w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
                        <TableBody>
@@ -532,10 +532,12 @@ export function ProductsTab() {
                   <TableRow key={product.id}>
                     {/* Product Details */}
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">{product.description}</div>
-                        <div className="text-xs text-blue-600 mt-1">
+                      <div className="max-w-[200px]">
+                        <div className="font-medium truncate" title={product.name}>{product.name}</div>
+                        <div className="text-sm text-muted-foreground line-clamp-2" title={product.description}>
+                          {product.description}
+                        </div>
+                        <div className="text-xs text-blue-600 mt-1 truncate">
                           ID: {product.id}
                         </div>
                       </div>
