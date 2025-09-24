@@ -294,16 +294,16 @@ export function MappingTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-
-                <TableHead>Group</TableHead>
-                <TableHead>Mapped Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[200px]">Product</TableHead>
+                  <TableHead className="min-w-[150px]">Group</TableHead>
+                  <TableHead className="min-w-[100px]">Mapped Date</TableHead>
+                  <TableHead className="min-w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {mappedProducts.length === 0 ? (
                 <TableRow>
@@ -315,9 +315,9 @@ export function MappingTab() {
                 mappedProducts.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-muted-foreground">{product.description}</div>
+                        <div className="max-w-[200px]">
+                          <div className="font-medium truncate" title={product.name}>{product.name}</div>
+                          <div className="text-sm text-muted-foreground line-clamp-2" title={product.description}>{product.description}</div>
                         </div>
                       </TableCell>
 
@@ -350,7 +350,8 @@ export function MappingTab() {
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -367,20 +368,21 @@ export function MappingTab() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                                     <TableHead>Product</TableHead>
-                   <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">Product</TableHead>
+                    <TableHead className="min-w-[100px]">Created</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {unmappedProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">{product.description}</div>
+                      <div className="max-w-[200px]">
+                        <div className="font-medium truncate" title={product.name}>{product.name}</div>
+                        <div className="text-sm text-muted-foreground line-clamp-2" title={product.description}>{product.description}</div>
                       </div>
                     </TableCell>
                     
@@ -390,7 +392,8 @@ export function MappingTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

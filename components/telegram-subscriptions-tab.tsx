@@ -398,15 +398,16 @@ export function SubscriptionsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead>Invite Link</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="min-w-[150px]">User</TableHead>
+                <TableHead className="min-w-[200px]">Product</TableHead>
+                <TableHead className="min-w-[120px]">Status</TableHead>
+                <TableHead className="min-w-[120px]">Expires</TableHead>
+                <TableHead className="min-w-[100px]">Invite Link</TableHead>
+                <TableHead className="min-w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -426,9 +427,9 @@ export function SubscriptionsTab() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{getProductName(subscription.product_id)}</div>
-                        <div className="text-sm text-muted-foreground">
+                      <div className="max-w-[200px]">
+                        <div className="font-medium truncate" title={getProductName(subscription.product_id)}>{getProductName(subscription.product_id)}</div>
+                        <div className="text-sm text-muted-foreground truncate">
                           Product ID: {subscription.product_id}
                         </div>
                       </div>
@@ -480,7 +481,8 @@ export function SubscriptionsTab() {
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
 
           {/* Pagination */}
           {subscriptionsData && subscriptionsData.pages > 1 && (
@@ -588,17 +590,18 @@ export function SubscriptionsTab() {
           ) : !joinedUsers || joinedUsers.length === 0 ? (
             <div className="text-sm text-muted-foreground">No joined users found. Click refresh to load.</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Group</TableHead>
-                  <TableHead>Telegram</TableHead>
-                  <TableHead>Subscription</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px]">User</TableHead>
+                    <TableHead className="min-w-[150px]">Product</TableHead>
+                    <TableHead className="min-w-[150px]">Group</TableHead>
+                    <TableHead className="min-w-[100px]">Telegram</TableHead>
+                    <TableHead className="min-w-[120px]">Subscription</TableHead>
+                    <TableHead className="min-w-[150px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {joinedUsers.map((row, idx) => (
                   <TableRow key={idx}>
@@ -649,7 +652,8 @@ export function SubscriptionsTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

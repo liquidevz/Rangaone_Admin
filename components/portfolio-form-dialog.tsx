@@ -1456,8 +1456,8 @@ export function PortfolioFormDialog({
           }
         }
         
-        // Update status in database for partial sells
-        if (action === 'partial-sell') {
+        // Update status in database for partial sells with correct remaining quantity
+        if (action === 'partial-sell' && pnlPreview) {
           try {
             await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/portfolios/${initialData.id}`, {
               method: 'PATCH',
@@ -1471,9 +1471,9 @@ export function PortfolioFormDialog({
                   symbol: originalHolding.symbol,
                   status: 'partial-sell',
                   buyPrice: originalHolding.buyPrice || 1,
-                  quantity: originalHolding.quantity || 1,
-                  minimumInvestmentValueStock: originalHolding.minimumInvestmentValueStock || 1,
-                  weight: originalHolding.weight,
+                  quantity: pnlPreview.remainingQuantity,
+                  minimumInvestmentValueStock: pnlPreview.remainingValue,
+                  weight: editingHolding.newWeight,
                   sector: originalHolding.sector,
                   stockCapType: originalHolding.stockCapType || 'large cap'
                 }]
