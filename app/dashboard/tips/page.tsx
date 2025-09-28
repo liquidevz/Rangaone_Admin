@@ -140,6 +140,7 @@ export default function TipsManagementPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [horizonFilter, setHorizonFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -212,6 +213,11 @@ export default function TipsManagementPage() {
       filtered = filtered.filter((tip) => tip.category === categoryFilter);
     }
 
+    // Filter by horizon
+    if (horizonFilter !== "all") {
+      filtered = filtered.filter((tip) => tip.horizon?.trim() === horizonFilter);
+    }
+
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -232,9 +238,10 @@ export default function TipsManagementPage() {
     if (statusFilter !== "all") count++;
     if (actionFilter !== "all") count++;
     if (categoryFilter !== "all") count++;
+    if (horizonFilter !== "all") count++;
     if (searchQuery) count++;
     setActiveFiltersCount(count);
-  }, [allTips, portfolioFilter, statusFilter, actionFilter, categoryFilter, searchQuery]);
+  }, [allTips, portfolioFilter, statusFilter, actionFilter, categoryFilter, horizonFilter, searchQuery]);
 
   const handleCreateTip = async (tipData: CreateTipRequest) => {
     try {
@@ -444,6 +451,7 @@ export default function TipsManagementPage() {
     setStatusFilter("all");
     setActionFilter("all");
     setCategoryFilter("all");
+    setHorizonFilter("all");
     setSearchQuery("");
   };
 
@@ -780,6 +788,22 @@ export default function TipsManagementPage() {
             </Select>
           </div>
 
+          {/* Horizon Filter */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Horizon</label>
+            <Select value={horizonFilter} onValueChange={setHorizonFilter}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Select horizon" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Horizons</SelectItem>
+                <SelectItem value="Short Term">Short Term</SelectItem>
+                <SelectItem value="Swing">Swing</SelectItem>
+                <SelectItem value="Long Term">Long Term</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Clear Filters */}
           {activeFiltersCount > 0 && (
             <div className="pt-2">
@@ -816,7 +840,7 @@ export default function TipsManagementPage() {
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-4">
         <Card className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
             {/* Search */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Search</label>
@@ -895,6 +919,22 @@ export default function TipsManagementPage() {
                   <SelectItem value="basic">Basic</SelectItem>
                   <SelectItem value="premium">Premium</SelectItem>
                   <SelectItem value="social_media">Social Media</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Horizon Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Horizon</label>
+              <Select value={horizonFilter} onValueChange={setHorizonFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select horizon" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Horizons</SelectItem>
+                  <SelectItem value="Short Term">Short Term</SelectItem>
+                  <SelectItem value="Swing">Swing</SelectItem>
+                  <SelectItem value="Long Term">Long Term</SelectItem>
                 </SelectContent>
               </Select>
             </div>

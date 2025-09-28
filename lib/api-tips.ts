@@ -119,11 +119,15 @@ export const updateTip = async (
       throw new Error("Invalid tip ID");
     }
 
-
+    // Normalize horizon field to remove extra spaces
+    const processedTipData = {
+      ...tipData,
+      horizon: tipData.horizon?.trim() || "Long Term"
+    };
 
     const response = await fetchWithAuth(`${API_BASE_URL}/api/tips/${id}`, {
       method: "PUT",
-      body: JSON.stringify(tipData),
+      body: JSON.stringify(processedTipData),
     });
 
     if (!response.ok) {
@@ -205,7 +209,7 @@ export const createTip = async (
     const processedTipData = {
       ...tipData,
       status: tipData.status || "Active",
-      horizon: tipData.horizon || "Long Term",
+      horizon: tipData.horizon?.trim() || "Long Term",
     };
 
     const response = await fetchWithAuth(
@@ -365,7 +369,7 @@ export const createGeneralTip = async (
     const processedTipData = {
       ...tipData,
       status: tipData.status || "Active",
-      horizon: tipData.horizon || "Long Term",
+      horizon: tipData.horizon?.trim() || "Long Term",
       downloadLinks: tipData.downloadLinks?.filter(link => link.name?.trim() && link.url?.trim()) || [],
     };
 

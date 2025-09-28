@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     const processedTipData = {
       ...tipData,
       status: tipData.status || "Active",
-      horizon: tipData.horizon || "Long Term",
+      horizon: tipData.horizon?.trim() || "Long Term",
       // Handle both spellings of the confidence field
       analysistConfidence: tipData.analysistConfidence || 5,
       downloadLinks: tipData.downloadLinks?.filter(link => link.name?.trim() && link.url?.trim()) || [],

@@ -92,6 +92,11 @@ export async function PUT(
       body.content = [{ key: "main", value: body.content }];
     }
 
+    // Normalize horizon field
+    if (body.horizon) {
+      body.horizon = body.horizon.trim();
+    }
+
     // TODO: In a real implementation, update the tip in your database
     // For now, return the updated data for testing
     return NextResponse.json({
