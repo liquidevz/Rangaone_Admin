@@ -193,11 +193,12 @@ export function TipFormDialog({
 
   // Conditional field display logic
   const showTargetFields = watchedAction === "buy" || watchedAction === "sell";
+  const showAddMoreField = watchedAction === "buy";
   const showClosedTipFields = watchedStatus === "Closed";
 
-  // Auto-calculate target/exit percentage
+  // Auto-calculate target/exit percentage (but not for closed tips)
   React.useEffect(() => {
-    if (isAutoCalcTarget && selectedStockDetails && watchedTargetPrice) {
+    if (isAutoCalcTarget && selectedStockDetails && watchedTargetPrice && watchedStatus !== "Closed") {
       const currentPrice = parseFloat(selectedStockDetails.currentPrice);
       const targetPrice = parseFloat(watchedTargetPrice);
       
@@ -213,7 +214,7 @@ export function TipFormDialog({
         setValue("targetPercentage", `${percentage}%`);
       }
     }
-  }, [watchedTargetPrice, selectedStockDetails, isAutoCalcTarget, setValue, watchedAction]);
+  }, [watchedTargetPrice, selectedStockDetails, isAutoCalcTarget, setValue, watchedAction, watchedStatus]);
 
   // Auto-calculate exit percentage
   React.useEffect(() => {
@@ -863,7 +864,7 @@ export function TipFormDialog({
                             <Input
                               placeholder={watchedStatus === "Closed" ? "e.g., 150-200 or 25-30%" : watchedAction === "sell" ? "e.g., 25% or 25" : "e.g., 25% or 25"}
                               {...field}
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || (watchedStatus !== "Closed" && isAutoCalcTarget)}
                             />
                           </FormControl>
                           <FormDescription className="text-xs">
@@ -878,13 +879,31 @@ export function TipFormDialog({
                     />
                   </div>
 
-
+                  {/* Add More At field - Show for buy action */}
+                  {showAddMoreField && (
+                    <FormField
+                      control={control}
+                      name="addMoreAt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Add More At Range (₹)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 90-95 or 90.50-95.75"
+                              {...field}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                            Price range to add more shares (format: min-max)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               )}
-
-
-
-
 
               {/* Status and Horizon */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
