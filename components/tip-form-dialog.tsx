@@ -190,44 +190,65 @@ export function TipFormDialog({
   const watchedStatus = watch("status");
   const watchedTargetPrice = watch("targetPrice");
   const watchedExitPrice = watch("exitPrice");
+  const watchedBuyRange = watch("buyRange");
 
   // Conditional field display logic
   const showTargetFields = watchedAction === "buy" || watchedAction === "sell";
   const showAddMoreField = watchedAction === "buy";
   const showClosedTipFields = watchedStatus === "Closed";
 
-  // Auto-calculate target/exit percentage (but not for closed tips)
+  // Auto-calculate target/exit percentage using buy range average (but not for closed tips)
   React.useEffect(() => {
-    if (isAutoCalcTarget && selectedStockDetails && watchedTargetPrice && watchedStatus !== "Closed") {
-      const currentPrice = parseFloat(selectedStockDetails.currentPrice);
+    if (isAutoCalcTarget && watchedTargetPrice && watchedStatus !== "Closed") {
       const targetPrice = parseFloat(watchedTargetPrice);
+      const buyRange = watch("buyRange");
       
-      if (currentPrice > 0 && targetPrice > 0) {
-        let percentage;
-        if (watchedAction === "sell") {
-          // For sell action, calculate exit percentage (how much to sell at)
-          percentage = ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
-        } else {
-          // For buy action, calculate target percentage (expected returns)
-          percentage = ((targetPrice - currentPrice) / currentPrice * 100).toFixed(2);
+      if (buyRange && targetPrice > 0) {
+        // Calculate buy range average
+        const rangeMatch = buyRange.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
+        if (rangeMatch) {
+          const minPrice = parseFloat(rangeMatch[1]);
+          const maxPrice = parseFloat(rangeMatch[2]);
+          const avgBuyPrice = (minPrice + maxPrice) / 2;
+          
+          if (avgBuyPrice > 0) {
+            let percentage;
+            if (watchedAction === "sell") {
+              // For sell action, calculate exit percentage (how much to sell at)
+              percentage = ((targetPrice - avgBuyPrice) / avgBuyPrice * 100).toFixed(2);
+            } else {
+              // For buy action, calculate target percentage (expected returns)
+              percentage = ((targetPrice - avgBuyPrice) / avgBuyPrice * 100).toFixed(2);
+            }
+            setValue("targetPercentage", `${percentage}%`);
+          }
         }
-        setValue("targetPercentage", `${percentage}%`);
       }
     }
-  }, [watchedTargetPrice, selectedStockDetails, isAutoCalcTarget, setValue, watchedAction, watchedStatus]);
+  }, [watchedTargetPrice, watch("buyRange"), isAutoCalcTarget, setValue, watchedAction, watchedStatus, watch]);
 
-  // Auto-calculate exit percentage
+  // Auto-calculate exit percentage using buy range average
   React.useEffect(() => {
-    if (isAutoCalcExit && selectedStockDetails && watchedExitPrice) {
-      const currentPrice = parseFloat(selectedStockDetails.currentPrice);
+    if (isAutoCalcExit && watchedExitPrice) {
       const exitPrice = parseFloat(watchedExitPrice);
+      const buyRange = watch("buyRange");
       
-      if (currentPrice > 0 && exitPrice > 0) {
-        const percentage = ((exitPrice - currentPrice) / currentPrice * 100).toFixed(2);
-        setValue("exitStatusPercentage", `${percentage}%`);
+      if (buyRange && exitPrice > 0) {
+        // Calculate buy range average
+        const rangeMatch = buyRange.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
+        if (rangeMatch) {
+          const minPrice = parseFloat(rangeMatch[1]);
+          const maxPrice = parseFloat(rangeMatch[2]);
+          const avgBuyPrice = (minPrice + maxPrice) / 2;
+          
+          if (avgBuyPrice > 0) {
+            const percentage = ((exitPrice - avgBuyPrice) / avgBuyPrice * 100).toFixed(2);
+            setValue("exitStatusPercentage", `${percentage}%`);
+          }
+        }
       }
     }
-  }, [watchedExitPrice, selectedStockDetails, isAutoCalcExit, setValue]);
+  }, [watchedExitPrice, watch("buyRange"), isAutoCalcExit, setValue, watch]);
 
   // Reset form when dialog opens/closes or initial data changes
   React.useEffect(() => {
@@ -857,8 +878,20 @@ export function TipFormDialog({
                   name="targetPercentage"
                   render={({ field }) => (
                     <FormItem>
-                          <FormLabel className="text-sm">
+                          <FormLabel className="text-sm flex items-center gap-2">
                             {watchedStatus === "Closed" ? "Exit Range" : watchedAction === "sell" ? "Exit Percentage" : "Target Percentage"}
+                            {watchedStatus !== "Closed" && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => setIsAutoCalcTarget(!isAutoCalcTarget)}
+                              >
+                                <Calculator className="h-3 w-3 mr-1" />
+                                {isAutoCalcTarget ? "Manual" : "Auto"}
+                              </Button>
+                            )}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -870,7 +903,9 @@ export function TipFormDialog({
                           <FormDescription className="text-xs">
                             {watchedStatus === "Closed" 
                               ? "Enter exit range manually (e.g., 150-200 or 25-30%)"
-                              : "Enter percentage manually"
+                              : isAutoCalcTarget 
+                                ? "Auto-calculated from buy range average and target price"
+                                : "Enter percentage manually"
                             }
                           </FormDescription>
                           <FormMessage />
@@ -953,51 +988,92 @@ export function TipFormDialog({
                 />
               </div>
 
-              {/* Exit Status and Percentage for Closed Tips */}
+              {/* Exit Price and Status for Closed Tips */}
               {showClosedTipFields && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <FormField
                     control={control}
-                    name="exitStatus"
+                    name="exitPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm">Exit Status</FormLabel>
-                        <FormControl>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select exit status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Loss Booked">Loss Booked</SelectItem>
-                              <SelectItem value="Profit Booked">Profit Booked</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={control}
-                    name="exitStatusPercentage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Exit Status Percentage</FormLabel>
+                        <FormLabel className="text-sm">Exit Price (₹)</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="e.g., 25% or -15%"
+                            placeholder="e.g., 150.75"
+                            type="number"
+                            step="0.01"
+                            min="0"
                             {...field}
                             disabled={isSubmitting}
                           />
                         </FormControl>
                         <FormDescription className="text-xs">
-                          Enter percentage gain/loss (positive for profit, negative for loss)
+                          Price at which the position was closed
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={control}
+                      name="exitStatus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Exit Status</FormLabel>
+                          <FormControl>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select exit status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Loss Booked">Loss Booked</SelectItem>
+                                <SelectItem value="Profit Booked">Profit Booked</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={control}
+                      name="exitStatusPercentage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm flex items-center gap-2">
+                            Exit Status Percentage
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => setIsAutoCalcExit(!isAutoCalcExit)}
+                            >
+                              <Calculator className="h-3 w-3 mr-1" />
+                              {isAutoCalcExit ? "Manual" : "Auto"}
+                            </Button>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 25% or -15%"
+                              {...field}
+                              disabled={isSubmitting || isAutoCalcExit}
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                            {isAutoCalcExit 
+                              ? "Auto-calculated from buy range average and exit price"
+                              : "Enter percentage gain/loss manually (positive for profit, negative for loss)"
+                            }
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               )}
 
