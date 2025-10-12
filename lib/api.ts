@@ -493,8 +493,80 @@ export const testSmtpConfig = async (to: string): Promise<{ success: boolean; me
 // SUBSCRIPTION API FUNCTIONS
 // =================================================================
 
+// Admin Subscription Types
+export interface AdminSubscription {
+  _id: string;
+  productName: string;
+  bundleName?: string;
+  productType: "Bundle" | "Portfolio";
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  paymentType: "Emandate" | "OneTime";
+  amount: number;
+  creationDate: string;
+  discount: number;
+  couponCode?: string;
+  paymentStatus: "active" | "expired" | "cancelled" | "pending";
+  planType: "monthly" | "quarterly" | "yearly";
+  category: "basic" | "premium";
+  razorpaySubscriptionId?: string;
+  lastPaymentAt?: string;
+  isRenewal: boolean;
+  compensationDays: number;
+  latestPayment?: {
+    paymentId: string;
+    orderId: string;
+    amount: number;
+    status: string;
+    createdAt: string;
+  };
+}
+
 /**
- * Fetches all user subscriptions (admin).
+ * Fetches all admin subscriptions with full details.
+ */
+export const fetchAdminSubscriptions = async (): Promise<AdminSubscription[]> => {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/subscriptions`);
+  if (!response.ok) throw new Error((await response.json()).message || "Failed to fetch admin subscriptions");
+  const data = await response.json();
+  return data?.subscriptions || [];
+};
+
+/**
+ * Fetches a single admin subscription by ID with full details.
+ */
+export const fetchAdminSubscriptionById = async (id: string): Promise<any> => {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/subscriptions/${id}`);
+  if (!response.ok) throw new Error((await response.json()).message || "Failed to fetch subscription");
+  const data = await response.json();
+  return data?.subscription;
+};
+
+/**
+ * Deletes an admin subscription by ID.
+ */
+export const deleteAdminSubscription = async (id: string): Promise<{ message: string }> => {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/subscriptions/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error((await response.json()).message || "Failed to delete subscription");
+  return await response.json();
+};
+
+/**
+ * Processes expired subscriptions.
+ */
+export const processExpiredSubscriptions = async (): Promise<{ message: string; result: any }> => {
+  const response = await fetchWithAuth(`${API_BASE_URL}/admin/subscriptions/process-expired`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error((await response.json()).message || "Failed to process expired subscriptions");
+  return await response.json();
+};
+
+/**
+ * Fetches all user subscriptions (admin) - legacy function.
  */
 export const fetchSubscriptions = async (): Promise<Subscription[]> => {
   const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/subscriptions`);
