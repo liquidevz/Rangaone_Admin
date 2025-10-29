@@ -73,6 +73,7 @@ export interface Tip {
   action?: string;
   buyRange?: string;
   addMoreAt?: string;
+  exitPrice?: string;
   weightage?: string;
   mpWeightage?: string;
   description: string;
@@ -91,6 +92,7 @@ export interface CreateTipRequest {
   action?: string;
   buyRange?: string;
   addMoreAt?: string;
+  exitPrice?: string;
   horizon?: string;
   downloadLinks?: Array<{ name: string; url: string }>;
   portfolioId?: string; // Ensure tip is associated with the correct portfolio
@@ -297,7 +299,7 @@ export function PortfolioTipDialog({
           action: initialData.action || "",
           buyRange: initialData.buyRange || "",
           addMoreAt: initialData.addMoreAt || "",
-          exitPrice: (initialData as any).exitPrice || "",
+          exitPrice: initialData.exitPrice || "",
           mpWeightage: parseFloat(initialData.mpWeightage || initialData.weightage || "0") || 0,
           description: initialData.description || ((initialData as any).content?.[0]?.value ?? ""),
           pdfLink: (initialData as any).tipUrl || "",
@@ -312,7 +314,7 @@ export function PortfolioTipDialog({
             action: initialData.action || "",
             buyRange: initialData.buyRange || "",
             addMoreAt: initialData.addMoreAt || "",
-            exitPrice: (initialData as any).exitPrice || "",
+            exitPrice: initialData.exitPrice || "",
             mpWeightage: parseFloat(initialData.mpWeightage || initialData.weightage || "0") || 0,
             description: initialData.description || ((initialData as any).content?.[0]?.value ?? ""),
             pdfLink: (initialData as any).tipUrl || "",
@@ -664,6 +666,7 @@ export function PortfolioTipDialog({
                 action: data.action,
                 buyRange: data.buyRange,
                 addMoreAt: data.addMoreAt,
+                exitPrice: data.exitPrice,
                 horizon: "Long Term" as const,
                 tipUrl: data.pdfLink,
                 analysistConfidence: 5, // Default confidence score
