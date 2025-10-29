@@ -63,7 +63,7 @@ export function RichTextEditor({
   }
 
   return (
-    <div className={cn("tinymce-wrapper relative", className)} style={{ zIndex: 1 }}>
+    <div className={cn("tinymce-wrapper relative", className)} style={{ zIndex: 1 }} onClick={(e) => e.stopPropagation()}>
       <Editor
         key={key}
         apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY}
@@ -114,11 +114,21 @@ export function RichTextEditor({
                   pointer-events: auto !important;
                   cursor: pointer !important;
                 }
+                .tox-tinymce-aux {
+                  z-index: 99999 !important;
+                }
               `;
               document.head.appendChild(style);
             });
             
-
+            // Prevent dialog from closing when clicking on TinyMCE dropdowns
+            editor.on('OpenWindow', (e) => {
+              e.stopPropagation();
+            });
+            
+            editor.on('CloseWindow', (e) => {
+              e.stopPropagation();
+            });
           }
         }}
       />

@@ -254,7 +254,7 @@ export function PortfolioTipDialog({
         return [...common, "buyRange", "addMoreAt", "weightage"];
       case "SELL":
       case "COMPLETE SELL":
-        return [...common, "exitPrice"];
+        return [...common, "exitPrice", "weightage"];
       case "PARTIAL SELL":
         return [...common, "buyRange", "exitPrice", "weightage"];
       case "PARTIAL PROFIT":
@@ -580,7 +580,17 @@ export function PortfolioTipDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      // Prevent closing if clicking on TinyMCE elements
+      const tinyMCEElements = document.querySelectorAll('.tox, .tox-collection, .tox-menu, .tox-tinymce-aux');
+      const isClickingTinyMCE = Array.from(tinyMCEElements).some(el => el.contains(document.activeElement));
+      
+      if (!newOpen && isClickingTinyMCE) {
+        return; // Don't close the dialog
+      }
+      
+      onOpenChange(newOpen);
+    }}>
       <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
         <DialogHeader>
           <DialogTitle className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
