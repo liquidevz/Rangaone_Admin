@@ -51,7 +51,7 @@ const stockSymbolSchema = z.object({
   symbol: z.string()
     .min(1, "Symbol is required")
     .max(20, "Symbol must be 20 characters or less")
-    .regex(/^[A-Z0-9.-]+$/, "Symbol can only contain uppercase letters, numbers, dots, and dashes"),
+    .transform(val => val.toUpperCase()),
   name: z.string()
     .min(1, "Company name is required")
     .max(200, "Company name must be 200 characters or less"),
@@ -382,7 +382,6 @@ export function StockSymbolFormDialog({
                         {...field}
                         disabled={isSubmitting || mode === "edit" || isLiveData}
                         className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 uppercase font-mono"
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                       />
                     </FormControl>
                     {isLiveData && (
