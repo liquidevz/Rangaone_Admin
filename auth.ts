@@ -1,19 +1,16 @@
-// lib\auth-config.ts  
-import { AuthOptions, DefaultSession } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { API_BASE_URL } from "./auth";
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import { API_BASE_URL } from "./lib/auth";
 
-// Extend the built-in session types
 declare module "next-auth" {
-  interface Session extends DefaultSession {
+  interface Session {
     accessToken?: string;
     user: {
       id: string;
       email: string;
       name?: string;
       role?: string;
-      token?: string;
-    } & DefaultSession["user"];
+    };
   }
 
   interface User {
@@ -25,10 +22,21 @@ declare module "next-auth" {
   }
 }
 
-export const authOptions: AuthOptions = {
+declare module "@auth/core/jwt" {
+  interface JWT {
+    accessToken?: string;
+    user?: {
+      id: string;
+      email: string;
+      name?: string;
+      role?: string;
+    };
+  }
+}
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
-    CredentialsProvider({
-      name: "Credentials",
+    Credentials({
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" }
@@ -82,12 +90,12 @@ export const authOptions: AuthOptions = {
       }
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }) {
       if (token.user) {
-        session.user = token.user;
-        session.accessToken = token.accessToken;
+        session.user = token.user as any;
+        session.accessToken = token.accessToken as string;
       }
       return session;
     },
   },
-}; 
+});
